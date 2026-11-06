@@ -1,0 +1,116 @@
+.compact {
+  height: var(--day-card-height, 112px);
+  min-width: 0;
+  padding: 10px 13px;
+  gap: 4px;
+  isolation: isolate;
+  background-image: linear-gradient(104deg, transparent 58%, var(--daily-card));
+}
+
+.compact::before,
+.overdue::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: -1;
+  width: 24%;
+  border-radius: inherit;
+  pointer-events: none;
+  background: url('/visuals/daily-v2/card-celestial-corner.svg') right -13px bottom -10px / 112%
+    auto no-repeat;
+  opacity: 0.53;
+  mask-image: linear-gradient(to right, transparent, black 55%);
+}
+
+.compact:nth-child(3n + 1)::before {
+  background-image: url('/visuals/daily-v2/ringed-planet.svg');
+  background-position: right -24px bottom -10px;
+  opacity: 0.35;
+}
+
+.compact:nth-child(3n + 2)::before {
+  background-image: url('/visuals/daily-v2/spiral-galaxy.svg');
+  background-position: right -12px bottom -4px;
+}
+
+.compactDescription {
+  min-height: 19px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compactMetadata {
+  flex-wrap: nowrap;
+  gap: 4px 7px;
+  min-width: 0;
+}
+
+.compactDeadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.compactDeadline > span {
+  min-width: 0;
+}
+
+.compactDeadline > span:not(:has(svg)),
+.compactDeadline > span > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.overdueHeader {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  margin-bottom: 8px;
+}
+
+.overdueHeader::before {
+  content: '';
+  position: absolute;
+  inset: -18px 0 -8px;
+  z-index: -1;
+  background: url('/visuals/daily-v2/eclipse-broken-orbit.svg') center 48% / min(54%, 390px) auto
+    no-repeat;
+  mask-image: linear-gradient(to bottom, transparent, black 25% 75%, transparent);
+  pointer-events: none;
+}
+
+.overdue {
+  isolation: isolate;
+  background-image: radial-gradient(
+    ellipse at 91% 94%,
+    color-mix(in srgb, var(--status-overdue) 11%, transparent),
+    transparent 65%
+  );
+}
+
+.overdue::before {
+  width: 29%;
+  background-image: url('/visuals/daily-v2/eclipse-broken-orbit.svg');
+  background-position: left 24% top 5px;
+  background-size: auto 77%;
+  opacity: 0.27;
+}
+
+@media (max-width: 760px) {
+  .compactMetadata {
+    flex-wrap: wrap;
+  }
+  .compactDeadline {
+    flex-basis: 100%;
+  }
+  .overdueHeader::before {
+    background-position: right center;
+    background-size: min(50%, 170px) auto;
+  }
+}

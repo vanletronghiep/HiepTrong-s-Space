@@ -1,0 +1,552 @@
+.workspace {
+  --daily-violet: var(--daily-accent);
+  --daily-duration: 300ms;
+  --daily-ease: cubic-bezier(0.2, 0.7, 0.17, 1);
+  --daily-carousel-bleed: 0px;
+  --daily-sky-gradient:
+    radial-gradient(ellipse at 47% 34%, var(--daily-card) 0%, transparent 62%),
+    linear-gradient(
+      160deg,
+      var(--daily-sky-start),
+      var(--daily-sky-end) 68%,
+      var(--daily-sky-start)
+    );
+}
+
+.sky {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-bg);
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--daily-violet);
+  background: var(--daily-sky-gradient);
+}
+
+.sky > svg,
+.sky > div > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.sky .stars,
+.sky .nebula {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.stars {
+  opacity: 0.63;
+}
+.nebula {
+  opacity: 0.67;
+}
+.clouds {
+  animation: daily-cloud-drift 94s ease-in-out infinite alternate;
+}
+.twinkle {
+  animation: daily-twinkle 6s ease-in-out infinite alternate;
+}
+
+.astrolabe,
+.upperPlanet,
+.sky .constellationLeft,
+.sky .constellationRight,
+.sky .constellationMid {
+  position: absolute;
+  opacity: 0.28;
+}
+.astrolabe {
+  top: calc(clamp(116px, 15.7vw, 252px) * -0.46);
+  left: calc(clamp(116px, 15.7vw, 252px) * -0.54);
+  width: clamp(116px, 15.7vw, 252px);
+  opacity: 0.46;
+}
+.upperPlanet {
+  right: 2.7%;
+  top: 1%;
+  width: clamp(64px, 9vw, 132px);
+  height: 100px;
+  opacity: 0.58;
+  background: url('/visuals/daily-v2/ringed-planet.svg') center top / contain no-repeat;
+}
+.galaxy {
+  position: absolute;
+  inset: -44px auto auto 51%;
+  width: clamp(190px, 25vw, 370px);
+  aspect-ratio: 2;
+  transform: translateX(-50%) rotate(-6deg);
+  opacity: 0.76;
+  background:
+    url('/visuals/daily-v2/spiral-galaxy.svg') center / contain no-repeat,
+    radial-gradient(ellipse, var(--daily-planet), transparent 67%);
+}
+.nebulaBank {
+  position: absolute;
+  inset: auto 0 0;
+  height: clamp(175px, 23vw, 365px);
+  background: url('/visuals/daily-v2/nebula-clouds.svg') center bottom / cover no-repeat;
+  opacity: 0.72;
+}
+.bottomSky {
+  position: absolute;
+  inset: auto 0 0;
+  overflow: visible;
+}
+.sky .constellationLeft {
+  left: 1.1%;
+  top: 27%;
+  width: clamp(49px, 7vw, 115px);
+}
+.sky .constellationRight {
+  right: 1%;
+  top: 12%;
+  width: clamp(60px, 8vw, 120px);
+}
+.sky .constellationMid {
+  right: 0.4%;
+  top: 40%;
+  width: clamp(58px, 7.5vw, 105px);
+}
+.sky[data-paused='true'] :is(.clouds, .twinkle) {
+  animation-play-state: paused;
+}
+
+@keyframes daily-cloud-drift {
+  from {
+    transform: translate(-4px, 0);
+  }
+  to {
+    transform: translate(17px, -10px);
+  }
+}
+@keyframes daily-twinkle {
+  from {
+    opacity: 0.38;
+  }
+  to {
+    opacity: 0.88;
+  }
+}
+
+.workspace .topbar {
+  height: 76px;
+}
+.topbarBackdrop {
+  position: absolute;
+  inset: 0 0 -24px;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--daily-sky-gradient) fixed;
+  mask-image: linear-gradient(to bottom, currentColor 0 calc(100% - 38px), transparent);
+  backdrop-filter: blur(6px);
+  opacity: calc(var(--daily-topbar-opacity, 0) * 0.94);
+  transition: opacity 120ms ease-out;
+}
+.workspace .main {
+  padding-top: 8px;
+  padding-bottom: 140px;
+}
+.frame {
+  max-width: var(--max-content);
+}
+.modeStage {
+  position: relative;
+  overflow: clip;
+  margin-inline: calc(-1 * var(--daily-carousel-bleed));
+  transition: height var(--daily-duration) var(--daily-ease);
+}
+.modeContent {
+  position: relative;
+  display: flow-root;
+  padding-inline: var(--daily-carousel-bleed);
+}
+.modePanel[data-present='true'] {
+  position: relative;
+  z-index: 1;
+  animation: daily-mode-in 210ms var(--daily-ease) both;
+}
+.modePanel[data-present='false'] {
+  position: absolute;
+  inset: 0 var(--daily-carousel-bleed) auto;
+  pointer-events: none;
+}
+@keyframes daily-mode-in {
+  from {
+    opacity: 0.48;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.datePill {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 35px;
+  padding-inline: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--daily-pill);
+  color: var(--ws-text);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.datePill svg {
+  color: var(--daily-violet);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.titleRow h1 {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: clamp(29px, 3.1vw, 45px);
+  line-height: 1.04;
+  font-weight: 600;
+}
+.titleRow h1 svg {
+  color: var(--daily-violet);
+  margin-top: 1px;
+}
+.titleActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.titleActions > div {
+  max-width: 100%;
+}
+
+.dashboard {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+.topCards {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 3fr);
+  gap: 15px;
+}
+.forecast,
+.progress,
+.arc {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid var(--daily-card-line);
+  background:
+    radial-gradient(ellipse at 95% 100%, var(--daily-pill), transparent 54%),
+    linear-gradient(135deg, var(--ws-surface), var(--daily-card));
+  box-shadow:
+    inset 0 0 0 1px var(--ws-surface),
+    var(--shadow-task);
+  border-radius: var(--radius-card);
+}
+.forecast::before,
+.progress::before,
+.arc::before,
+.arc::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-repeat: no-repeat;
+}
+.forecast::before {
+  background-image: url('/visuals/daily-v2/nebula-clouds.svg');
+  background-position: right bottom;
+  background-size: min(440px, 100%) auto;
+  opacity: 0.54;
+  mask-image: linear-gradient(to right, transparent 37%, black 88%);
+}
+.progress::before {
+  background-image: url('/visuals/daily-v2/card-celestial-corner.svg');
+  background-position: right -13px bottom -21px;
+  background-size: 158px auto;
+  opacity: 0.6;
+}
+.forecast,
+.progress {
+  min-height: 80px;
+  padding: 11px 20px;
+}
+.forecast {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) clamp(20px, 4vw, 64px);
+  align-items: center;
+  column-gap: 10px;
+}
+.forecastStar {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid var(--daily-card-line);
+  border-radius: 50%;
+  outline: 1px dashed var(--daily-arc-line);
+  outline-offset: -5px;
+  background: radial-gradient(var(--ws-surface) 20%, var(--daily-pill));
+  color: var(--daily-violet);
+}
+.forecastPlanet {
+  width: 100%;
+  color: var(--daily-violet);
+  opacity: 0.52;
+}
+.forecast p {
+  font-size: var(--fs-ui);
+  line-height: 1.42;
+  margin-top: 3px;
+}
+.eyebrow {
+  color: var(--daily-heading-accent);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.075em;
+  font-variant-caps: all-small-caps;
+}
+.progress {
+  display: grid;
+  align-content: center;
+  row-gap: 6px;
+}
+.progressHeader,
+.arcHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.progressValue,
+.progressNote {
+  display: grid;
+  font-variant-numeric: tabular-nums;
+}
+.progressValue > *,
+.progressNote > * {
+  grid-area: 1 / 1;
+}
+.progressValue {
+  text-align: right;
+  line-height: 1.2;
+  min-height: 1.2em;
+}
+.progressNote {
+  color: var(--ws-text-muted);
+  font-size: var(--fs-small);
+  min-height: 1.5em;
+}
+.progressTrack {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--daily-pill);
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--daily-violet);
+  transform-origin: left;
+  transition: transform var(--daily-duration) var(--daily-ease);
+}
+.arc {
+  min-height: 123px;
+  padding: 12px 19px 7px;
+}
+.arc::before {
+  background-image: url('/visuals/daily-v2/day-arc-decoration.svg');
+  background-position: center bottom -24px;
+  background-size: 102% 120px;
+  opacity: 0.9;
+}
+.arc::after {
+  background-image: url('/visuals/daily-v2/moon-phase-divider.svg');
+  background-position: center top 5px;
+  background-size: clamp(125px, 19%, 240px) auto;
+  opacity: 0.56;
+}
+.arcHeader {
+  flex-wrap: wrap;
+  gap: 5px 14px;
+}
+.clock {
+  display: inline-flex;
+  flex-wrap: wrap;
+  column-gap: 4px;
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--ws-text-muted);
+}
+.clock time {
+  min-width: 5ch;
+  font-weight: 700;
+  color: var(--ws-text);
+}
+.timeline {
+  position: relative;
+  height: 65px;
+  margin-inline: clamp(12px, 2.5vw, 36px);
+  margin-top: 1px;
+  margin-bottom: 18px;
+}
+.arcPath {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.arcElapsed {
+  transition: clip-path 1s linear;
+}
+.moon,
+.deadlineStar {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.moon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  background: radial-gradient(var(--ws-surface), var(--daily-pill));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--daily-arc-line) 24%, transparent);
+  color: var(--daily-heading-accent);
+  transition:
+    left 1s linear,
+    top 1s linear;
+}
+.moon[data-midnight='true'],
+.arcElapsed[data-midnight='true'] {
+  transition: none;
+}
+.deadlineStar {
+  left: 100%;
+  top: 78%;
+  color: var(--status-overdue);
+}
+.times {
+  position: absolute;
+  inset: calc(100% + 3px) 0 auto;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--ws-text-muted);
+  text-align: center;
+  margin-inline: -12.5%;
+}
+
+@media (min-width: 1024px) {
+  .workspace {
+    --daily-carousel-bleed: min(6vw, 90px);
+  }
+  .frame {
+    width: calc(80% + 2 * var(--gutter-lg));
+  }
+  .workspace .main {
+    padding-bottom: 190px;
+  }
+}
+@media (max-width: 900px) {
+  .topCards {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .workspace .topbar {
+    height: var(--topbar-h);
+  }
+  .workspace .main {
+    padding-top: 20px;
+    padding-bottom: 96px;
+  }
+  .datePill {
+    display: none;
+  }
+  .titleRow {
+    margin-bottom: 18px;
+  }
+  .topCards {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .forecast,
+  .progress {
+    min-height: 74px;
+    padding-inline: 14px;
+  }
+  .forecast {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+  .forecastPlanet {
+    display: none;
+  }
+  .dashboard {
+    gap: 10px;
+  }
+  .arc {
+    padding-inline: 14px;
+  }
+  .timeline {
+    height: 66px;
+    margin-inline: 14px;
+  }
+  .arc::after {
+    background-position: center top 23px;
+    background-size: 130px auto;
+  }
+  .galaxy {
+    left: 64%;
+    top: -14px;
+    opacity: 0.38;
+  }
+  .nebulaBank {
+    opacity: 0.55;
+  }
+  .times {
+    margin-inline: -12%;
+  }
+  .sky .constellationRight,
+  .sky .constellationMid {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modePanel[data-present='true'] {
+    opacity: 1;
+    animation: none;
+  }
+  .modeStage {
+    transition: none;
+  }
+  .clouds,
+  .twinkle {
+    animation: none;
+  }
+  .moon,
+  .arcElapsed,
+  .progressFill {
+    transition: none;
+  }
+  .topbarBackdrop {
+    transition: none;
+  }
+}

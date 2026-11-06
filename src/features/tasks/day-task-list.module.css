@@ -1,0 +1,167 @@
+.list {
+  --day-card-height: 104px;
+  --day-card-gap: 10px;
+  position: relative;
+  min-width: 0;
+}
+
+.list[data-scrollable='true'] {
+  padding-inline-end: 25px;
+}
+
+.viewport {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--day-card-gap);
+  min-width: 0;
+}
+
+.list[data-scrollable='true'] .viewport {
+  block-size: var(--day-list-height, calc(3.5 * var(--day-card-height) + 3 * var(--day-card-gap)));
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+}
+
+.list[data-scrollable='true']:not([data-list-end='true']) .viewport:not(:focus-within) {
+  mask-image: linear-gradient(
+    black 0 calc(100% - var(--day-list-fade, var(--day-card-height) / 2)),
+    transparent
+  );
+}
+
+.viewport > article {
+  flex: none;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.list[data-thumb-dragging='true'] .viewport {
+  scroll-snap-type: none;
+}
+
+.endSpacer {
+  flex: 0 0 var(--day-list-tail, calc(2.5 * var(--day-card-height) + 2 * var(--day-card-gap)));
+  pointer-events: none;
+}
+
+.fade {
+  position: absolute;
+  inset: auto 25px 0 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: var(--day-list-fade, calc(var(--day-card-height) / 2));
+  padding-block-end: 4px;
+  pointer-events: none;
+  transition: opacity var(--dur-fast);
+}
+
+.fade span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ws-text-muted);
+  font-size: var(--fs-micro);
+  opacity: 0.72;
+}
+
+.list[data-list-end='true'] .fade {
+  opacity: 0;
+}
+
+.track {
+  --day-thumb-size: 20px;
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 22px;
+  border-radius: var(--radius-pill);
+  color: var(--ws-accent);
+  touch-action: none;
+  cursor: ns-resize;
+  background: linear-gradient(var(--daily-arc-line), var(--daily-pill)) center / 4px 100% no-repeat;
+}
+
+.constellation {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.thumb {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(var(--day-scroll-progress, 0) * (100% - var(--day-thumb-size)));
+  display: grid;
+  place-items: center;
+  height: var(--day-thumb-size);
+  background: url('/visuals/daily-v2/celestial-scroll-thumb.svg') center / 18px 18px no-repeat;
+  color: var(--daily-heading-accent);
+  filter: drop-shadow(0 0 4px var(--ws-accent));
+  pointer-events: none;
+  transition:
+    filter var(--dur-fast),
+    color var(--dur-fast);
+}
+
+.track:is(:hover, :focus-visible) .thumb,
+.list[data-thumb-dragging='true'] .thumb {
+  color: var(--ws-text);
+  filter: drop-shadow(0 0 7px var(--ws-accent));
+}
+
+.empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  min-height: 192px;
+  text-align: center;
+  color: var(--ws-text-muted);
+  font-size: var(--fs-small);
+}
+
+.emptyArt {
+  width: min(100%, 228px);
+  color: var(--ws-accent);
+  opacity: 0.66;
+}
+
+.emptyArt svg {
+  display: block;
+  width: 100%;
+}
+
+.planet {
+  aspect-ratio: 1.9;
+  background: url('/visuals/daily-v2/orbiting-moon.svg') center / contain no-repeat;
+}
+
+.planet[data-planet='tomorrow'] {
+  background-image: url('/visuals/daily-v2/ringed-planet.svg');
+}
+
+.empty[data-compact='true'] {
+  gap: 4px;
+  min-height: 84px;
+}
+
+.empty[data-compact='true'] .emptyArt {
+  width: min(100%, 86px);
+}
+
+@media (max-width: 760px) {
+  .list {
+    --day-card-height: 132px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade,
+  .thumb {
+    transition: none;
+  }
+}

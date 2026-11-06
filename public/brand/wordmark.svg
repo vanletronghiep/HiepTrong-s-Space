@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 430" fill="none">
+  <title>Hiep Trong Space</title>
+  <desc>
+    Thin geometric lettering with an open triangular A and two luminous four-point glints.
+    Reconstructed from the owner's reference.
+  </desc>
+  <defs>
+    <linearGradient
+      id="letter-ink"
+      x1="40"
+      y1="140"
+      x2="1120"
+      y2="400"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop stop-color="#F4EFFF" />
+      <stop offset=".45" stop-color="#FFFDF5" />
+      <stop offset="1" stop-color="#DCE3F8" />
+    </linearGradient>
+    <linearGradient
+      id="vertical-ray"
+      x1="600"
+      y1="0"
+      x2="600"
+      y2="113"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop stop-color="#A9CFFF" stop-opacity="0" />
+      <stop offset=".44" stop-color="#F4EFFF" stop-opacity=".9" />
+      <stop offset="1" stop-color="#A9CFFF" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient
+      id="horizontal-ray"
+      x1="523"
+      y1="49"
+      x2="677"
+      y2="49"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop stop-color="#A9CFFF" stop-opacity="0" />
+      <stop offset=".5" stop-color="#F4EFFF" />
+      <stop offset="1" stop-color="#A9CFFF" stop-opacity="0" />
+    </linearGradient>
+    <radialGradient id="glint-halo">
+      <stop stop-color="#FFF3D1" stop-opacity=".8" />
+      <stop offset=".2" stop-color="#A9CFFF" stop-opacity=".26" />
+      <stop offset="1" stop-color="#A9CFFF" stop-opacity="0" />
+    </radialGradient>
+    <filter id="soft-light" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="4" />
+    </filter>
+  </defs>
+  <g id="upper-glint" aria-hidden="true">
+    <ellipse cx="600" cy="49" rx="45" ry="44" fill="url(#glint-halo)" />
+    <path d="M600 0V113" stroke="url(#vertical-ray)" stroke-width="1.2" />
+    <path d="M523 49H677" stroke="url(#horizontal-ray)" stroke-width="1.1" />
+    <path
+      d="M600 38Q601 48 611 49Q601 50 600 60Q599 50 589 49Q599 48 600 38Z"
+      fill="#FFFDF5"
+      filter="url(#soft-light)"
+    />
+    <path d="M600 42Q601 48 607 49Q601 50 600 56Q599 50 593 49Q599 48 600 42Z" fill="#FFFDF5" />
+  </g>
+  <g
+    id="name"
+    transform="translate(-38 0)"
+    stroke="url(#letter-ink)"
+    stroke-width="4"
+    stroke-linecap="square"
+    stroke-linejoin="miter"
+    aria-label="Hiep Trong"
+  >
+    <path d="M160 135V181M204 135V181M160 158H204" />
+    <path d="M272 135V181" />
+    <path d="M380 135H342V181H380M342 158H374" />
+    <path d="M450 181V135H472C501 135 501 161 472 161H450" />
+    <path d="M613 135H661M637 135V181" />
+    <path d="M729 181V135H750C779 135 779 160 750 160H729M749 160L775 181" />
+    <path d="M869 135C837 135 837 181 869 181C901 181 901 135 869 135Z" />
+    <path d="M964 181V135L1008 181V135" />
+    <path d="M1115 143C1100 127 1070 134 1070 158C1070 182 1096 189 1115 174V160H1099" />
+  </g>
+  <g
+    id="space"
+    stroke="url(#letter-ink)"
+    stroke-width="7"
+    stroke-linecap="butt"
+    stroke-linejoin="miter"
+    aria-label="Space"
+  >
+    <path d="M216 247C181 224 94 223 83 268C69 324 215 298 216 356C217 409 119 432 60 396" />
+    <path d="M322 413V238H392C490 238 488 325 392 325H322" />
+    <path id="open-a" d="M484 426L600 207L716 426" />
+    <path d="M970 248C937 221 870 225 839 263C809 301 811 356 841 386C875 421 938 425 972 396" />
+    <path d="M1136 238H1035V413H1136M1035 323H1122" />
+  </g>
+  <g id="a-glint" aria-hidden="true">
+    <ellipse cx="600" cy="326" rx="34" ry="45" fill="url(#glint-halo)" opacity=".55" />
+    <path
+      d="M600 290L601.5 323.5L629 326L601.5 328.5L600 363L598.5 328.5L571 326L598.5 323.5Z"
+      fill="#FFF3D1"
+      opacity=".85"
+    />
+    <path
+      d="M600 316Q601 325 610 326Q601 327 600 336Q599 327 590 326Q599 325 600 316Z"
+      fill="#FFFDF5"
+    />
+  </g>
+</svg>

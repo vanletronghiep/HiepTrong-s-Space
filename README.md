@@ -1,0 +1,118 @@
+# Hiep Trong Space
+
+A local-first, single-user personal universe for daily task management, reminders, learning, projects, and ambitions — built for Windows with Next.js (App Router), TypeScript, Tailwind CSS design tokens, TanStack Query, Drizzle ORM, and SQLite.
+
+---
+
+## Quick start (Windows)
+
+### Prerequisites
+- **Node.js** (current LTS or newer) and **npm**
+- **Git**
+
+### 1. Configure environment
+If `.env` does not exist yet, copy `.env.example` to `.env`:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+### 2. Install dependencies & run database migrations
+
+```powershell
+npm install
+npm run db:migrate
+```
+
+*(Note: starting the app also ensures `data/` and SQLite tables are initialised automatically.)*
+
+### 3. Start the local server
+
+```powershell
+npm run dev
+```
+
+Open **http://localhost:3000** in your browser.
+*(If port `3000` is busy, run `npm run dev -- -p 3001`.)*
+
+---
+
+## Available scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the local development server at `http://localhost:3000` |
+| `npm run build` | Build the optimised production bundle |
+| `npm start` | Run the production server after `npm run build` |
+| `npm run check` | Run ESLint (including layer boundaries) + TypeScript + Vitest |
+| `npm run lint` | Run ESLint across `src/` and `tests/` |
+| `npm run typecheck` | Run `tsc --noEmit` (`strict: true`, `noUncheckedIndexedAccess: true`) |
+| `npm test` | Run the deterministic Vitest test suite once |
+| `npm run test:watch` | Run Vitest in watch mode |
+| `npm run format` | Format `src/` and `tests/` with Prettier |
+| `npm run db:generate` | Generate Drizzle SQL migrations under `drizzle/` |
+| `npm run db:migrate` | Apply Drizzle SQL migrations |
+
+---
+
+## Environment variables (`.env`)
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `APP_TIMEZONE` | `Asia/Saigon` | Timezone used for `YYYY-MM-DD` scheduled dates and `DD/MM HH:mm` formatting |
+| `STORAGE_DRIVER` | `local` | Active storage adapter (`local` SQLite + filesystem; `drive` is a future stub) |
+| `DATA_DIR` | `./data` | Local data directory (git-ignored) |
+| `DATABASE_FILE` | `hiep-trong-space.db` | SQLite database filename inside `DATA_DIR` |
+| `MEDIA_DIR` | `./data/media` | Media storage folder inside `DATA_DIR` |
+| `GOOGLE_DRIVE_FOLDER_ID` | *(empty)* | Reserved for a future Google Drive `StorageAdapter` |
+| `SCHEDULER_TICK_SECONDS` | `30` | Interval (seconds) for in-app Due soon / Overdue reminder checks |
+
+---
+
+## Architecture overview
+
+The codebase enforces strict one-way layer boundaries via ESLint (`eslint.config.mjs`):
+
+```text
+UI (src/features, src/ui, src/app pages)
+  ↓
+Client (src/client — typed API wrapper, TanStack Query hooks, UI preferences)
+  ↓ HTTP JSON
+API routes (src/app/api/** — Zod input validation → service call → DTO response)
+  ↓
+Services (src/services — TaskService, NotificationService)
+  ↓ StorageAdapter interface only
+Storage (src/services/storage — local SQLite/filesystem adapter + Google Drive stub)
+```
+
+Shared pure modules:
+- `src/contracts`: Zod schemas and DTO types shared between API and UI.
+- `src/domain`: Pure, React-free and DB-free business rules (`task-status`, `task-sort`, `reminder`, `date-input`, `notification-rules`, `time`, `clock`).
+- `src/design`: Closed-palette CSS variables (`tokens.css`), self-hosted fonts (`Cormorant Garamond` & `Inter`), and motion curves.
+
+### Built surfaces
+- **Homepage (`/`)**: Dark cosmos with a 2D Canvas 3D-perspective starfield, typographic `Wordmark`, `"Let's go"` button, **Feature Collection** (scroll-linked pinned Horizontal gallery and 2-column Vertical grid), and cosmos notification bell.
+- **Daily Task Management (`/tasks/daily`)**: Yesterday / Today / Tomorrow columns (responsive tabs below `1024px`), Week view, Month calendar view with day drawer, Overdue lane with Transfer action, finished counters, and Statistics placeholder drawer.
+- **Tasks Hub (`/tasks/hub`)**: Overdue / Due soon / Later urgency groups, search, priority filter, deadline/priority sort, completed toggle, `?task=<id>` scroll-and-glow highlight, and Daily schedule actions — sharing one database table, one `TaskCard`, and one `TaskForm` with Daily tasks.
+- **Notification Center**: Floating popover anchored to the bell on `/` and inside `WorkspaceShell` (`Ctrl+K` Universe menu), powered by a 30-second server scheduler, 15-second API fallback tick, startup catch-up, live task joins, and 7-day automatic database purge.
+- **Cosmic Launch**: ~3-second 4-phase spacecraft page transition coordinated with destination `<PageReady />` signals (with `<= 300ms` crossfade for `prefers-reduced-motion` and browser Back/Forward).
+- **11 Blank Pages**: `/events`, `/ai-engineering`, `/blogs`, `/apcs`, `/flashcards`, `/entertainment`, `/tracking`, `/projects`, `/milestones`, `/learning-room`, `/achievements`.
+
+---
+
+## Backup & restore (`data/`)
+
+All user data lives inside the git-ignored `data/` folder (`data/hiep-trong-space.db` plus any WAL files and `data/media/`).
+
+### Backup
+1. Stop the running server (`Ctrl+C` in the terminal) so SQLite flushes its write-ahead log cleanly.
+2. Copy the `data/` folder to a timestamped backup directory:
+
+```powershell
+$stamp = Get-Date -Format "yyyy-MM-dd_HHmm"
+Copy-Item -Recurse .\data ".\backups\data_$stamp"
+```
+
+### Restore
+1. Stop the running server (`Ctrl+C`).
+2. Replace `.\data` with your backup copy and restart with `npm run dev`.

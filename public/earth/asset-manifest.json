@@ -1,0 +1,140 @@
+{
+  "generatedAt": "2026-11-03T15:18:30.599Z",
+  "sourcePage": "https://www.solarsystemscope.com/textures/",
+  "author": "Solar System Scope / INOVE; based on NASA imagery",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "modifications": [
+    "Lanczos resize",
+    "WebP conversion/optimization",
+    "Cloud map converted to a grayscale non-color opacity mask"
+  ],
+  "sources": [
+    {
+      "kind": "daymap",
+      "url": "https://www.solarsystemscope.com/textures/download/8k_earth_daymap.jpg",
+      "file": "8k_earth_daymap.jpg",
+      "width": 8192,
+      "height": 4096,
+      "bytes": 4565076,
+      "sha256": "88ab060b6e7d241cfc590c69f528fab2b3247b738d40124cb590999a6fe44abc"
+    },
+    {
+      "kind": "nightmap",
+      "url": "https://www.solarsystemscope.com/textures/download/8k_earth_nightmap.jpg",
+      "file": "8k_earth_nightmap.jpg",
+      "width": 8192,
+      "height": 4096,
+      "bytes": 3144468,
+      "sha256": "9894e83a585a22c1c425e7ca4f987a9ba625bf08ecee45d3c9dcacae3c2ad5f7"
+    },
+    {
+      "kind": "clouds",
+      "url": "https://www.solarsystemscope.com/textures/download/8k_earth_clouds.jpg",
+      "file": "8k_earth_clouds.jpg",
+      "width": 8192,
+      "height": 4096,
+      "bytes": 11619184,
+      "sha256": "c792eca228989d36ebb45d3ea6ff1198be5e21a25d70d2fbcb2124ffd14ba7f5"
+    }
+  ],
+  "variants": [
+    {
+      "file": "earth-day-4k.webp",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 584284,
+      "sha256": "44d34a8827c65740eca59a956e264231d7d01dd82d254f21374e17b1e5e7df46",
+      "source": "8k_earth_daymap.jpg",
+      "colorSpace": "sRGB"
+    },
+    {
+      "file": "earth-day-2k.webp",
+      "width": 2048,
+      "height": 1024,
+      "bytes": 178456,
+      "sha256": "7704faa2cdd40ec194eee2e900248bc7c3537d247ddcf09b9dec8f6a4ee531fd",
+      "source": "8k_earth_daymap.jpg",
+      "colorSpace": "sRGB"
+    },
+    {
+      "file": "earth-night-4k.webp",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 543012,
+      "sha256": "ddcfdf7fbdacfdeb35fbbefc77a26286ab5e62e7add00f9b16de44d619ec65e3",
+      "source": "8k_earth_nightmap.jpg",
+      "colorSpace": "sRGB"
+    },
+    {
+      "file": "earth-night-2k.webp",
+      "width": 2048,
+      "height": 1024,
+      "bytes": 149630,
+      "sha256": "685072ff98d97be1eac5db12dc067064849ea29bf83c01e3d22ff4265936d03d",
+      "source": "8k_earth_nightmap.jpg",
+      "colorSpace": "sRGB"
+    },
+    {
+      "file": "earth-clouds-4k.webp",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 2466436,
+      "sha256": "5b5bad8f06c45a611acaca9da1a65b997919c3df0f4a10be1649e6aa027bd7de",
+      "source": "8k_earth_clouds.jpg",
+      "colorSpace": "non-color mask"
+    },
+    {
+      "file": "earth-clouds-2k.webp",
+      "width": 2048,
+      "height": 1024,
+      "bytes": 618006,
+      "sha256": "7bae34ebe02b439dfa41266a182886a2afebdac74bc6f1bb81bc9321f3944c39",
+      "source": "8k_earth_clouds.jpg",
+      "colorSpace": "non-color mask"
+    }
+  ],
+  "optionalNormalMap": "Deferred: this static proof uses the surface/night/cloud set; add a renormalized normal map only if the reviewed appearance needs it.",
+  "posters": [
+    {
+      "file": "earth-poster-4k.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 448174,
+      "sha256": "8057c715fa7e02f71ede63a2e71b0b42daa9b6136de598b684da338827dacead",
+      "alpha": true,
+      "source": "earth-scene.js; matching profile maps, yaw -1.82 radians"
+    },
+    {
+      "file": "earth-poster-2k.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 137380,
+      "sha256": "8e8549a8f5f2de146f4fa94bbb1e10a80fae47c44bdf53fce3122a24f0a60e48",
+      "alpha": true,
+      "source": "earth-scene.js; matching profile maps, yaw -1.82 radians"
+    }
+  ],
+  "profileBudgets": [
+    {
+      "profile": "4k",
+      "bytes": 4041906,
+      "targetBytes": 6000000,
+      "withinTarget": true
+    },
+    {
+      "profile": "2k",
+      "bytes": 1083472,
+      "targetBytes": 2000000,
+      "withinTarget": true
+    }
+  ],
+  "posterNote": "Static visual-review candidates; regenerate after material/orientation approval and before production integration.",
+  "wordmark": {
+    "file": "../brand/wordmark.svg",
+    "viewBox": "0 0 1200 430",
+    "bytes": 3818,
+    "sha256": "a524d0aa14161bcfbe3cc22711f2bd506b45b044f950d8f24c01c2e21a880e6b",
+    "source": "Vector reconstruction of owner-supplied sources/img/img0.png; no font files used."
+  }
+}

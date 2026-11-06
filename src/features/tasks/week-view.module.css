@@ -1,0 +1,220 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 264px;
+  flex-direction: column;
+  gap: 15px;
+  overflow: hidden;
+  padding: 14px 11px 12px;
+  border: 1px solid var(--daily-card-line);
+  border-radius: var(--radius-card);
+  background: var(--daily-card);
+  box-shadow: var(--shadow-task);
+  transition:
+    border-color var(--dur-fast) var(--daily-ease),
+    background-color var(--dur-fast) var(--daily-ease),
+    box-shadow var(--dur-fast) var(--daily-ease),
+    translate var(--dur-fast) var(--daily-ease);
+}
+
+.card[data-today='true'] {
+  border-color: var(--daily-accent);
+  background: color-mix(in srgb, var(--daily-pill) 50%, var(--daily-card));
+  box-shadow: var(--shadow-task-hover);
+}
+
+.card:has(.trigger:hover) {
+  translate: 0 -2px;
+  border-color: var(--ws-accent);
+  box-shadow: var(--shadow-task-hover);
+}
+
+.trigger {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  cursor: pointer;
+}
+
+.trigger:focus-visible {
+  outline-offset: -3px;
+}
+
+.header,
+.date {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.header {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.date {
+  flex-wrap: wrap;
+  color: var(--ws-text-muted);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.date strong {
+  color: var(--ws-text);
+  font-weight: 700;
+}
+
+.constellation {
+  width: clamp(16px, 2.2vw, 30px);
+  min-width: 16px;
+  color: var(--daily-accent);
+  opacity: 0.31;
+  pointer-events: none;
+}
+
+.progress {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress > svg {
+  width: clamp(43px, 4.4vw, 58px);
+  height: auto;
+  flex: none;
+}
+
+.progress text {
+  fill: var(--ws-text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.done {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  color: var(--ws-text-muted);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.done strong {
+  overflow-wrap: anywhere;
+  color: var(--ws-text);
+  font-size: var(--fs-body);
+}
+
+.priorities {
+  display: grid;
+  gap: 7px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.priorities li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 5px;
+  align-items: center;
+  color: var(--ws-text);
+  font-size: var(--fs-micro);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.priorities li span {
+  text-transform: capitalize;
+  overflow-wrap: anywhere;
+}
+
+.planet[data-priority='urgent'] {
+  color: var(--daily-planet-urgent);
+  --planet-light: var(--daily-planet-urgent-light);
+}
+
+.planet[data-priority='normal'] {
+  color: var(--daily-planet-normal);
+  --planet-light: var(--daily-planet-normal-light);
+}
+
+.planet[data-priority='optional'] {
+  color: var(--daily-planet-optional);
+  --planet-light: var(--daily-planet-optional-light);
+}
+
+.empty {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-width: 0;
+}
+
+.deadline {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) clamp(14px, 1.6vw, 26px);
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 9px;
+  border-top: 1px solid var(--daily-card-line);
+  color: var(--ws-text-muted);
+  font-size: var(--fs-micro);
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.deadline strong {
+  color: var(--ws-text);
+}
+
+.ringDecoration {
+  width: 100%;
+  height: auto;
+  color: var(--daily-accent);
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+@media (width < 1000px) {
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (width < 700px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .card {
+    min-height: 236px;
+    gap: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+
+  .card:has(.trigger:hover) {
+    translate: none;
+  }
+}

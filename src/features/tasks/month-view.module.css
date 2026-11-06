@@ -1,0 +1,227 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.weekdays {
+  margin-bottom: 8px;
+  color: var(--ws-text-muted);
+  text-align: center;
+  font-size: var(--fs-small);
+  font-weight: 500;
+}
+
+.cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 112px;
+  min-width: 0;
+  padding: 10px 11px 13px;
+  border: 1px solid var(--daily-card-line);
+  border-radius: var(--radius-task);
+  background: var(--ws-surface);
+  color: var(--ws-text);
+  text-align: left;
+  cursor: pointer;
+  animation: calendar-arrive 280ms cubic-bezier(0.2, 0.7, 0.17, 1) both;
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.adjacent {
+  background: var(--daily-sky-end);
+  color: var(--ws-text-muted);
+}
+
+.cell:hover,
+.cell[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--daily-pill) 40%, var(--ws-surface));
+  border-color: var(--ws-accent);
+  box-shadow: var(--shadow-task);
+}
+
+.today {
+  background: color-mix(in srgb, var(--daily-pill) 55%, var(--ws-surface));
+  border-color: var(--ws-accent);
+  box-shadow: inset 0 0 0 1px var(--ws-accent);
+}
+
+.today .cellHeader {
+  color: var(--ws-text);
+  font-weight: 700;
+}
+
+.cellHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.overdue {
+  flex: none;
+  width: 6px;
+  aspect-ratio: 1;
+  border-radius: var(--radius-pill);
+  background: var(--status-overdue);
+}
+
+.priorities {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  min-width: 0;
+  width: 100%;
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.urgent {
+  color: var(--daily-priority-urgent, var(--text-overdue));
+}
+
+.normal {
+  color: var(--daily-priority-normal, var(--text-accent));
+}
+
+.optional {
+  color: var(--daily-priority-optional, var(--text-notif-completed));
+}
+
+.priorityLong,
+.priorityShort,
+.completion span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.priorityShort {
+  display: none;
+}
+
+.completion {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  margin-top: auto;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--daily-pill);
+  color: var(--text-accent);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+.completion svg {
+  flex: none;
+  width: 11px;
+  height: 11px;
+}
+
+.sparkle {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  width: 7px;
+  height: 7px;
+  color: var(--daily-accent);
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.drawerHeading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  align-items: center;
+  gap: 12px;
+}
+
+.drawerPlanet {
+  width: 100%;
+  color: var(--daily-accent);
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+@keyframes calendar-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 767px) {
+  .grid {
+    gap: 4px;
+  }
+
+  .weekdays {
+    font-size: var(--fs-micro);
+  }
+
+  .cell {
+    gap: 4px;
+    min-height: 92px;
+    padding: 6px 3px 10px;
+    border-radius: var(--radius-sm);
+  }
+
+  .priorities {
+    font-size: 0.625rem;
+  }
+
+  .priorityLong {
+    display: none;
+  }
+
+  .priorityShort {
+    display: block;
+  }
+
+  .completion {
+    gap: 1px;
+    padding-inline: 2px;
+    font-size: 0.5625rem;
+  }
+
+  .completion svg {
+    width: 8px;
+    height: 8px;
+  }
+
+  .sparkle {
+    right: 3px;
+    bottom: 3px;
+    width: 5px;
+    height: 5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell {
+    animation: none;
+    transition: none;
+  }
+}
