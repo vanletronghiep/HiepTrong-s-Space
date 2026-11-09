@@ -57,9 +57,8 @@ function sortByDeadlineThenPriority(tasks: readonly TaskDto[]): TaskDto[] {
   });
 }
 
-export function HubList() {
+export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string } = {}) {
   const now = useMinuteTicker();
-  const timeZone = DEFAULT_APP_TIMEZONE;
   const searchParams = useSearchParams();
   const { pushToast } = useToast();
 

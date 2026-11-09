@@ -103,9 +103,8 @@ function DailyModeStage({ mode, children }: { mode: DailyViewMode; children: Rea
   );
 }
 
-export function DailyBoard() {
+export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string } = {}) {
   const now = useMinuteTicker();
-  const timeZone = DEFAULT_APP_TIMEZONE;
   const { pushToast } = useToast();
 
   const todayStr = formatScheduledDate(now, timeZone);

@@ -46,17 +46,24 @@ export function useSetNotificationRead() {
     },
     onMutate: async ({ id, isRead }) => {
       await queryClient.cancelQueries({ queryKey: notificationKeys.all });
-      const snapshot = queryClient.getQueryData<NotificationListResponse>(notificationKeys.list());
+      const prevList = queryClient.getQueryData<NotificationListResponse>(notificationKeys.list());
+      const previousIsRead = prevList?.items.find((item) => item.id === id)?.isRead;
       queryClient.setQueryData<NotificationListResponse>(notificationKeys.list(), (prev) =>
         updateCachedList(prev, (items) =>
           items.map((item) => (item.id === id ? { ...item, isRead } : item)),
         ),
       );
-      return { snapshot };
+      return { previousIsRead };
     },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.snapshot) {
-        queryClient.setQueryData(notificationKeys.list(), ctx.snapshot);
+    onError: (_err, vars, ctx) => {
+      if (ctx?.previousIsRead !== undefined) {
+        queryClient.setQueryData<NotificationListResponse>(notificationKeys.list(), (prev) =>
+          updateCachedList(prev, (items) =>
+            items.map((item) =>
+              item.id === vars.id ? { ...item, isRead: ctx.previousIsRead! } : item,
+            ),
+          ),
+        );
       }
     },
     onSettled: () => {

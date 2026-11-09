@@ -1,5 +1,6 @@
 import { addDays, format, parseISO } from 'date-fns';
 import { TZDate } from '@date-fns/tz';
+import { isValidCalendarDay } from '@/contracts';
 
 export const DEFAULT_APP_TIMEZONE = 'Asia/Saigon';
 
@@ -67,25 +68,11 @@ export function buildZonedInstant(
   const hour = Number(timeMatch[1]);
   const minute = Number(timeMatch[2]);
 
-  if (
-    month < 1 ||
-    month > 12 ||
-    day < 1 ||
-    day > 31 ||
-    hour < 0 ||
-    hour > 23 ||
-    minute < 0 ||
-    minute > 59
-  ) {
+  if (!isValidCalendarDay(year, month, day) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
     throw new RangeError(`Out-of-range date/time input: "${scheduledDate}" "${timeHm}"`);
   }
 
   const zoned = new TZDate(year, month - 1, day, hour, minute, 0, 0, timeZone);
-  // Reject non-existent calendar dates such as 2026-02-30 that roll over into March.
-  if (zoned.getFullYear() !== year || zoned.getMonth() !== month - 1 || zoned.getDate() !== day) {
-    throw new RangeError(`Non-existent calendar date: "${scheduledDate}"`);
-  }
-
   return new Date(zoned.getTime()).toISOString();
 }
 
@@ -104,6 +91,9 @@ export function shiftScheduledDate(
   const year = Number(dateMatch[1]);
   const month = Number(dateMatch[2]);
   const day = Number(dateMatch[3]);
+  if (!isValidCalendarDay(year, month, day)) {
+    throw new RangeError(`Non-existent calendar date: "${scheduledDate}"`);
+  }
   // Use noon in the target timezone so DST transitions (if another timezone is configured) cannot skip/repeat a day.
   const anchor = new TZDate(year, month - 1, day, 12, 0, 0, 0, timeZone);
   return format(addDays(anchor, deltaDays), 'yyyy-MM-dd');

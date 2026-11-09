@@ -104,6 +104,94 @@ describe('TaskCard component states', () => {
     expect(screen.getByText(/Overdue by 2h/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Transfer/i })).toBeInTheDocument();
   });
+
+  it('supports keyboard disclosure to expand and collapse Hub scheduling actions without triggering checkbox or menu (C11)', () => {
+    const onToggle = vi.fn();
+    const onScheduleDate = vi.fn();
+    const now = new Date('2026-10-30T10:00:00.000Z');
+    const task = makeTaskDto({
+      title: 'Keyboard expandable task',
+      description: 'Detailed notes for keyboard expansion test',
+      scheduledDate: null,
+    });
+
+    render(
+      <TaskCard
+        task={task}
+        now={now}
+        context="hub"
+        onToggleComplete={onToggle}
+        onEdit={noop}
+        onScheduleDate={onScheduleDate}
+        onOpenPickDate={noop}
+        onOpenTransfer={noop}
+        onRequestDelete={noop}
+      />,
+    );
+
+    const disclosureBtn = screen.getByRole('button', { name: 'Keyboard expandable task' });
+    expect(disclosureBtn).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /Add to today/i })).not.toBeInTheDocument();
+
+    // Activate disclosure button via keyboard (Enter / click on focused button)
+    disclosureBtn.focus();
+    fireEvent.keyDown(disclosureBtn, { key: 'Enter', code: 'Enter' });
+    fireEvent.click(disclosureBtn);
+
+    expect(disclosureBtn).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /Add to today/i })).toBeInTheDocument();
+    expect(onToggle).not.toHaveBeenCalled();
+
+    // Also support direct Enter/Space on the article element when focused directly
+    const article = disclosureBtn.closest('article')!;
+    fireEvent.keyDown(article, { key: ' ', code: 'Space' });
+    expect(disclosureBtn).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /Add to today/i })).not.toBeInTheDocument();
+  });
+
+  it('generates distinct DOM IDs when the same task is rendered in daily carousel and overdue lane (C12)', () => {
+    const now = new Date('2026-10-30T18:00:00.000Z');
+    const overdueTask = makeTaskDto({
+      id: '99999999-9999-4999-8999-999999999999',
+      title: 'Shared overdue task',
+      deadlineAt: '2026-10-30T15:00:00.000Z',
+      scheduledDate: '2026-10-30',
+    });
+
+    const { container } = render(
+      <div>
+        <TaskCard
+          task={overdueTask}
+          now={now}
+          context="daily"
+          carousel
+          onToggleComplete={noop}
+          onEdit={noop}
+          onScheduleDate={noop}
+          onOpenPickDate={noop}
+          onOpenTransfer={noop}
+          onRequestDelete={noop}
+        />
+        <TaskCard
+          task={overdueTask}
+          now={now}
+          context="overdue"
+          onToggleComplete={noop}
+          onEdit={noop}
+          onScheduleDate={noop}
+          onOpenPickDate={noop}
+          onOpenTransfer={noop}
+          onRequestDelete={noop}
+        />
+      </div>,
+    );
+
+    const articles = Array.from(container.querySelectorAll('article'));
+    expect(articles).toHaveLength(2);
+    expect(articles[0]?.id).toBeTruthy();
+    expect(articles[1]?.id).toBeTruthy();
+    expect(articles[0]?.id).not.toBe(articles[1]?.id);
+  });
 });
 
 describe('TaskForm validation', () => {

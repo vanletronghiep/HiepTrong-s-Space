@@ -14,17 +14,17 @@ const FORECAST =
   'Focus tends to peak between 8 and 10 PM. One urgent task is still due before midnight.';
 const ARC = 'M0 78 Q500 -18 1000 78';
 
-export function DailyHeaderDate() {
+export function DailyHeaderDate({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string } = {}) {
   const now = useMinuteTicker();
   const formatter = useMemo(
     () =>
       new Intl.DateTimeFormat('en-US', {
-        timeZone: DEFAULT_APP_TIMEZONE,
+        timeZone,
         month: 'long',
         day: 'numeric',
         year: 'numeric',
       }),
-    [],
+    [timeZone],
   );
   const parts = formatter.formatToParts(now);
   const day = Number(parts.find((part) => part.type === 'day')?.value);

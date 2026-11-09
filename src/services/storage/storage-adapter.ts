@@ -35,7 +35,13 @@ export interface MediaStorage {
   deleteMedia(id: string): Promise<void>;
 }
 
-export type TaskRepository = Repository<TaskRecord, TaskQuery>;
+export type TaskRecordPatch = Partial<Omit<TaskRecord, 'id' | 'createdAt'>> & {
+  updatedAt: string;
+};
+
+export interface TaskRepository extends Repository<TaskRecord, TaskQuery> {
+  patchItem(id: string, patch: TaskRecordPatch): Promise<TaskRecord | null>;
+}
 
 export interface NotificationRepository extends Repository<NotificationRecord, NotificationQuery> {
   deleteWhere(filter: NotificationDeleteFilter): Promise<number>;
@@ -47,4 +53,5 @@ export interface StorageAdapter {
   media: MediaStorage;
   init(): Promise<void>;
   close(): Promise<void>;
+  runInTransaction<T>(work: () => Promise<T>): Promise<T>;
 }

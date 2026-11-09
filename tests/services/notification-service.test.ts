@@ -217,4 +217,77 @@ describe('NotificationService (§6.9, §6.10, Epic 4)', () => {
     await notificationService.runReminderTickIfStale(15_000);
     expect((await notificationService.listNotifications()).items).toHaveLength(1);
   });
+
+  it('hides notifications older than 7 days in listNotifications even before hourly purge runs (C14)', async () => {
+    await storage.notifications.saveItem({
+      id: crypto.randomUUID(),
+      kind: 'system',
+      taskId: null,
+      dedupeKey: 'system:expired-unpurged',
+      payload: { title: 'Expired notice', message: 'Created 7 days and 1 second ago' },
+      createdAt: '2026-10-23T09:59:59.000Z',
+      readAt: null,
+    });
+    await storage.notifications.saveItem({
+      id: crypto.randomUUID(),
+      kind: 'system',
+      taskId: null,
+      dedupeKey: 'system:exact-7d-boundary',
+      payload: { title: 'Boundary notice', message: 'Created exactly 7 days ago' },
+      createdAt: '2026-10-23T10:00:00.000Z',
+      readAt: null,
+    });
+    const visibleId = crypto.randomUUID();
+    await storage.notifications.saveItem({
+      id: visibleId,
+      kind: 'general',
+      taskId: null,
+      dedupeKey: 'general:still-fresh',
+      payload: { title: 'Fresh notice', message: 'Within 7-day window' },
+      createdAt: '2026-10-23T10:00:01.000Z',
+      readAt: null,
+    });
+
+    // Without calling purgeExpired(), listNotifications must exclude the <= 7-day cutoff items
+    const listed = await notificationService.listNotifications();
+    expect(listed.items.map((item) => item.id)).toEqual([visibleId]);
+    expect(listed.unreadCount).toBe(1);
+  });
+
+  it('does not advance lastTickAt when runReminderTick fails and deduplicates concurrent in-flight ticks (S02)', async () => {
+    await taskService.createTask({
+      title: 'Retryable tick task',
+      deadlineAt: '2026-10-30T10:02:00.000Z',
+    });
+
+    clock.set('2026-10-30T10:01:35.000Z');
+
+    const originalListItems = storage.tasks.listItems.bind(storage.tasks);
+    let failOnce = true;
+    let listCallCount = 0;
+    storage.tasks.listItems = async (query) => {
+      listCallCount += 1;
+      if (failOnce) {
+        failOnce = false;
+        throw new Error('Transient DB read error');
+      }
+      return originalListItems(query);
+    };
+
+    // First stale tick fails -> lastTickAt must remain null so immediate retry runs
+    await expect(notificationService.runReminderTickIfStale(15_000)).rejects.toThrow(
+      'Transient DB read error',
+    );
+
+    // Concurrent calls share the single in-flight tick execution
+    const [r1, r2] = await Promise.all([
+      notificationService.runReminderTick(),
+      notificationService.runReminderTick(),
+    ]);
+    expect(r1.createdCount).toBe(1);
+    expect(r2.createdCount).toBe(1);
+    expect(listCallCount).toBe(2); // 1 failed + 1 shared success
+
+    storage.tasks.listItems = originalListItems;
+  });
 });

@@ -37,47 +37,49 @@ export function TransferDialog({
   const tomorrowStr = shiftScheduledDate(todayStr, 1, timeZone);
 
   const [dateInput, setDateInput] = useState('');
+  const [canonicalDate, setCanonicalDate] = useState<string | null>(null);
   const [timeInput, setTimeInput] = useState('23:59');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const dateFieldRef = useRef<HTMLInputElement>(null);
   const nativeDateRef = useRef<HTMLInputElement>(null);
 
+  // Initialize once per dialog session (open + task id); clock ticks must not reset drafts.
+  const sessionKey = open && task ? task.id : null;
+  const initializedSessionRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
-      const defaultDate = isFutureInstant(
-        buildDeadlineFromInputs({
-          dateInput: todayStr,
-          timeInput: '23:59',
-          referenceNow: now,
-          timeZone,
-        }).ok
-          ? (
-              buildDeadlineFromInputs({
-                dateInput: todayStr,
-                timeInput: '23:59',
-                referenceNow: now,
-                timeZone,
-              }) as { ok: true; deadlineAt: string }
-            ).deadlineAt
-          : now.toISOString(),
-        now,
-      )
-        ? todayStr
-        : tomorrowStr;
-
-      const resolved = resolveDateInput(defaultDate, now, timeZone);
-      setDateInput(resolved?.displayInput ?? '');
-      setTimeInput('23:59');
-      setErrorMessage(null);
+    if (sessionKey === null) {
+      initializedSessionRef.current = null;
+      return;
     }
-  }, [open, now, timeZone, todayStr, tomorrowStr]);
+    if (initializedSessionRef.current === sessionKey) {
+      return;
+    }
+    initializedSessionRef.current = sessionKey;
 
-  const resolvedDate = resolveDateInput(dateInput, now, timeZone);
+    const todayEndOfDay = buildDeadlineFromInputs({
+      dateInput: todayStr,
+      timeInput: '23:59',
+      referenceNow: now,
+      timeZone,
+    });
+    const defaultDate =
+      todayEndOfDay.ok && isFutureInstant(todayEndOfDay.deadlineAt, now) ? todayStr : tomorrowStr;
+
+    const resolved = resolveDateInput(defaultDate, now, timeZone);
+    setDateInput(resolved?.displayInput ?? '');
+    setCanonicalDate(resolved?.scheduledDate ?? null);
+    setTimeInput('23:59');
+    setErrorMessage(null);
+  }, [sessionKey, now, timeZone, todayStr, tomorrowStr]);
+
+  const resolvedDate = resolveDateInput(dateInput, now, timeZone, canonicalDate);
 
   const applyPresetDate = (isoDate: string) => {
     const resolved = resolveDateInput(isoDate, now, timeZone);
     if (resolved) {
       setDateInput(resolved.displayInput);
+      setCanonicalDate(resolved.scheduledDate);
       setErrorMessage(null);
     }
   };
@@ -93,6 +95,7 @@ export function TransferDialog({
       timeInput,
       referenceNow: now,
       timeZone,
+      canonicalDate,
     });
 
     if (!built.ok) {
@@ -100,7 +103,7 @@ export function TransferDialog({
       return;
     }
 
-    if (!isFutureInstant(built.deadlineAt, new Date())) {
+    if (!isFutureInstant(built.deadlineAt, now)) {
       setErrorMessage('New deadline must be in the future.');
       return;
     }
@@ -159,6 +162,7 @@ export function TransferDialog({
                 value={dateInput}
                 onChange={(e) => {
                   setDateInput(e.target.value);
+                  setCanonicalDate(null);
                   setErrorMessage(null);
                 }}
                 className="w-full h-11 rounded-item bg-ws-surface border border-ws-border px-3.5 pr-10 text-[length:var(--fs-ui)] text-ws-text tabular-nums"
@@ -262,25 +266,39 @@ export function ScheduleDateDialog({
   const tomorrowStr = shiftScheduledDate(todayStr, 1, timeZone);
 
   const [dateInput, setDateInput] = useState('');
+  const [canonicalDate, setCanonicalDate] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const nativeDateRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (open) {
-      const initialIso = task?.scheduledDate ?? todayStr;
-      const resolved = resolveDateInput(initialIso, now, timeZone);
-      setDateInput(resolved?.displayInput ?? '');
-      setErrorMessage(null);
-    }
-  }, [open, task, todayStr, now, timeZone]);
+  // Initialize once per dialog session (open + task id); clock ticks must not reset drafts.
+  const sessionKey = open && task ? task.id : null;
+  const initializedSessionRef = useRef<string | null>(null);
 
-  const resolvedDate = resolveDateInput(dateInput, now, timeZone);
+  useEffect(() => {
+    if (sessionKey === null) {
+      initializedSessionRef.current = null;
+      return;
+    }
+    if (initializedSessionRef.current === sessionKey) {
+      return;
+    }
+    initializedSessionRef.current = sessionKey;
+
+    const initialIso = task?.scheduledDate ?? todayStr;
+    const resolved = resolveDateInput(initialIso, now, timeZone);
+    setDateInput(resolved?.displayInput ?? '');
+    setCanonicalDate(resolved?.scheduledDate ?? null);
+    setErrorMessage(null);
+  }, [sessionKey, task, todayStr, now, timeZone]);
+
+  const resolvedDate = resolveDateInput(dateInput, now, timeZone, canonicalDate);
 
   const applyPreset = (isoDate: string) => {
     const resolved = resolveDateInput(isoDate, now, timeZone);
     if (resolved) {
       setDateInput(resolved.displayInput);
+      setCanonicalDate(resolved.scheduledDate);
       setErrorMessage(null);
     }
   };
@@ -345,6 +363,7 @@ export function ScheduleDateDialog({
               value={dateInput}
               onChange={(e) => {
                 setDateInput(e.target.value);
+                setCanonicalDate(null);
                 setErrorMessage(null);
               }}
               className="w-full h-11 rounded-item bg-ws-surface border border-ws-border px-3.5 pr-10 text-[length:var(--fs-ui)] text-ws-text tabular-nums"

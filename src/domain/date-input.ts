@@ -10,20 +10,15 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { TZDate } from '@date-fns/tz';
+import { isValidCalendarDay, isValidScheduledDate } from '@/contracts';
 import { buildZonedInstant, DEFAULT_APP_TIMEZONE, formatScheduledDate } from './time';
+
+export { isValidCalendarDay, isValidScheduledDate };
 
 export interface ResolvedDateInput {
   scheduledDate: string; // YYYY-MM-DD
   displayInput: string; // DD/MM or DD/MM/YYYY
   humanLabel: string; // e.g. 'Friday, 30 Oct 2026'
-}
-
-function isValidCalendarDay(year: number, month: number, day: number): boolean {
-  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1970 || year > 2100) {
-    return false;
-  }
-  const probe = new TZDate(year, month - 1, day, 12, 0, 0, 0, 'UTC');
-  return probe.getFullYear() === year && probe.getMonth() === month - 1 && probe.getDate() === day;
 }
 
 function toHumanLabel(scheduledDate: string, timeZone: string): string {
@@ -40,12 +35,14 @@ function toHumanLabel(scheduledDate: string, timeZone: string): string {
 
 /**
  * Resolves user date text ('DD/MM', 'DD/MM/YYYY', or 'YYYY-MM-DD') against `referenceNow` in `timeZone`.
- * When year is omitted ('DD/MM'), selects the nearest valid calendar occurrence on or after today (§9.2).
+ * When year is omitted ('DD/MM'), preserves `canonicalDate` if the day and month still match it;
+ * otherwise selects the nearest valid calendar occurrence on or after today (§9.2).
  */
 export function resolveDateInput(
   rawInput: string,
   referenceNow: Date,
   timeZone: string = DEFAULT_APP_TIMEZONE,
+  canonicalDate?: string | null,
 ): ResolvedDateInput | null {
   const trimmed = rawInput.trim();
   if (!trimmed) {
@@ -100,6 +97,29 @@ export function resolveDateInput(
           : `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${explicitYear}`,
       humanLabel: toHumanLabel(scheduledDate, timeZone),
     };
+  }
+
+  if (canonicalDate) {
+    const canonicalMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(canonicalDate);
+    if (canonicalMatch) {
+      const canonicalYear = Number(canonicalMatch[1]);
+      const canonicalMonth = Number(canonicalMatch[2]);
+      const canonicalDay = Number(canonicalMatch[3]);
+      if (
+        canonicalMonth === month &&
+        canonicalDay === day &&
+        isValidCalendarDay(canonicalYear, canonicalMonth, canonicalDay)
+      ) {
+        return {
+          scheduledDate: canonicalDate,
+          displayInput:
+            canonicalYear === currentYear
+              ? `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`
+              : `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${canonicalYear}`,
+          humanLabel: toHumanLabel(canonicalDate, timeZone),
+        };
+      }
+    }
   }
 
   // Search up to 8 years ahead so 29/02 resolves cleanly to the next leap year on or after today
@@ -160,11 +180,18 @@ export function buildDeadlineFromInputs(options: {
   timeInput: string;
   referenceNow: Date;
   timeZone?: string;
+  canonicalDate?: string | null;
+  existingDeadlineAt?: string | null;
 }):
   | { ok: true; scheduledDate: string; deadlineAt: string }
   | { ok: false; field: 'date' | 'time'; message: string } {
   const timeZone = options.timeZone ?? DEFAULT_APP_TIMEZONE;
-  const resolved = resolveDateInput(options.dateInput, options.referenceNow, timeZone);
+  const resolved = resolveDateInput(
+    options.dateInput,
+    options.referenceNow,
+    timeZone,
+    options.canonicalDate,
+  );
   if (!resolved) {
     return {
       ok: false,
@@ -179,6 +206,21 @@ export function buildDeadlineFromInputs(options: {
       field: 'time',
       message: 'Enter a valid 24-hour time as HH:mm (for example 23:59).',
     };
+  }
+
+  if (options.existingDeadlineAt) {
+    const existing = extractZonedDateAndTime(
+      options.existingDeadlineAt,
+      options.referenceNow,
+      timeZone,
+    );
+    if (existing.scheduledDate === resolved.scheduledDate && existing.timeHm === trimmedTime) {
+      return {
+        ok: true,
+        scheduledDate: resolved.scheduledDate,
+        deadlineAt: options.existingDeadlineAt,
+      };
+    }
   }
 
   const deadlineAt = buildZonedInstant(resolved.scheduledDate, trimmedTime, timeZone);

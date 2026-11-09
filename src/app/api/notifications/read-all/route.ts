@@ -1,12 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import type { ApiErrorResponse } from '@/contracts';
-import { handleApiError } from '@/server/api-response';
+import { assertSameOriginMutation, handleApiError } from '@/server/api-response';
 import { getContainer } from '@/server/container';
 
-export async function POST(): Promise<
-  NextResponse<{ ok: true; updatedCount: number } | ApiErrorResponse>
-> {
+export async function POST(
+  request: NextRequest,
+): Promise<NextResponse<{ ok: true; updatedCount: number } | ApiErrorResponse>> {
   try {
+    assertSameOriginMutation(request);
     const { notificationService } = await getContainer();
     const { updatedCount } = await notificationService.markAllRead();
     return NextResponse.json({ ok: true, updatedCount }, { status: 200 });

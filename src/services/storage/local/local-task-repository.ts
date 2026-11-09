@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, isNull, lte, type SQL } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { taskRecordSchema, type TaskQuery, type TaskRecord } from '@/contracts';
-import type { TaskRepository } from '../storage-adapter';
+import type { TaskRecordPatch, TaskRepository } from '../storage-adapter';
 import { tasksTable } from './schema';
 
 type TaskRow = typeof tasksTable.$inferSelect;
@@ -68,6 +68,31 @@ export class LocalTaskRepository implements TaskRepository {
       .run();
 
     return validated;
+  }
+
+  async patchItem(id: string, patch: TaskRecordPatch): Promise<TaskRecord | null> {
+    const db = this.getDb();
+    const updateValues: Partial<typeof tasksTable.$inferInsert> = {
+      updatedAt: patch.updatedAt,
+    };
+
+    if (patch.title !== undefined) updateValues.title = patch.title;
+    if (patch.description !== undefined) updateValues.description = patch.description;
+    if (patch.priority !== undefined) updateValues.priority = patch.priority;
+    if (patch.pinned !== undefined) updateValues.pinned = patch.pinned;
+    if (patch.deadlineAt !== undefined) updateValues.deadlineAt = patch.deadlineAt;
+    if (patch.scheduledDate !== undefined) updateValues.scheduledDate = patch.scheduledDate;
+    if (patch.status !== undefined) updateValues.status = patch.status;
+    if (patch.completedAt !== undefined) updateValues.completedAt = patch.completedAt;
+    if (patch.reminderAt !== undefined) updateValues.reminderAt = patch.reminderAt;
+
+    const result = db.update(tasksTable).set(updateValues).where(eq(tasksTable.id, id)).run();
+    if (result.changes === 0) {
+      return null;
+    }
+
+    const row = db.select().from(tasksTable).where(eq(tasksTable.id, id)).get();
+    return row ? taskRecordSchema.parse(rowToTaskRecord(row)) : null;
   }
 
   async getItem(id: string): Promise<TaskRecord | null> {

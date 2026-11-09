@@ -13,6 +13,7 @@ import type {
   MediaUploadResult,
   NotificationRepository,
   StorageAdapter,
+  TaskRecordPatch,
   TaskRepository,
 } from '../storage-adapter';
 
@@ -24,6 +25,12 @@ class DriveTaskRepository implements TaskRepository {
     // - drive.files.list (q: appProperties has taskId or locate tasks JSON index in GOOGLE_DRIVE_FOLDER_ID)
     // - drive.files.create / drive.files.update (uploadType=multipart) to upsert task payload
     void _record;
+    throw new NotImplementedError(NOT_IMPLEMENTED_MESSAGE);
+  }
+
+  async patchItem(_id: string, _patch: TaskRecordPatch): Promise<TaskRecord | null> {
+    void _id;
+    void _patch;
     throw new NotImplementedError(NOT_IMPLEMENTED_MESSAGE);
   }
 
@@ -133,5 +140,10 @@ export class DriveStorageAdapter implements StorageAdapter {
   async close(): Promise<void> {
     // Future Google Drive API mapping:
     // - Flush any pending batch writes / release HTTP agent resources (no-op when uninitialized)
+  }
+
+  async runInTransaction<T>(_work: () => Promise<T>): Promise<T> {
+    void _work;
+    throw new NotImplementedError(NOT_IMPLEMENTED_MESSAGE);
   }
 }

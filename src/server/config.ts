@@ -3,8 +3,25 @@ import { z } from 'zod';
 import { storageDriverSchema, type StorageDriver } from '@/contracts';
 import { DEFAULT_APP_TIMEZONE } from '@/domain/time';
 
+export function isValidIanaTimeZone(timeZone: string): boolean {
+  if (!timeZone || !timeZone.trim()) {
+    return false;
+  }
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timeZone.trim() });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const envSchema = z.object({
-  APP_TIMEZONE: z.string().trim().min(1).default(DEFAULT_APP_TIMEZONE),
+  APP_TIMEZONE: z
+    .string()
+    .trim()
+    .min(1)
+    .default(DEFAULT_APP_TIMEZONE)
+    .refine(isValidIanaTimeZone, 'Invalid IANA timezone in APP_TIMEZONE'),
   STORAGE_DRIVER: storageDriverSchema.default('local'),
   DATA_DIR: z.string().trim().min(1).default('./data'),
   DATABASE_FILE: z.string().trim().min(1).default('hiep-trong-space.db'),
@@ -12,6 +29,14 @@ const envSchema = z.object({
   GOOGLE_DRIVE_FOLDER_ID: z.string().trim().optional().default(''),
   SCHEDULER_TICK_SECONDS: z.coerce.number().int().positive().default(30),
 });
+
+export function resolveDatabasePath(
+  rawEnv: Record<string, string | undefined> = process.env,
+): string {
+  const dataDir = path.resolve(rawEnv.DATA_DIR?.trim() || './data');
+  const databaseFile = rawEnv.DATABASE_FILE?.trim() || 'hiep-trong-space.db';
+  return path.join(dataDir, databaseFile);
+}
 
 export interface AppConfig {
   appTimezone: string;

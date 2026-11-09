@@ -5,7 +5,7 @@ import {
   type ApiErrorResponse,
   type TaskDto,
 } from '@/contracts';
-import { handleApiError } from '@/server/api-response';
+import { handleApiError, parseJsonBody } from '@/server/api-response';
 import { getContainer } from '@/server/container';
 
 export async function GET(
@@ -43,7 +43,7 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<{ item: TaskDto } | ApiErrorResponse>> {
   try {
-    const body: unknown = await request.json();
+    const body = await parseJsonBody(request);
     const input = createTaskInputSchema.parse(body);
     const { taskService } = await getContainer();
     const item = await taskService.createTask(input);

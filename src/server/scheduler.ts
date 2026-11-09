@@ -6,11 +6,17 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 
 interface GlobalWithScheduler {
   __htsSchedulerStarted?: boolean;
+  __htsTickInFlight?: boolean;
+  __htsPurgeInFlight?: boolean;
 }
 
 const globalForScheduler = globalThis as unknown as GlobalWithScheduler;
 
 async function safeRunReminderTick(): Promise<void> {
+  if (globalForScheduler.__htsTickInFlight) {
+    return;
+  }
+  globalForScheduler.__htsTickInFlight = true;
   try {
     const { notificationService } = await getContainer();
     await notificationService.runReminderTick();
@@ -18,10 +24,16 @@ async function safeRunReminderTick(): Promise<void> {
     logger.error('Scheduler reminder tick failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+  } finally {
+    globalForScheduler.__htsTickInFlight = false;
   }
 }
 
 async function safePurgeExpired(): Promise<void> {
+  if (globalForScheduler.__htsPurgeInFlight) {
+    return;
+  }
+  globalForScheduler.__htsPurgeInFlight = true;
   try {
     const { notificationService } = await getContainer();
     await notificationService.purgeExpired();
@@ -29,6 +41,8 @@ async function safePurgeExpired(): Promise<void> {
     logger.error('Scheduler notification purge failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+  } finally {
+    globalForScheduler.__htsPurgeInFlight = false;
   }
 }
 

@@ -66,22 +66,38 @@ export function TaskForm({
 
   const [title, setTitle] = useState('');
   const [dateInput, setDateInput] = useState('');
+  const [canonicalDate, setCanonicalDate] = useState<string | null>(null);
   const [timeInput, setTimeInput] = useState('23:59');
   const [priority, setPriority] = useState<Priority>('normal');
   const [description, setDescription] = useState('');
   const [pinned, setPinned] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
 
+  // Draft fields are initialized once per editing session (opening the form or deliberately
+  // switching the edited task), never on clock ticks or refetched task objects.
+  const sessionKey = open
+    ? mode === 'edit'
+      ? `edit:${initialTask?.id ?? ''}`
+      : `create:${defaultScheduledDate ?? ''}`
+    : null;
+  const initializedSessionRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!open) {
+    if (sessionKey === null) {
+      initializedSessionRef.current = null;
       return;
     }
+    if (initializedSessionRef.current === sessionKey) {
+      return;
+    }
+    initializedSessionRef.current = sessionKey;
     setErrors({});
 
     if (mode === 'edit' && initialTask) {
       const extracted = extractZonedDateAndTime(initialTask.deadlineAt, now, timeZone);
       setTitle(initialTask.title);
       setDateInput(extracted.dateInput);
+      setCanonicalDate(extracted.scheduledDate);
       setTimeInput(extracted.timeHm);
       setPriority(initialTask.priority);
       setDescription(initialTask.description);
@@ -93,18 +109,20 @@ export function TaskForm({
     const resolved = resolveDateInput(baseDate, now, timeZone);
     setTitle('');
     setDateInput(resolved?.displayInput ?? '');
+    setCanonicalDate(resolved?.scheduledDate ?? null);
     setTimeInput('23:59');
     setPriority('normal');
     setDescription('');
     setPinned(false);
-  }, [open, mode, initialTask, defaultScheduledDate, todayStr, now, timeZone]);
+  }, [sessionKey, mode, initialTask, defaultScheduledDate, todayStr, now, timeZone]);
 
-  const resolvedDate = resolveDateInput(dateInput, now, timeZone);
+  const resolvedDate = resolveDateInput(dateInput, now, timeZone, canonicalDate);
 
   const applyPresetDate = (isoDate: string) => {
     const resolved = resolveDateInput(isoDate, now, timeZone);
     if (resolved) {
       setDateInput(resolved.displayInput);
+      setCanonicalDate(resolved.scheduledDate);
       setErrors((prev) => ({ ...prev, deadlineDate: undefined, form: undefined }));
     }
   };
@@ -129,6 +147,8 @@ export function TaskForm({
       timeInput,
       referenceNow: now,
       timeZone,
+      canonicalDate,
+      existingDeadlineAt: mode === 'edit' ? initialTask?.deadlineAt : null,
     });
 
     if (!builtDeadline.ok) {
@@ -137,7 +157,7 @@ export function TaskForm({
       } else {
         nextErrors.deadlineTime = builtDeadline.message;
       }
-    } else if (mode === 'create' && !isFutureInstant(builtDeadline.deadlineAt, new Date())) {
+    } else if (mode === 'create' && !isFutureInstant(builtDeadline.deadlineAt, now)) {
       nextErrors.deadlineDate = 'New tasks must have a deadline in the future.';
     }
 
@@ -277,6 +297,7 @@ export function TaskForm({
                   value={dateInput}
                   onChange={(e) => {
                     setDateInput(e.target.value);
+                    setCanonicalDate(null);
                     if (errors.deadlineDate) {
                       setErrors((prev) => ({ ...prev, deadlineDate: undefined }));
                     }

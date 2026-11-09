@@ -29,6 +29,7 @@ describe('Cosmic Launch page transition (§9.10 & Epic 7)', () => {
     pushMock.mockReset();
     replaceMock.mockReset();
     vi.useFakeTimers();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   });
 
   afterEach(() => {

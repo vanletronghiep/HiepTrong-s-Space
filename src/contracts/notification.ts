@@ -51,6 +51,7 @@ export const notificationQuerySchema = z.object({
   taskId: z.string().uuid().optional(),
   kinds: z.array(notificationKindSchema).optional(),
   unreadOnly: z.boolean().optional(),
+  createdAtAfter: isoInstantSchema.optional(),
 });
 export type NotificationQuery = z.infer<typeof notificationQuerySchema>;
 

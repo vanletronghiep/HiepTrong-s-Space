@@ -8,6 +8,7 @@ import type {
   TransferTaskInput,
   UpdateTaskInput,
 } from '@/contracts';
+import { computeReminderAt } from '@/domain/reminder';
 import { sortTasks } from '@/domain/task-sort';
 import { toTaskDto } from '@/domain/task-status';
 import { apiRequest } from '../api-client';
@@ -51,30 +52,67 @@ export function useTasks(params?: TaskQuery) {
   });
 }
 
-type TasksSnapshot = Array<[QueryKey, TaskDto[] | undefined]>;
+type TaskItemSnapshot = Array<[QueryKey, TaskDto | undefined]>;
 
-function snapshotAndUpdateTaskLists(
+function snapshotAndTransformTaskItem(
   queryClient: ReturnType<typeof useQueryClient>,
-  updater: (items: TaskDto[]) => TaskDto[],
-): TasksSnapshot {
-  const snapshots = queryClient.getQueriesData<TaskDto[]>({ queryKey: taskKeys.all });
-  for (const [key, data] of snapshots) {
-    if (Array.isArray(data)) {
-      queryClient.setQueryData<TaskDto[]>(key, sortTasks(updater(data)));
+  taskId: string,
+  transform: (item: TaskDto) => TaskDto | null,
+): TaskItemSnapshot {
+  const queries = queryClient.getQueriesData<TaskDto[]>({ queryKey: taskKeys.all });
+  const itemSnapshots: TaskItemSnapshot = [];
+
+  for (const [key, data] of queries) {
+    if (!Array.isArray(data)) {
+      continue;
     }
+    const existingItem = data.find((item) => item.id === taskId);
+    itemSnapshots.push([key, existingItem]);
+
+    if (!existingItem) {
+      continue;
+    }
+
+    const nextItem = transform(existingItem);
+    const nextList =
+      nextItem === null
+        ? data.filter((item) => item.id !== taskId)
+        : data.map((item) => (item.id === taskId ? nextItem : item));
+
+    queryClient.setQueryData<TaskDto[]>(key, sortTasks(nextList));
   }
-  return snapshots;
+
+  return itemSnapshots;
 }
 
-function restoreTaskSnapshots(
+function restoreTaskItemSnapshot(
   queryClient: ReturnType<typeof useQueryClient>,
-  snapshots: TasksSnapshot | undefined,
+  taskId: string,
+  snapshots: TaskItemSnapshot | undefined,
 ): void {
   if (!snapshots) {
     return;
   }
-  for (const [key, data] of snapshots) {
-    queryClient.setQueryData(key, data);
+  for (const [key, previousItem] of snapshots) {
+    const currentList = queryClient.getQueryData<TaskDto[]>(key);
+    if (!Array.isArray(currentList)) {
+      continue;
+    }
+
+    if (previousItem === undefined) {
+      queryClient.setQueryData<TaskDto[]>(
+        key,
+        currentList.filter((item) => item.id !== taskId),
+      );
+      continue;
+    }
+
+    const existsInCurrent = currentList.some((item) => item.id === taskId);
+    const restoredList = existsInCurrent
+      ? currentList.map((item) => (item.id === taskId ? previousItem : item))
+      : [...currentList, previousItem];
+
+    queryClient.setQueryData<TaskDto[]>(key, sortTasks(restoredList));
   }
 }
 
@@ -110,24 +148,31 @@ export function useUpdateTask() {
     onMutate: async ({ id, input }) => {
       await queryClient.cancelQueries({ queryKey: taskKeys.all });
       const now = new Date();
-      const snapshots = snapshotAndUpdateTaskLists(queryClient, (items) =>
-        items.map((item) =>
-          item.id === id
-            ? toTaskDto(
-                {
-                  ...item,
-                  ...input,
-                  updatedAt: now.toISOString(),
-                },
-                now,
-              )
-            : item,
-        ),
-      );
+      const snapshots = snapshotAndTransformTaskItem(queryClient, id, (item) => {
+        const nextDeadlineAt = input.deadlineAt ?? item.deadlineAt;
+        const deadlineChanged =
+          input.deadlineAt !== undefined && input.deadlineAt !== item.deadlineAt;
+        const nextReminderAt = deadlineChanged
+          ? item.status === 'completed'
+            ? null
+            : computeReminderAt(nextDeadlineAt, now)
+          : item.reminderAt;
+
+        return toTaskDto(
+          {
+            ...item,
+            ...input,
+            deadlineAt: nextDeadlineAt,
+            reminderAt: nextReminderAt,
+            updatedAt: now.toISOString(),
+          },
+          now,
+        );
+      });
       return { snapshots };
     },
-    onError: (_err, _vars, ctx) => {
-      restoreTaskSnapshots(queryClient, ctx?.snapshots);
+    onError: (_err, vars, ctx) => {
+      restoreTaskItemSnapshot(queryClient, vars.id, ctx?.snapshots);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: taskKeys.all });
@@ -150,26 +195,22 @@ export function useCompleteTask() {
       await queryClient.cancelQueries({ queryKey: taskKeys.all });
       const now = new Date();
       const nowIso = now.toISOString();
-      const snapshots = snapshotAndUpdateTaskLists(queryClient, (items) =>
-        items.map((item) =>
-          item.id === id
-            ? toTaskDto(
-                {
-                  ...item,
-                  status: 'completed',
-                  completedAt: nowIso,
-                  reminderAt: null,
-                  updatedAt: nowIso,
-                },
-                now,
-              )
-            : item,
+      const snapshots = snapshotAndTransformTaskItem(queryClient, id, (item) =>
+        toTaskDto(
+          {
+            ...item,
+            status: 'completed',
+            completedAt: nowIso,
+            reminderAt: null,
+            updatedAt: nowIso,
+          },
+          now,
         ),
       );
       return { snapshots };
     },
-    onError: (_err, _vars, ctx) => {
-      restoreTaskSnapshots(queryClient, ctx?.snapshots);
+    onError: (_err, id, ctx) => {
+      restoreTaskItemSnapshot(queryClient, id, ctx?.snapshots);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: taskKeys.all });
@@ -192,25 +233,22 @@ export function useUncompleteTask() {
       await queryClient.cancelQueries({ queryKey: taskKeys.all });
       const now = new Date();
       const nowIso = now.toISOString();
-      const snapshots = snapshotAndUpdateTaskLists(queryClient, (items) =>
-        items.map((item) =>
-          item.id === id
-            ? toTaskDto(
-                {
-                  ...item,
-                  status: 'active',
-                  completedAt: null,
-                  updatedAt: nowIso,
-                },
-                now,
-              )
-            : item,
+      const snapshots = snapshotAndTransformTaskItem(queryClient, id, (item) =>
+        toTaskDto(
+          {
+            ...item,
+            status: 'active',
+            completedAt: null,
+            reminderAt: computeReminderAt(item.deadlineAt, now),
+            updatedAt: nowIso,
+          },
+          now,
         ),
       );
       return { snapshots };
     },
-    onError: (_err, _vars, ctx) => {
-      restoreTaskSnapshots(queryClient, ctx?.snapshots);
+    onError: (_err, id, ctx) => {
+      restoreTaskItemSnapshot(queryClient, id, ctx?.snapshots);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: taskKeys.all });
@@ -234,25 +272,23 @@ export function useTransferTask() {
       await queryClient.cancelQueries({ queryKey: taskKeys.all });
       const now = new Date();
       const nowIso = now.toISOString();
-      const snapshots = snapshotAndUpdateTaskLists(queryClient, (items) =>
-        items.map((item) =>
-          item.id === id
-            ? toTaskDto(
-                {
-                  ...item,
-                  scheduledDate: input.scheduledDate,
-                  deadlineAt: input.deadlineAt,
-                  updatedAt: nowIso,
-                },
-                now,
-              )
-            : item,
+      const snapshots = snapshotAndTransformTaskItem(queryClient, id, (item) =>
+        toTaskDto(
+          {
+            ...item,
+            scheduledDate: input.scheduledDate,
+            deadlineAt: input.deadlineAt,
+            reminderAt:
+              item.status === 'completed' ? null : computeReminderAt(input.deadlineAt, now),
+            updatedAt: nowIso,
+          },
+          now,
         ),
       );
       return { snapshots };
     },
-    onError: (_err, _vars, ctx) => {
-      restoreTaskSnapshots(queryClient, ctx?.snapshots);
+    onError: (_err, vars, ctx) => {
+      restoreTaskItemSnapshot(queryClient, vars.id, ctx?.snapshots);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: taskKeys.all });
@@ -273,13 +309,11 @@ export function useDeleteTask() {
     },
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: taskKeys.all });
-      const snapshots = snapshotAndUpdateTaskLists(queryClient, (items) =>
-        items.filter((item) => item.id !== id),
-      );
+      const snapshots = snapshotAndTransformTaskItem(queryClient, id, () => null);
       return { snapshots };
     },
-    onError: (_err, _vars, ctx) => {
-      restoreTaskSnapshots(queryClient, ctx?.snapshots);
+    onError: (_err, id, ctx) => {
+      restoreTaskItemSnapshot(queryClient, id, ctx?.snapshots);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: taskKeys.all });

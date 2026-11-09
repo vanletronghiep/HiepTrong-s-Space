@@ -6,6 +6,7 @@ export type StorageDriver = z.infer<typeof storageDriverSchema>;
 export const healthResponseSchema = z.object({
   ok: z.literal(true),
   storage: storageDriverSchema,
+  timeZone: z.string().optional(),
 });
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
 

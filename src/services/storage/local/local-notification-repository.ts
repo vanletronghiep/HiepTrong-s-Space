@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lte, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lte, type SQL } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import {
   notificationPayloadSchema,
@@ -111,6 +111,9 @@ export class LocalNotificationRepository implements NotificationRepository {
     }
     if (query?.unreadOnly === true) {
       conditions.push(isNull(notificationsTable.readAt));
+    }
+    if (query?.createdAtAfter !== undefined) {
+      conditions.push(gt(notificationsTable.createdAt, query.createdAtAfter));
     }
 
     const baseQuery = db.select().from(notificationsTable);

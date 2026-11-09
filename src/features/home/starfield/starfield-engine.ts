@@ -171,13 +171,12 @@ export class StarfieldEngine {
     if (this.destroyed) {
       return;
     }
+    this.running = true;
     if (this.reducedMotion) {
-      this.running = false;
       this.pauseLoop();
       this.renderFrame(0);
       return;
     }
-    this.running = true;
     this.renderFrame(0);
     if (typeof document === 'undefined' || !document.hidden) {
       this.lastTimestamp = 0;
@@ -202,7 +201,7 @@ export class StarfieldEngine {
       this.parallaxY = 0;
       this.pauseLoop();
       this.renderFrame(0);
-    } else if (this.running) {
+    } else if (this.running && (typeof document === 'undefined' || !document.hidden)) {
       this.lastTimestamp = 0;
       this.scheduleNextFrame();
     }

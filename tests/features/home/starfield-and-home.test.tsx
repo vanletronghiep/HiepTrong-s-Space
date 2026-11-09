@@ -72,4 +72,29 @@ describe('Homepage StarfieldEngine', () => {
     engine.destroy();
     engine.destroy();
   });
+
+  it('resumes scheduling RAF frames when reducedMotion is disabled after starting in reduced-motion mode (C13)', () => {
+    const canvas = document.createElement('canvas');
+    Object.defineProperty(canvas, 'clientWidth', { value: 1280 });
+    Object.defineProperty(canvas, 'clientHeight', { value: 800 });
+    const mockCtx = createMockCanvasContext();
+    vi.spyOn(canvas, 'getContext').mockReturnValue(mockCtx);
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+
+    const engine = new StarfieldEngine({
+      canvas,
+      reducedMotion: true,
+    });
+
+    engine.start();
+    expect(rafSpy).not.toHaveBeenCalled();
+
+    // User disables prefers-reduced-motion while engine is started -> RAF loop must resume automatically
+    engine.setReducedMotion(false);
+    expect(rafSpy).toHaveBeenCalledTimes(1);
+
+    // Re-enabling reducedMotion pauses the loop again
+    engine.setReducedMotion(true);
+    engine.destroy();
+  });
 });

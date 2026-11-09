@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import {
+  createTaskInputSchema,
+  isoInstantSchema,
+  scheduledDateSchema,
+  taskQuerySchema,
+} from '@/contracts';
 import type { Clock } from '@/domain/clock';
 import {
   buildZonedInstant,
@@ -56,5 +62,34 @@ describe('domain/time', () => {
     expect(shiftScheduledDate('2027-01-01', -1, 'Asia/Saigon')).toBe('2026-12-31');
     expect(shiftScheduledDate('2028-02-28', 1, 'Asia/Saigon')).toBe('2028-02-29');
     expect(shiftScheduledDate('2026-02-28', 1, 'Asia/Saigon')).toBe('2026-03-01');
+    expect(() => shiftScheduledDate('2026-02-30', 1, 'Asia/Saigon')).toThrow(RangeError);
+  });
+
+  it('rejects impossible YYYY-MM-DD calendar dates in scheduledDateSchema and taskQuerySchema (C06)', () => {
+    expect(scheduledDateSchema.safeParse('2026-10-30').success).toBe(true);
+    expect(scheduledDateSchema.safeParse('2028-02-29').success).toBe(true);
+    expect(scheduledDateSchema.safeParse('2026-02-29').success).toBe(false);
+    expect(scheduledDateSchema.safeParse('2026-02-30').success).toBe(false);
+    expect(scheduledDateSchema.safeParse('2026-13-01').success).toBe(false);
+    expect(scheduledDateSchema.safeParse('2026-00-10').success).toBe(false);
+
+    expect(
+      createTaskInputSchema.safeParse({
+        title: 'Bad scheduled date',
+        deadlineAt: '2026-10-30T16:59:00.000Z',
+        scheduledDate: '2026-02-30',
+      }).success,
+    ).toBe(false);
+
+    expect(
+      taskQuerySchema.safeParse({
+        scheduledFrom: '2026-02-30',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('normalizes offset ISO instants to canonical UTC .toISOString() in isoInstantSchema (C05)', () => {
+    expect(isoInstantSchema.parse('2026-10-30T23:59:00+07:00')).toBe('2026-10-30T16:59:00.000Z');
+    expect(isoInstantSchema.parse('2026-10-30T16:59:00Z')).toBe('2026-10-30T16:59:00.000Z');
   });
 });

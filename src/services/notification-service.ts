@@ -18,6 +18,7 @@ export class NotificationService {
   private readonly clock: Clock;
   private readonly timeZone: string;
   private lastTickAt: Date | null = null;
+  private inFlightTick: Promise<{ createdCount: number }> | null = null;
 
   constructor(deps: { storage: StorageAdapter; clock: Clock; timeZone?: string }) {
     this.storage = deps.storage;
@@ -26,8 +27,21 @@ export class NotificationService {
   }
 
   async runReminderTick(): Promise<{ createdCount: number }> {
+    if (this.inFlightTick) {
+      return this.inFlightTick;
+    }
+
+    const tickPromise = this.executeReminderTick().finally(() => {
+      if (this.inFlightTick === tickPromise) {
+        this.inFlightTick = null;
+      }
+    });
+    this.inFlightTick = tickPromise;
+    return tickPromise;
+  }
+
+  private async executeReminderTick(): Promise<{ createdCount: number }> {
     const now = this.clock.now();
-    this.lastTickAt = now;
     const nowIso = now.toISOString();
 
     const [activeTasks, existingAlerts] = await Promise.all([
@@ -65,10 +79,15 @@ export class NotificationService {
       }
     }
 
+    this.lastTickAt = now;
     return { createdCount };
   }
 
   async runReminderTickIfStale(maxAgeMs: number = 15_000): Promise<void> {
+    if (this.inFlightTick) {
+      await this.inFlightTick;
+      return;
+    }
     const now = this.clock.now();
     if (this.lastTickAt === null || differenceInMilliseconds(now, this.lastTickAt) > maxAgeMs) {
       await this.runReminderTick();
@@ -85,8 +104,9 @@ export class NotificationService {
 
   async listNotifications(): Promise<NotificationListResponse> {
     const now = this.clock.now();
+    const cutoffIso = addDays(now, -RETENTION_DAYS).toISOString();
     const [records, tasks] = await Promise.all([
-      this.storage.notifications.listItems(),
+      this.storage.notifications.listItems({ createdAtAfter: cutoffIso }),
       this.storage.tasks.listItems(),
     ]);
 
@@ -97,6 +117,9 @@ export class NotificationService {
 
     const items: NotificationDto[] = [];
     for (const record of records) {
+      if (record.createdAt <= cutoffIso) {
+        continue;
+      }
       const linkedTask = record.taskId ? (taskMap.get(record.taskId) ?? null) : null;
       const dto = buildNotificationDto({
         record,

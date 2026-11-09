@@ -1,22 +1,20 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { z } from 'zod';
 import type { ApiErrorResponse, TaskDto } from '@/contracts';
-import { handleApiError } from '@/server/api-response';
+import { assertSameOriginMutation, handleApiError, parseUuidParam } from '@/server/api-response';
 import { getContainer } from '@/server/container';
-
-const idSchema = z.string().uuid('Invalid task id');
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   context: RouteContext,
 ): Promise<NextResponse<{ item: TaskDto } | ApiErrorResponse>> {
   try {
+    assertSameOriginMutation(request);
     const { id } = await context.params;
-    const taskId = idSchema.parse(id);
+    const taskId = parseUuidParam(id, 'Invalid task id');
     const { taskService } = await getContainer();
     const item = await taskService.completeTask(taskId);
     return NextResponse.json({ item }, { status: 200 });

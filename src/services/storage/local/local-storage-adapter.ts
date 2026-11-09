@@ -29,6 +29,8 @@ export class LocalStorageAdapter implements StorageAdapter {
   private readonly localMedia: LocalMediaStorage;
   private sqlite: Database.Database | null = null;
   private db: BetterSQLite3Database | null = null;
+  private txChain: Promise<void> = Promise.resolve();
+  private savepointSeq = 0;
 
   constructor(options: LocalStorageAdapterOptions) {
     this.databasePath = options.databasePath;
@@ -56,14 +58,52 @@ export class LocalStorageAdapter implements StorageAdapter {
     await this.localMedia.ensureDirectory();
 
     const sqlite = new Database(this.databasePath);
-    sqlite.pragma('journal_mode = WAL');
-    sqlite.pragma('foreign_keys = ON');
+    try {
+      sqlite.pragma('journal_mode = WAL');
+      sqlite.pragma('foreign_keys = ON');
 
-    const db = drizzle(sqlite);
-    migrate(db, { migrationsFolder: this.migrationsFolder });
+      const db = drizzle(sqlite);
+      migrate(db, { migrationsFolder: this.migrationsFolder });
 
-    this.sqlite = sqlite;
-    this.db = db;
+      this.sqlite = sqlite;
+      this.db = db;
+    } catch (error: unknown) {
+      sqlite.close();
+      throw error;
+    }
+  }
+
+  async runInTransaction<T>(work: () => Promise<T>): Promise<T> {
+    if (!this.sqlite || !this.db) {
+      throw new Error('LocalStorageAdapter has not been initialized. Call init() first.');
+    }
+
+    const sqlite = this.sqlite;
+    let releaseQueue!: () => void;
+    const prevChain = this.txChain;
+    this.txChain = new Promise<void>((resolve) => {
+      releaseQueue = resolve;
+    });
+
+    await prevChain;
+
+    this.savepointSeq += 1;
+    const spName = `hts_sp_${this.savepointSeq}`;
+    sqlite.exec(`SAVEPOINT ${spName}`);
+    try {
+      const result = await work();
+      sqlite.exec(`RELEASE SAVEPOINT ${spName}`);
+      return result;
+    } catch (error: unknown) {
+      try {
+        sqlite.exec(`ROLLBACK TO SAVEPOINT ${spName}; RELEASE SAVEPOINT ${spName}`);
+      } catch {
+        // Ignore rollback cleanup errors if connection closed
+      }
+      throw error;
+    } finally {
+      releaseQueue();
+    }
   }
 
   async close(): Promise<void> {

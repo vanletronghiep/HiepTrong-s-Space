@@ -31,4 +31,32 @@ describe('server/config', () => {
 
     expect(() => parseAppConfig({ STORAGE_DRIVER: 's3' })).toThrow();
   });
+
+  it('validates APP_TIMEZONE against IANA timezones and rejects invalid zones (C09)', () => {
+    expect(parseAppConfig({ APP_TIMEZONE: 'Asia/Ho_Chi_Minh' }).appTimezone).toBe(
+      'Asia/Ho_Chi_Minh',
+    );
+    expect(parseAppConfig({ APP_TIMEZONE: 'Asia/Saigon' }).appTimezone).toBe('Asia/Saigon');
+    expect(parseAppConfig({ APP_TIMEZONE: 'America/New_York' }).appTimezone).toBe(
+      'America/New_York',
+    );
+    expect(() => parseAppConfig({ APP_TIMEZONE: 'Mars/Phobos' })).toThrow(/timezone/i);
+    expect(() => parseAppConfig({ APP_TIMEZONE: 'Invalid/Zone_Name' })).toThrow(/timezone/i);
+  });
+
+  it('resolves identical database paths for runtime config and Drizzle CLI config (C10)', async () => {
+    const { resolveDatabasePath } = await import('@/server/config');
+    const defaultConfig = parseAppConfig({});
+    expect(resolveDatabasePath({})).toBe(defaultConfig.databasePath);
+
+    const customEnv = {
+      DATA_DIR: './custom-runtime-data',
+      DATABASE_FILE: 'custom-space.db',
+    };
+    const customConfig = parseAppConfig(customEnv);
+    expect(resolveDatabasePath(customEnv)).toBe(customConfig.databasePath);
+    expect(customConfig.databasePath).toBe(
+      path.resolve('./custom-runtime-data', 'custom-space.db'),
+    );
+  });
 });

@@ -103,10 +103,13 @@ export function TaskCard({
     </>
   );
 
+  const cardDomId = `task-card-${context}${carousel ? '-carousel' : ''}-${task.id}`;
+
   return (
     <motion.article
       ref={cardRef}
-      id={`task-card-${task.id}`}
+      id={cardDomId}
+      data-task-id={task.id}
       layout={reducedMotion ? false : 'position'}
       initial={reducedMotion ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: isCompleted ? 0.72 : 1, y: 0 }}
@@ -116,6 +119,16 @@ export function TaskCard({
         ease: MOTION_EASE,
       }}
       onClick={carousel ? undefined : () => setExpanded((prev) => !prev)}
+      onKeyDown={
+        carousel
+          ? undefined
+          : (e) => {
+              if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                setExpanded((prev) => !prev);
+              }
+            }
+      }
       className={cn(
         'group/card relative flex flex-col rounded-task border select-none',
         carousel
@@ -159,7 +172,21 @@ export function TaskCard({
               : 'text-ws-text',
           )}
         >
-          {task.title}
+          {carousel ? (
+            task.title
+          ) : (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded((prev) => !prev);
+              }}
+              className="w-full text-left bg-transparent border-0 p-0 font-inherit text-inherit cursor-pointer rounded-sm"
+            >
+              {task.title}
+            </button>
+          )}
         </h3>
 
         <TaskMenu

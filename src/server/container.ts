@@ -53,6 +53,7 @@ async function buildContainer(): Promise<AppContainer> {
       return {
         ok: true,
         storage: config.storageDriver,
+        timeZone: config.appTimezone,
       };
     },
   };

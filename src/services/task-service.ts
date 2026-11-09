@@ -16,7 +16,7 @@ import { computeReminderAt } from '@/domain/reminder';
 import { sortTasks } from '@/domain/task-sort';
 import { toTaskDto } from '@/domain/task-status';
 import { ConflictError, NotFoundError, ValidationError } from './errors';
-import type { StorageAdapter } from './storage/storage-adapter';
+import type { StorageAdapter, TaskRecordPatch } from './storage/storage-adapter';
 
 export class TaskService {
   private readonly storage: StorageAdapter;
@@ -83,35 +83,40 @@ export class TaskService {
     const now = this.clock.now();
     const nowIso = now.toISOString();
     const nextDeadlineAt = input.deadlineAt ?? existing.deadlineAt;
-    const deadlineChanged = nextDeadlineAt !== existing.deadlineAt;
+    const deadlineChanged =
+      input.deadlineAt !== undefined && input.deadlineAt !== existing.deadlineAt;
 
-    let nextReminderAt = existing.reminderAt;
-    if (deadlineChanged) {
-      nextReminderAt =
-        existing.status === 'completed' ? null : computeReminderAt(nextDeadlineAt, now);
-    }
-
-    const updated: TaskRecord = {
-      ...existing,
-      title: input.title ?? existing.title,
-      description: input.description ?? existing.description,
-      priority: input.priority ?? existing.priority,
-      pinned: input.pinned ?? existing.pinned,
-      deadlineAt: nextDeadlineAt,
-      scheduledDate:
-        input.scheduledDate !== undefined ? input.scheduledDate : existing.scheduledDate,
-      reminderAt: nextReminderAt,
+    const patch: TaskRecordPatch = {
       updatedAt: nowIso,
     };
-
-    const saved = await this.storage.tasks.saveItem(updated);
-
-    if (deadlineChanged) {
-      await this.storage.notifications.deleteWhere({
-        taskId: id,
-        kinds: ['due_soon', 'overdue'],
-      });
+    if (input.title !== undefined) patch.title = input.title;
+    if (input.description !== undefined) patch.description = input.description;
+    if (input.priority !== undefined) patch.priority = input.priority;
+    if (input.pinned !== undefined) patch.pinned = input.pinned;
+    if (input.scheduledDate !== undefined) patch.scheduledDate = input.scheduledDate;
+    if (input.deadlineAt !== undefined) {
+      patch.deadlineAt = nextDeadlineAt;
+      if (deadlineChanged) {
+        patch.reminderAt =
+          existing.status === 'completed' ? null : computeReminderAt(nextDeadlineAt, now);
+      }
     }
+
+    const saved = await this.storage.runInTransaction(async () => {
+      const patched = await this.storage.tasks.patchItem(id, patch);
+      if (!patched) {
+        throw new NotFoundError('Task not found.');
+      }
+
+      if (deadlineChanged) {
+        await this.storage.notifications.deleteWhere({
+          taskId: id,
+          kinds: ['due_soon', 'overdue'],
+        });
+      }
+
+      return patched;
+    });
 
     return toTaskDto(saved, now);
   }
@@ -123,44 +128,49 @@ export class TaskService {
     }
 
     const now = this.clock.now();
-    if (existing.status === 'completed') {
-      return toTaskDto(existing, now);
-    }
-
     const nowIso = now.toISOString();
-    const updated: TaskRecord = {
-      ...existing,
-      status: 'completed',
-      completedAt: nowIso,
-      reminderAt: null,
-      updatedAt: nowIso,
-    };
 
-    const saved = await this.storage.tasks.saveItem(updated);
+    const saved = await this.storage.runInTransaction(async () => {
+      const target =
+        existing.status === 'completed'
+          ? existing
+          : await this.storage.tasks.patchItem(id, {
+              status: 'completed',
+              completedAt: nowIso,
+              reminderAt: null,
+              updatedAt: nowIso,
+            });
 
-    // §6.7: If the task had a due_soon or overdue notification, delete those and create one completed notification.
-    const removedAlertCount = await this.storage.notifications.deleteWhere({
-      taskId: id,
-      kinds: ['due_soon', 'overdue'],
-    });
+      if (!target) {
+        throw new NotFoundError('Task not found.');
+      }
 
-    if (removedAlertCount > 0) {
-      try {
-        await this.storage.notifications.saveItem({
-          id: crypto.randomUUID(),
-          kind: 'completed',
-          taskId: id,
-          dedupeKey: `task:${id}:completed:${existing.deadlineAt}`,
-          payload: null,
-          createdAt: nowIso,
-          readAt: null,
-        });
-      } catch (error: unknown) {
-        if (!(error instanceof ConflictError)) {
-          throw error;
+      // §6.7: If the task had a due_soon or overdue notification, delete those and create one completed notification.
+      const removedAlertCount = await this.storage.notifications.deleteWhere({
+        taskId: id,
+        kinds: ['due_soon', 'overdue'],
+      });
+
+      if (removedAlertCount > 0) {
+        try {
+          await this.storage.notifications.saveItem({
+            id: crypto.randomUUID(),
+            kind: 'completed',
+            taskId: id,
+            dedupeKey: `task:${id}:completed:${target.deadlineAt}`,
+            payload: null,
+            createdAt: nowIso,
+            readAt: null,
+          });
+        } catch (error: unknown) {
+          if (!(error instanceof ConflictError)) {
+            throw error;
+          }
         }
       }
-    }
+
+      return target;
+    });
 
     return toTaskDto(saved, now);
   }
@@ -172,20 +182,31 @@ export class TaskService {
     }
 
     const now = this.clock.now();
-    if (existing.status === 'active') {
-      return toTaskDto(existing, now);
-    }
-
     const nowIso = now.toISOString();
-    const updated: TaskRecord = {
-      ...existing,
-      status: 'active',
-      completedAt: null,
-      reminderAt: computeReminderAt(existing.deadlineAt, now),
-      updatedAt: nowIso,
-    };
 
-    const saved = await this.storage.tasks.saveItem(updated);
+    const saved = await this.storage.runInTransaction(async () => {
+      const target =
+        existing.status === 'active'
+          ? existing
+          : await this.storage.tasks.patchItem(id, {
+              status: 'active',
+              completedAt: null,
+              reminderAt: computeReminderAt(existing.deadlineAt, now),
+              updatedAt: nowIso,
+            });
+
+      if (!target) {
+        throw new NotFoundError('Task not found.');
+      }
+
+      await this.storage.notifications.deleteWhere({
+        taskId: id,
+        kinds: ['completed'],
+      });
+
+      return target;
+    });
+
     return toTaskDto(saved, now);
   }
 
@@ -205,19 +226,26 @@ export class TaskService {
     }
 
     const nowIso = now.toISOString();
-    const updated: TaskRecord = {
-      ...existing,
-      scheduledDate: input.scheduledDate,
-      deadlineAt: input.deadlineAt,
-      reminderAt: existing.status === 'completed' ? null : computeReminderAt(input.deadlineAt, now),
-      updatedAt: nowIso,
-    };
 
-    const saved = await this.storage.tasks.saveItem(updated);
+    const saved = await this.storage.runInTransaction(async () => {
+      const patched = await this.storage.tasks.patchItem(id, {
+        scheduledDate: input.scheduledDate,
+        deadlineAt: input.deadlineAt,
+        reminderAt:
+          existing.status === 'completed' ? null : computeReminderAt(input.deadlineAt, now),
+        updatedAt: nowIso,
+      });
 
-    await this.storage.notifications.deleteWhere({
-      taskId: id,
-      kinds: ['due_soon', 'overdue'],
+      if (!patched) {
+        throw new NotFoundError('Task not found.');
+      }
+
+      await this.storage.notifications.deleteWhere({
+        taskId: id,
+        kinds: ['due_soon', 'overdue'],
+      });
+
+      return patched;
     });
 
     return toTaskDto(saved, now);
@@ -228,7 +256,9 @@ export class TaskService {
     if (!existing) {
       throw new NotFoundError('Task not found.');
     }
-    await this.storage.notifications.deleteWhere({ taskId: id });
-    await this.storage.tasks.deleteItem(id);
+    await this.storage.runInTransaction(async () => {
+      await this.storage.notifications.deleteWhere({ taskId: id });
+      await this.storage.tasks.deleteItem(id);
+    });
   }
 }
