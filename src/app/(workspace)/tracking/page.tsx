@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { BlankPage } from '@/features/blank/BlankPage';
+import { TrackingView } from '@/features/tracking/TrackingView';
 import { getFeatureById } from '@/features/registry';
 
 const feature = getFeatureById('tracking');
@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function TrackingPage() {
-  return <BlankPage title={feature?.title ?? 'Tracking'} />;
+  return <TrackingView />;
 }

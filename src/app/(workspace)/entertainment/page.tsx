@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { BlankPage } from '@/features/blank/BlankPage';
+import { EntertainmentView } from '@/features/entertainment/EntertainmentView';
 import { getFeatureById } from '@/features/registry';
 
 const feature = getFeatureById('entertainment');
@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function EntertainmentPage() {
-  return <BlankPage title={feature?.title ?? 'Entertainment Hub'} />;
+  return <EntertainmentView />;
 }

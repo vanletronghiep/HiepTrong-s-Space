@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { BlankPage } from '@/features/blank/BlankPage';
+import { FlashcardsView } from '@/features/flashcards/FlashcardsView';
 import { getFeatureById } from '@/features/registry';
 
 const feature = getFeatureById('flashcards');
@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function FlashcardsPage() {
-  return <BlankPage title={feature?.title ?? 'Flashcards'} />;
+  return <FlashcardsView />;
 }

@@ -1,0 +1,367 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-4);
+  max-width: 1060px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding: var(--space-8) var(--space-6);
+  }
+}
+
+/* Tasteful Gallery Header */
+.header {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--cosmos-lavender) 12%, var(--ws-surface)) 0%,
+    color-mix(in srgb, var(--daily-shooting-star) 10%, var(--ws-surface)) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--cosmos-lavender) 25%, var(--ws-border));
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  overflow: hidden;
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--cosmos-lavender) 5%, transparent);
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--daily-heading-accent);
+  background: color-mix(in srgb, var(--cosmos-lavender) 15%, transparent);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  width: fit-content;
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--ws-text);
+  margin: var(--space-2) 0 0;
+  letter-spacing: -0.02em;
+}
+
+.description {
+  font-size: var(--text-sm);
+  color: var(--ws-text-muted);
+  max-width: 660px;
+  line-height: 1.6;
+  margin: var(--space-2) 0 0;
+}
+
+/* Mode Switcher & Controls Bar */
+.controlsBar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .controlsBar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.filterChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.filterChip {
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  color: var(--ws-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--timing-fast) var(--motion-standard),
+    background var(--timing-fast) var(--motion-standard),
+    color var(--timing-fast) var(--motion-standard);
+}
+
+.filterChip:hover {
+  border-color: var(--cosmos-lavender);
+  color: var(--ws-text);
+}
+
+.filterChipActive {
+  background: color-mix(in srgb, var(--cosmos-lavender) 18%, transparent);
+  border-color: var(--cosmos-lavender);
+  color: var(--daily-heading-accent);
+  font-weight: 600;
+}
+
+.rightControls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* View Mode vs Edit Mode Toggle */
+.modeToggle {
+  display: flex;
+  background: color-mix(in srgb, var(--ws-bg) 60%, var(--ws-surface));
+  padding: 3px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--ws-border);
+}
+
+.modeToggleBtn {
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--ws-text-muted);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background var(--timing-fast) var(--motion-standard),
+    color var(--timing-fast) var(--motion-standard);
+}
+
+.modeToggleBtnActive {
+  background: var(--ws-surface);
+  color: var(--ws-text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ws-text) 8%, transparent);
+}
+
+.addBtn {
+  background: var(--daily-heading-accent);
+  color: var(--cosmos-star-white);
+  border: none;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Gallery Grid */
+.galleryGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .galleryGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.achievementCard {
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-3);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--ws-text) 3%, transparent);
+  transition: transform var(--timing-fast) var(--motion-standard),
+    box-shadow var(--timing-fast) var(--motion-standard);
+}
+
+.achievementCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--cosmos-lavender) 10%, transparent);
+}
+
+.cardHeaderLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--text-xs);
+  color: var(--ws-text-muted);
+}
+
+.eraBadge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--cosmos-lavender) 15%, transparent);
+  color: var(--daily-heading-accent);
+  text-transform: capitalize;
+}
+
+.awardPill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--daily-shooting-star) 12%, transparent);
+  color: var(--daily-shooting-star);
+}
+
+.cardTitle {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--ws-text);
+  margin: var(--space-1) 0 0;
+  line-height: 1.35;
+}
+
+.orgName {
+  font-size: var(--text-xs);
+  color: var(--ws-text-muted);
+  margin: 2px 0 0;
+}
+
+.cardDesc {
+  font-size: var(--text-xs);
+  color: var(--ws-text);
+  line-height: 1.5;
+  margin: var(--space-2) 0 0;
+}
+
+/* Lessons Learned Callout */
+.lessonsBox {
+  background: color-mix(in srgb, var(--cosmos-lavender) 6%, var(--ws-bg));
+  border-left: 3px solid var(--cosmos-lavender);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: var(--text-xs);
+  color: var(--ws-text);
+  line-height: 1.5;
+}
+
+/* Future Contest Alert Banner */
+.contestAlert {
+  background: color-mix(in srgb, var(--status-due-soon) 12%, var(--ws-surface));
+  border: 1px solid color-mix(in srgb, var(--status-due-soon) 35%, var(--ws-border));
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--ws-text);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.editActionsRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  border-top: 1px solid var(--ws-border);
+  padding-top: var(--space-2);
+}
+
+.cardActionBtn {
+  background: none;
+  border: 1px solid var(--ws-border);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--ws-text-muted);
+  cursor: pointer;
+}
+
+.cardActionBtn:hover {
+  color: var(--ws-text);
+  border-color: var(--cosmos-lavender);
+}
+
+/* Modals */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: var(--ws-scrim);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 100;
+}
+
+.modalContent {
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-lg);
+  max-width: 540px;
+  width: 100%;
+  max-height: 90vh;
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--ws-text) 15%, transparent);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow-y: auto;
+}
+
+.inputField,
+.selectField,
+.textareaField {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--ws-text);
+  background: color-mix(in srgb, var(--ws-bg) 60%, var(--ws-surface));
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--timing-fast) var(--motion-standard);
+}
+
+.inputField:focus,
+.selectField:focus,
+.textareaField:focus {
+  border-color: var(--cosmos-lavender);
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.cancelBtn {
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  color: var(--ws-text);
+  cursor: pointer;
+}
+
+.submitBtn {
+  background: var(--daily-heading-accent);
+  color: var(--cosmos-star-white);
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .achievementCard,
+  .filterChip,
+  .modeToggleBtn {
+    transition: none;
+  }
+}
+

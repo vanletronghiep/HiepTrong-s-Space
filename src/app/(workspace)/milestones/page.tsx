@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
-import { BlankPage } from '@/features/blank/BlankPage';
+import { MilestonesView } from '@/features/milestones/MilestonesView';
 import { getFeatureById } from '@/features/registry';
 
 const feature = getFeatureById('milestones');
 
 export const metadata: Metadata = {
-  title: feature?.title ?? 'Annual Milestones',
+  title: feature?.title ?? 'Milestone',
 };
 
 export default function MilestonesPage() {
-  return <BlankPage title={feature?.title ?? 'Annual Milestones'} />;
+  return <MilestonesView />;
 }

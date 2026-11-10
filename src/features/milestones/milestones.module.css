@@ -1,0 +1,262 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.horizonGlow {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 1200px;
+  height: 280px;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 70% 60% at 50% 0%,
+    color-mix(in srgb, var(--cosmos-star) 10%, transparent) 0%,
+    transparent 75%
+  );
+  z-index: 0;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.titleArea {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-small);
+  color: var(--cosmos-star);
+  font-weight: 600;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.2vw, 2.75rem);
+  font-weight: 600;
+  color: var(--ws-text);
+  line-height: 1.1;
+  margin: 0;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--dur-fast) ease-out;
+}
+
+.statCard:hover {
+  border-color: color-mix(in srgb, var(--cosmos-star) 40%, var(--ws-border));
+}
+
+.statValue {
+  font-family: var(--font-sans);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--ws-text);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.statLabel {
+  font-size: var(--fs-small);
+  color: var(--ws-text-muted);
+}
+
+.milestonesList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.milestoneCard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 28px;
+  border-radius: var(--radius-lg);
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--dur-fast) ease-out, box-shadow var(--dur-fast) ease-out;
+}
+
+.milestoneCard:hover {
+  border-color: color-mix(in srgb, var(--cosmos-star) 40%, var(--ws-border));
+  box-shadow: var(--shadow-md);
+}
+
+.cardHeaderRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.timeframeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--cosmos-star) 14%, var(--ws-surface));
+  color: var(--ws-text);
+  font-size: var(--fs-micro, 11px);
+  font-weight: 600;
+}
+
+.cardTitle {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--ws-text);
+  line-height: 1.25;
+}
+
+.cardMeaning {
+  font-size: var(--fs-ui);
+  color: var(--ws-text);
+  line-height: 1.55;
+  font-style: italic;
+}
+
+.reflectionBox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--ws-bg);
+  border-left: 3px solid var(--cosmos-star);
+  font-size: var(--fs-small);
+}
+
+.reflectionLabel {
+  font-size: var(--fs-micro, 11px);
+  font-weight: 700;
+  color: var(--ws-text-muted);
+}
+
+.landmarksSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.landmarksHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--ws-text);
+}
+
+.landmarksList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.landmarkItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--ws-bg-alt);
+  border: 1px solid var(--ws-border);
+  cursor: pointer;
+  transition: background var(--dur-fast) ease-out;
+}
+
+.landmarkItem:hover {
+  background: color-mix(in srgb, var(--ws-accent-soft) 80%, var(--ws-bg-alt));
+}
+
+.landmarkTitle {
+  font-size: var(--fs-small);
+  color: var(--ws-text);
+  flex: 1;
+}
+
+.landmarkTitleDone {
+  text-decoration: line-through;
+  color: var(--ws-text-muted);
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--cosmos-bg) 50%, transparent);
+  backdrop-filter: blur(4px);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modalWindow {
+  position: relative;
+  width: 100%;
+  max-width: 540px;
+  border-radius: var(--radius-lg);
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  box-shadow: var(--shadow-lg);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.modalCloseButton {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  color: var(--ws-text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-pill);
+}
+
+.modalCloseButton:hover {
+  color: var(--ws-text);
+  background: var(--ws-bg-alt);
+}
+

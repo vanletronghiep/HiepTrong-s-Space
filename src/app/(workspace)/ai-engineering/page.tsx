@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { BlankPage } from '@/features/blank/BlankPage';
+import { AiEngineeringView } from '@/features/ai-engineering/AiEngineeringView';
 import { getFeatureById } from '@/features/registry';
 
 const feature = getFeatureById('ai-engineering');
@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function AiEngineeringPage() {
-  return <BlankPage title={feature?.title ?? 'AI Engineering'} />;
+  return <AiEngineeringView />;
 }

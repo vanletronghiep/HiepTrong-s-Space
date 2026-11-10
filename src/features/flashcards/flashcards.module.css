@@ -1,0 +1,423 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-4);
+  max-width: 1040px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding: var(--space-8) var(--space-6);
+  }
+}
+
+/* Viking / Ancient Historical Header */
+.header {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--daily-shooting-star) 12%, var(--ws-surface)) 0%,
+    color-mix(in srgb, var(--cosmos-navy-1) 8%, var(--ws-surface)) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--daily-shooting-star) 30%, var(--ws-border));
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  overflow: hidden;
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--daily-shooting-star) 5%, transparent);
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--daily-shooting-star);
+  background: color-mix(in srgb, var(--daily-shooting-star) 12%, transparent);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  width: fit-content;
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--ws-text);
+  margin: var(--space-2) 0 0;
+  letter-spacing: -0.02em;
+}
+
+.description {
+  font-size: var(--text-sm);
+  color: var(--ws-text-muted);
+  max-width: 660px;
+  line-height: 1.6;
+  margin: var(--space-2) 0 0;
+}
+
+/* Stats Row */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .statsRow {
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-4);
+  }
+}
+
+.statCard {
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.statValue {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--daily-shooting-star);
+  line-height: 1.2;
+}
+
+.statLabel {
+  font-size: var(--text-xs);
+  color: var(--ws-text-muted);
+  margin-top: 2px;
+}
+
+/* Section Header */
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.sectionTitle {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--ws-text);
+  margin: 0;
+}
+
+.actionBtn {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--daily-shooting-star);
+  background: color-mix(in srgb, var(--daily-shooting-star) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--daily-shooting-star) 30%, transparent);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  transition: background var(--timing-fast) var(--motion-standard);
+}
+
+.actionBtn:hover {
+  background: color-mix(in srgb, var(--daily-shooting-star) 20%, transparent);
+}
+
+/* Decks Grid */
+.decksGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .decksGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.deckCard {
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-4);
+  transition: transform var(--timing-fast) var(--motion-standard),
+    box-shadow var(--timing-fast) var(--motion-standard),
+    border-color var(--timing-fast) var(--motion-standard);
+}
+
+.deckCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--daily-shooting-star) 8%, transparent);
+  border-color: color-mix(in srgb, var(--daily-shooting-star) 40%, var(--ws-border));
+}
+
+.deckTopic {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--daily-shooting-star);
+}
+
+.deckName {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--ws-text);
+  margin: var(--space-1) 0 0;
+}
+
+.deckDesc {
+  font-size: var(--text-xs);
+  color: var(--ws-text-muted);
+  line-height: 1.5;
+  margin: var(--space-1) 0 0;
+}
+
+.deckProgressTrack {
+  height: 6px;
+  background: color-mix(in srgb, var(--ws-border) 80%, transparent);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-top: var(--space-2);
+}
+
+.deckProgressFill {
+  height: 100%;
+  background: var(--daily-shooting-star);
+}
+
+.deckFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid color-mix(in srgb, var(--ws-border) 70%, transparent);
+  padding-top: var(--space-3);
+}
+
+.studyBtn {
+  background: var(--daily-shooting-star);
+  color: var(--cosmos-star-white);
+  border: none;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--timing-fast) var(--motion-standard);
+}
+
+.studyBtn:hover {
+  background: color-mix(in srgb, var(--daily-shooting-star) 85%, var(--journey-space-black));
+}
+
+/* ─── Active Study Session (Brainscape prompt/answer flow) ─── */
+.studyContainer {
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--ws-text) 5%, transparent);
+}
+
+.flashcardFrame {
+  width: 100%;
+  max-width: 580px;
+  min-height: 240px;
+  background: color-mix(in srgb, var(--ws-bg) 40%, var(--ws-surface));
+  border: 1px solid color-mix(in srgb, var(--daily-shooting-star) 30%, var(--ws-border));
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-4);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--daily-shooting-star) 6%, transparent);
+}
+
+.cardPrompt {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--ws-text);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.revealBtn {
+  background: var(--ws-surface);
+  border: 1px solid var(--daily-shooting-star);
+  color: var(--daily-shooting-star);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--timing-fast) var(--motion-standard);
+}
+
+.revealBtn:hover {
+  background: color-mix(in srgb, var(--daily-shooting-star) 10%, transparent);
+}
+
+.cardAnswerBox {
+  border-top: 1px dashed var(--ws-border);
+  padding-top: var(--space-4);
+  width: 100%;
+}
+
+.cardAnswer {
+  font-size: var(--text-base);
+  color: var(--ws-text);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.cardNotes {
+  font-size: var(--text-xs);
+  color: var(--ws-text-muted);
+  font-style: italic;
+  margin-top: var(--space-2);
+}
+
+/* Confidence Rating Buttons (1 to 5) */
+.confidenceRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.confidenceLabel {
+  font-size: var(--text-xs);
+  color: var(--ws-text-muted);
+}
+
+.ratingGroup {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.rateBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--ws-border);
+  background: var(--ws-surface);
+  color: var(--ws-text);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  transition: border-color var(--timing-fast) var(--motion-standard),
+    background var(--timing-fast) var(--motion-standard),
+    color var(--timing-fast) var(--motion-standard);
+}
+
+.rateBtn:hover {
+  border-color: var(--daily-shooting-star);
+  background: color-mix(in srgb, var(--daily-shooting-star) 10%, transparent);
+  color: var(--daily-shooting-star);
+}
+
+/* Modals */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: var(--ws-scrim);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 100;
+}
+
+.modalContent {
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-lg);
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--ws-text) 15%, transparent);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.inputField,
+.textareaField {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--ws-text);
+  background: color-mix(in srgb, var(--ws-bg) 60%, var(--ws-surface));
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--timing-fast) var(--motion-standard);
+}
+
+.inputField:focus,
+.textareaField:focus {
+  border-color: var(--daily-shooting-star);
+}
+
+.shortcutHint {
+  font-size: 11px;
+  color: var(--ws-text-muted);
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.cancelBtn {
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  color: var(--ws-text);
+  cursor: pointer;
+}
+
+.submitBtn {
+  background: var(--daily-shooting-star);
+  color: var(--cosmos-star-white);
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deckCard,
+  .actionBtn,
+  .studyBtn,
+  .revealBtn,
+  .rateBtn {
+    transition: none;
+  }
+}
+

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { BlankPage } from '@/features/blank/BlankPage';
+import { ApcsView } from '@/features/apcs/ApcsView';
 import { getFeatureById } from '@/features/registry';
 
 const feature = getFeatureById('apcs');
@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function ApcsPage() {
-  return <BlankPage title={feature?.title ?? 'APCS Hub'} />;
+  return <ApcsView />;
 }
