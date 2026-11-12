@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleApiError } from '@/server/api-response';
 import { apcsService } from '@/services/apcs-service';
 
 export async function GET(request: NextRequest) {
@@ -11,8 +12,7 @@ export async function GET(request: NextRequest) {
     const results = apcsService.searchFiles(query, course, category);
     return NextResponse.json({ success: true, data: results });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Search failed';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return handleApiError(err);
   }
 }
 

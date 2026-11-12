@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { patchEventInputSchema } from '@/contracts/event';
-import { handleApiError, parseJsonBody } from '@/server/api-response';
+import { assertSameOriginMutation, handleApiError, parseJsonBody } from '@/server/api-response';
+import { NotFoundError } from '@/services/errors';
 import { eventService } from '@/services/event-service';
 
 export async function GET(
@@ -11,7 +12,7 @@ export async function GET(
     const { id } = await params;
     const item = await eventService.getEvent(id);
     if (!item) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      throw new NotFoundError('Event not found');
     }
     return NextResponse.json({ item }, { status: 200 });
   } catch (error: unknown) {
@@ -29,7 +30,7 @@ export async function PATCH(
     const patch = patchEventInputSchema.parse(body);
     const item = await eventService.updateEvent(id, patch);
     if (!item) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      throw new NotFoundError('Event not found');
     }
     return NextResponse.json({ item }, { status: 200 });
   } catch (error: unknown) {
@@ -42,10 +43,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   try {
+    assertSameOriginMutation(_request);
     const { id } = await params;
     const deleted = await eventService.deleteEvent(id);
     if (!deleted) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      throw new NotFoundError('Event not found');
     }
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error: unknown) {

@@ -1,19 +1,27 @@
+'use client';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateHabitInput,
+  HabitItem,
   LogScreenTimeInput,
   LogSleepInput,
+  ScreenTimeLog,
+  SleepLog,
   TrackingData,
 } from '@/contracts/tracking';
+import { apiRequest } from '../api-client';
+
+export const trackingKeys = {
+  all: ['tracking'] as const,
+};
 
 export function useTrackingData() {
   return useQuery<TrackingData>({
-    queryKey: ['tracking'],
+    queryKey: trackingKeys.all,
     queryFn: async () => {
-      const res = await fetch('/api/tracking');
-      if (!res.ok) throw new Error('Failed to load tracking data');
-      const json = await res.json();
-      return json.data;
+      const res = await apiRequest<{ success: boolean; data: TrackingData }>('/api/tracking');
+      return res.data;
     },
   });
 }
@@ -23,17 +31,14 @@ export function useToggleHabit() {
 
   return useMutation({
     mutationFn: async ({ habitId, date }: { habitId: string; date: string }) => {
-      const res = await fetch('/api/tracking?action=toggle-habit', {
+      const res = await apiRequest<{ success: boolean; data: HabitItem }>('/api/tracking?action=toggle-habit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ habitId, date }),
+        body: { habitId, date },
       });
-      if (!res.ok) throw new Error('Failed to toggle habit');
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tracking'] });
+      queryClient.invalidateQueries({ queryKey: trackingKeys.all });
     },
   });
 }
@@ -43,17 +48,14 @@ export function useCreateHabit() {
 
   return useMutation({
     mutationFn: async (input: CreateHabitInput) => {
-      const res = await fetch('/api/tracking?action=habit', {
+      const res = await apiRequest<{ success: boolean; data: HabitItem }>('/api/tracking?action=habit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: input,
       });
-      if (!res.ok) throw new Error('Failed to create habit');
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tracking'] });
+      queryClient.invalidateQueries({ queryKey: trackingKeys.all });
     },
   });
 }
@@ -63,17 +65,14 @@ export function useLogSleep() {
 
   return useMutation({
     mutationFn: async (input: LogSleepInput) => {
-      const res = await fetch('/api/tracking?action=sleep', {
+      const res = await apiRequest<{ success: boolean; data: SleepLog }>('/api/tracking?action=sleep', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: input,
       });
-      if (!res.ok) throw new Error('Failed to log sleep');
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tracking'] });
+      queryClient.invalidateQueries({ queryKey: trackingKeys.all });
     },
   });
 }
@@ -83,18 +82,14 @@ export function useLogScreenTime() {
 
   return useMutation({
     mutationFn: async (input: LogScreenTimeInput) => {
-      const res = await fetch('/api/tracking?action=screen-time', {
+      const res = await apiRequest<{ success: boolean; data: ScreenTimeLog }>('/api/tracking?action=screen-time', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: input,
       });
-      if (!res.ok) throw new Error('Failed to log screen time');
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tracking'] });
+      queryClient.invalidateQueries({ queryKey: trackingKeys.all });
     },
   });
 }
-

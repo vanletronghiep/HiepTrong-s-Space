@@ -1,3 +1,5 @@
+import { parseJsonBody, handleApiError } from '@/server/api-response';
+import { NotFoundError, ValidationError } from '@/services/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   createCardInputSchema,
@@ -11,8 +13,7 @@ export async function GET() {
     const data = await flashcardService.getData();
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to retrieve flashcards';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return handleApiError(err);
   }
 }
 
@@ -20,39 +21,30 @@ export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
-    const body = await request.json();
+    const body = await parseJsonBody(request);
 
     if (action === 'deck') {
-      const parsed = createDeckInputSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
-      }
-      const created = await flashcardService.createDeck(parsed.data);
+      const validated = createDeckInputSchema.parse(body);
+      const created = await flashcardService.createDeck(validated);
       return NextResponse.json({ success: true, data: created }, { status: 201 });
     }
 
     if (action === 'card') {
-      const parsed = createCardInputSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
-      }
-      const created = await flashcardService.createCard(parsed.data);
+      const validated = createCardInputSchema.parse(body);
+      const created = await flashcardService.createCard(validated);
       return NextResponse.json({ success: true, data: created }, { status: 201 });
     }
 
     if (action === 'review') {
-      const parsed = reviewCardInputSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
-      }
-      const updated = await flashcardService.reviewCard(parsed.data);
+      const validated = reviewCardInputSchema.parse(body);
+      const updated = await flashcardService.reviewCard(validated);
+      if (!updated) throw new NotFoundError('Record not found');
       return NextResponse.json({ success: true, data: updated });
     }
 
-    return NextResponse.json({ success: false, error: 'Unknown action' }, { status: 400 });
+    throw new ValidationError('Unknown action');
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to process flashcard request';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return handleApiError(err);
   }
 }
 

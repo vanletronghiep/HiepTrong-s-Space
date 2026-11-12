@@ -41,6 +41,25 @@ export function FeatureCollection() {
       aria-labelledby="features-heading"
       className="relative w-full scroll-mt-4"
     >
+      <div
+        className="pointer-events-none absolute inset-0 -top-32 overflow-hidden -z-10"
+        aria-hidden="true"
+      >
+        <div
+          className="absolute left-[12%] top-[5%] w-[60vw] max-w-[850px] aspect-square rounded-full blur-[90px]"
+          style={{
+            background:
+              'radial-gradient(circle, color-mix(in srgb, var(--cosmos-accent) 12%, transparent) 0%, color-mix(in srgb, var(--cosmos-accent) 3%, transparent) 50%, transparent 70%)',
+          }}
+        />
+        <div
+          className="absolute right-[8%] top-[30%] w-[55vw] max-w-[750px] aspect-square rounded-full blur-[100px]"
+          style={{
+            background:
+              'radial-gradient(circle, color-mix(in srgb, var(--daily-planet) 10%, transparent) 0%, color-mix(in srgb, var(--daily-planet) 2%, transparent) 55%, transparent 72%)',
+          }}
+        />
+      </div>
       {layout === 'horizontal' ? (
         <HorizontalGallery
           features={FEATURE_REGISTRY}

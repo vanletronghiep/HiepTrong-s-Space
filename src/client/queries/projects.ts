@@ -27,8 +27,7 @@ export function useCreateProject() {
     mutationFn: async (input: CreateProjectInput) => {
       const res = await apiRequest<{ item: ProjectItem }>('/api/projects', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: input,
       });
       return res.item;
     },
@@ -44,8 +43,7 @@ export function useUpdateProject() {
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<CreateProjectInput> }) => {
       const res = await apiRequest<{ item: ProjectItem }>(`/api/projects/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
+        body: patch,
       });
       return res.item;
     },

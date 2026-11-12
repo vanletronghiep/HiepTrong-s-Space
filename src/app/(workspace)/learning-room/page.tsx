@@ -1,3 +1,4 @@
+import { PageReady } from '@/features/transitions/TransitionProvider';
 import type { Metadata } from 'next';
 import { LearningRoomView } from '@/features/learning-room/LearningRoomView';
 import { getFeatureById } from '@/features/registry';
@@ -9,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function LearningRoomPage() {
-  return <LearningRoomView />;
+  return <><PageReady /><LearningRoomView /></>;
 }

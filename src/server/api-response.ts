@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ZodError, z } from 'zod';
 import type { ApiErrorResponse } from '@/contracts';
-import { AppError, ValidationError } from '@/services/errors';
+import { isAppError, ValidationError } from '@/services/errors';
 import { logger } from './logger';
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
@@ -70,7 +70,7 @@ function zodFieldsToMap(error: ZodError): Record<string, string> {
 }
 
 export function handleApiError(error: unknown): NextResponse<ApiErrorResponse> {
-  if (error instanceof AppError) {
+  if (isAppError(error)) {
     return NextResponse.json(
       {
         error: {

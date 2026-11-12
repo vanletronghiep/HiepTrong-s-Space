@@ -27,8 +27,7 @@ export function useCreateEvent() {
     mutationFn: async (input: CreateEventInput) => {
       const res = await apiRequest<{ item: EventItem }>('/api/events', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: input,
       });
       return res.item;
     },
@@ -44,8 +43,7 @@ export function useUpdateEvent() {
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<CreateEventInput> }) => {
       const res = await apiRequest<{ item: EventItem }>(`/api/events/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
+        body: patch,
       });
       return res.item;
     },

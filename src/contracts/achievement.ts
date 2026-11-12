@@ -16,7 +16,7 @@ export const achievementItemSchema = z.object({
   organization: z.string(),
   description: z.string(),
   lessonsLearned: z.string().default(''),
-  futureDate: z.string().nullable().default(null),
+  futureDate: z.union([z.string().date(), z.string().datetime({ offset: true })]).nullable().default(null),
   reminderEnabled: z.boolean().default(false),
   featured: z.boolean().default(false),
 });
@@ -31,7 +31,7 @@ export const createAchievementInputSchema = z.object({
   organization: z.string().default(''),
   description: z.string().default(''),
   lessonsLearned: z.string().default(''),
-  futureDate: z.string().nullable().optional(),
+  futureDate: z.union([z.string().date(), z.string().datetime({ offset: true })]).nullable().optional(),
   reminderEnabled: z.boolean().default(false),
   featured: z.boolean().default(false),
 });

@@ -6,6 +6,7 @@ import { HomeFooter } from './HomeFooter';
 import Image from 'next/image';
 import { Bell } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
+import { StarIcon } from '@/ui/StarIcon';
 import { clamp, earthPose, ease, EARTH_SPEED, INITIAL_EARTH_YAW, mix } from './home-journey';
 import { Starfield } from './starfield/Starfield';
 import type { StarfieldEngine } from './starfield/starfield-engine';
@@ -36,6 +37,7 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
     let paintedProgress = Number.NaN;
     let renderedYaw = Number.NaN;
     let pose = earthPose(0, 0, 0);
+    let centerX = 0;
     let yaw = INITIAL_EARTH_YAW;
     let resumeAt = 0;
     let width = 0;
@@ -50,6 +52,7 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
     const measure = () => {
       width = scene.clientWidth;
       height = scene.clientHeight;
+      centerX = width / 2;
       introTop = section.getBoundingClientRect().top + window.scrollY;
       travel = Math.max(1, section.offsetHeight - height);
       paintedProgress = Number.NaN;
@@ -68,15 +71,30 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
       const changed = progress !== paintedProgress;
       if (changed) {
         paintedProgress = progress;
-        pose = earthPose(width, height, progress);
         const phone = width < 768;
-        const logo = ease(progress / 0.66);
+
+        // Phase 1: progress 0 to 0.44 (Zoom Earth into center)
+        const p1 = clamp(progress / 0.44);
+        // Phase 2: progress 0.44 to 0.78 (Shift Earth left, reveal Meet Hiep on right)
+        const p2 = clamp((progress - 0.44) / 0.34);
+        // Phase 3: progress 0.78 to 1.0 (Fade Earth into Soft Nebula)
+        const p3 = clamp((progress - 0.78) / 0.22);
+
+        pose = earthPose(width, height, p1 * 0.58);
+        const shift = ease(p2);
+        centerX = mix(width / 2, width * (phone ? 0.35 : 0.23), shift);
+        const earthOpacity = 1 - ease(p3 * 1.3);
+
+        const logo = ease(progress / 0.44);
         const openingWidth = Math.min(width * (phone ? 0.88 : 0.78), height * 1.0605, 1120);
         const logoWidth = mix(openingWidth, phone ? 132 : 200, logo);
+
         scene.style.setProperty('--earth-size', pose.diameter + 'px');
+        scene.style.setProperty('--earth-x', centerX + 'px');
         scene.style.setProperty('--earth-y', pose.centerY + 'px');
+        scene.style.setProperty('--earth-opacity', String(earthOpacity));
         scene.style.setProperty('--flare-y', pose.centerY - pose.diameter / 2 + 'px');
-        scene.style.setProperty('--flare-opacity', String(1 - ease(progress / 0.5)));
+        scene.style.setProperty('--flare-opacity', String(1 - ease(p1 / 0.8)));
         section.style.setProperty(
           '--logo-x',
           mix((width - openingWidth) / 2, phone ? 16 : 24, logo) + 'px',
@@ -87,6 +105,11 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
         );
         section.style.setProperty('--logo-scale', String(logoWidth / 1200));
         section.style.setProperty('--nav-scrim', String(ease((progress - 0.72) / 0.28)));
+        section.style.setProperty('--intro-progress', String(p2));
+        section.style.setProperty(
+          '--intro-opacity',
+          String(p2 > 0.04 ? (p3 > 0.4 ? Math.max(0, 1 - (p3 - 0.4) * 2.5) : 1) : 0),
+        );
       }
 
       const spinning = visible && Boolean(renderer) && !motion.matches && !drag?.active;
@@ -95,7 +118,7 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
       }
       previous = spinning ? now : 0;
       if (renderer && visible && (changed || yaw !== renderedYaw)) {
-        renderer.render(width, height, pose.diameter, pose.centerY, yaw);
+        renderer.render(width, height, pose.diameter, pose.centerY, yaw, centerX);
         renderedYaw = yaw;
         if (!scene.dataset.webgl) scene.dataset.webgl = 'ready';
       }
@@ -248,6 +271,28 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
         <div className={styles.bell}>
           {preview ? <Bell size={20} aria-hidden="true" /> : <BellButton tone="cosmos" />}
         </div>
+        {preview ? null : (
+          <div className={styles.meetHiep} aria-label="Meet Hiep">
+            <div className={styles.meetHiepInner}>
+              <div className={styles.meetHiepHeader}>
+                <div role="heading" aria-level={2} className={styles.meetHiepTitle}>
+                  Hi! I&apos;m Hiep.
+                </div>
+                <StarIcon size={20} className={styles.meetHiepStar} />
+              </div>
+              <p className={styles.meetHiepRole}>
+                A first-year student in the Advanced Program in Computer Science at HCMUS.
+              </p>
+              <p className={styles.meetHiepBio}>
+                Passionate about AI, Machine Learning, and their applications. I enjoy solving
+                problems, exploring new technologies, and turning ideas into real projects.
+              </p>
+              <div className={styles.meetHiepMotto}>
+                <strong>Less talk. More action. Keep building.</strong>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
       {preview ? (
         <section className={styles.collection} aria-labelledby="preview-features-heading">

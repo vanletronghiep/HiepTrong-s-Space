@@ -1,6 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useId } from 'react';
+import { Dialog } from '@/ui/Dialog';
+
+import { formatScheduledDate } from '@/domain/time';
+
+import React, { useRef, useState, useId } from 'react';
 import type { HabitCategory } from '@/contracts/tracking';
 import {
   useCreateHabit,
@@ -12,7 +16,8 @@ import {
 import styles from './tracking.module.css';
 
 export function TrackingView() {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const writeLocks = useRef(new Set<string>());
+  const todayStr = formatScheduledDate(new Date());
 
   // Modals state
   const [showAddHabit, setShowAddHabit] = useState<boolean>(false);
@@ -47,24 +52,11 @@ export function TrackingView() {
   const scrNotesId = useId();
 
   // Queries & Mutations
-  const { data, isLoading } = useTrackingData();
+  const { data, isLoading, isError: loadFailed, refetch } = useTrackingData();
   const toggleHabit = useToggleHabit();
   const createHabit = useCreateHabit();
   const logSleep = useLogSleep();
   const logScreenTime = useLogScreenTime();
-
-  // Close modals on Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowAddHabit(false);
-        setShowLogSleep(false);
-        setShowLogScreenTime(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   const handleToggleHabit = (habitId: string) => {
     toggleHabit.mutate({ habitId, date: todayStr });
@@ -73,25 +65,41 @@ export function TrackingView() {
   const handleCreateHabitSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!habitTitle.trim()) return;
-    await createHabit.mutateAsync({
-      title: habitTitle.trim(),
-      category: habitCategory,
-      targetFrequency: 'daily',
-    });
+    if (writeLocks.current.has('createHabit')) return;
+    writeLocks.current.add('createHabit');
+    try {
+      await createHabit.mutateAsync({
+        title: habitTitle.trim(),
+        category: habitCategory,
+        targetFrequency: 'daily',
+      });
+    } catch {
+      return;
+    } finally {
+      writeLocks.current.delete('createHabit');
+    }
     setHabitTitle('');
     setShowAddHabit(false);
   };
 
   const handleLogSleepSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await logSleep.mutateAsync({
-      date: todayStr,
-      bedTime: sleepBedTime,
-      wakeTime: sleepWakeTime,
-      durationHours: Number(sleepDuration),
-      qualityRating: Number(sleepRating),
-      notes: sleepNotes.trim(),
-    });
+    if (writeLocks.current.has('logSleep')) return;
+    writeLocks.current.add('logSleep');
+    try {
+      await logSleep.mutateAsync({
+        date: todayStr,
+        bedTime: sleepBedTime,
+        wakeTime: sleepWakeTime,
+        durationHours: Number(sleepDuration),
+        qualityRating: Number(sleepRating),
+        notes: sleepNotes.trim(),
+      });
+    } catch {
+      return;
+    } finally {
+      writeLocks.current.delete('logSleep');
+    }
     setShowLogSleep(false);
     setSleepNotes('');
   };
@@ -100,13 +108,21 @@ export function TrackingView() {
     e.preventDefault();
     const prod = Number(scrProductive);
     const leis = Number(scrLeisure);
-    await logScreenTime.mutateAsync({
-      date: todayStr,
-      totalMinutes: prod + leis,
-      productiveMinutes: prod,
-      leisureMinutes: leis,
-      notes: scrNotes.trim(),
-    });
+    if (writeLocks.current.has('logScreenTime')) return;
+    writeLocks.current.add('logScreenTime');
+    try {
+      await logScreenTime.mutateAsync({
+        date: todayStr,
+        totalMinutes: prod + leis,
+        productiveMinutes: prod,
+        leisureMinutes: leis,
+        notes: scrNotes.trim(),
+      });
+    } catch {
+      return;
+    } finally {
+      writeLocks.current.delete('logScreenTime');
+    }
     setShowLogScreenTime(false);
     setScrNotes('');
   };
@@ -116,8 +132,13 @@ export function TrackingView() {
   const screenTimeLogs = data?.screenTimeLogs ?? [];
   const stats = data?.stats;
 
+
+
+  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+
   return (
     <div className={styles.container}>
+      {[toggleHabit, createHabit, logSleep, logScreenTime].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Retry the action.</p>}
       {/* Mindful Japanese Aesthetic Header */}
       <header className={styles.header}>
         <div className={styles.eyebrow}>
@@ -149,15 +170,15 @@ export function TrackingView() {
             <div className={styles.statLabel}>Today&apos;s habit progress</div>
           </div>
           <div className={styles.statCard}>
-            <div className={styles.statValue}>{stats?.averageSleepHours ?? 7.5} hrs</div>
+            <div className={styles.statValue}>{stats?.averageSleepHours ?? 0} hrs</div>
             <div className={styles.statLabel}>7-day average sleep</div>
           </div>
           <div className={styles.statCard}>
-            <div className={styles.statValue}>{stats?.averageProductiveRatio ?? 80}%</div>
+            <div className={styles.statValue}>{stats?.averageProductiveRatio ?? 0}%</div>
             <div className={styles.statLabel}>Productive screen ratio</div>
           </div>
           <div className={styles.statCard}>
-            <div className={styles.statValue}>{stats?.activeStreakDays ?? 6} days</div>
+            <div className={styles.statValue}>{stats?.activeStreakDays ?? 0} days</div>
             <div className={styles.statLabel}>Consistent discipline</div>
           </div>
         </div>
@@ -242,7 +263,7 @@ export function TrackingView() {
           <div className={styles.calcBox}>
             <strong>Optimal 90-minute sleep cycles:</strong>
             <span>
-              If you fall asleep around 23:00, waking at full cycle boundaries ensures peak morning energy:
+              If you fall asleep around 23:00, these are illustrative sleep durations, not guaranteed energy predictions:
             </span>
             <div className={styles.cycleChips}>
               <span className={styles.cycleChip}>05:00 (4 cycles · 6h)</span>
@@ -354,17 +375,10 @@ export function TrackingView() {
 
       {/* Add Habit Modal */}
       {showAddHabit && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-habit-modal-title"
-          onClick={() => setShowAddHabit(false)}
-        >
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2 id="add-habit-modal-title" className={styles.modalTitle}>
-              Add daily habit
-            </h2>
+        <Dialog open portal title="Add daily habit" className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setShowAddHabit(false)}>
+{[toggleHabit, createHabit, logSleep, logScreenTime].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+
             <form onSubmit={handleCreateHabitSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label
@@ -422,22 +436,15 @@ export function TrackingView() {
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Log Sleep Modal */}
       {showLogSleep && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="log-sleep-modal-title"
-          onClick={() => setShowLogSleep(false)}
-        >
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2 id="log-sleep-modal-title" className={styles.modalTitle}>
-              Log night&apos;s sleep
-            </h2>
+        <Dialog open portal title="Log night&apos;s sleep" className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setShowLogSleep(false)}>
+{[toggleHabit, createHabit, logSleep, logScreenTime].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+
             <form onSubmit={handleLogSleepSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
@@ -528,22 +535,15 @@ export function TrackingView() {
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Log Screen Time Modal */}
       {showLogScreenTime && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="log-screen-modal-title"
-          onClick={() => setShowLogScreenTime(false)}
-        >
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2 id="log-screen-modal-title" className={styles.modalTitle}>
-              Log screen time hours
-            </h2>
+        <Dialog open portal title="Log screen time hours" className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setShowLogScreenTime(false)}>
+{[toggleHabit, createHabit, logSleep, logScreenTime].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+
             <form onSubmit={handleLogScreenTimeSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
@@ -604,7 +604,7 @@ export function TrackingView() {
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

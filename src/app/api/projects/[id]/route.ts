@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { patchProjectInputSchema } from '@/contracts/project';
-import { handleApiError, parseJsonBody } from '@/server/api-response';
+import { assertSameOriginMutation, handleApiError, parseJsonBody } from '@/server/api-response';
+import { NotFoundError } from '@/services/errors';
 import { projectService } from '@/services/project-service';
 
 export async function GET(
@@ -11,7 +12,7 @@ export async function GET(
     const { id } = await params;
     const item = await projectService.getProject(id);
     if (!item) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      throw new NotFoundError('Project not found');
     }
     return NextResponse.json({ item }, { status: 200 });
   } catch (error: unknown) {
@@ -29,7 +30,7 @@ export async function PATCH(
     const patch = patchProjectInputSchema.parse(body);
     const item = await projectService.updateProject(id, patch);
     if (!item) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      throw new NotFoundError('Project not found');
     }
     return NextResponse.json({ item }, { status: 200 });
   } catch (error: unknown) {
@@ -42,10 +43,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   try {
+    assertSameOriginMutation(_request);
     const { id } = await params;
     const deleted = await projectService.deleteProject(id);
     if (!deleted) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      throw new NotFoundError('Project not found');
     }
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error: unknown) {

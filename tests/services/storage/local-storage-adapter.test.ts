@@ -1,7 +1,8 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import Database from 'better-sqlite3';
+import { describe, expect, it, vi } from 'vitest';
 import { createStorageAdapter } from '@/services/storage/factory';
 import { LocalStorageAdapter } from '@/services/storage/local/local-storage-adapter';
 import { runStorageAdapterContractTests } from './storage-adapter.contract';
@@ -24,6 +25,31 @@ runStorageAdapterContractTests('LocalStorageAdapter', async () => {
 });
 
 describe('LocalStorageAdapter lifecycle (S03)', () => {
+  it('releases the transaction queue when opening a savepoint fails', async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'hts-sqlite-queue-'));
+    const adapter = new LocalStorageAdapter({
+      databasePath: path.join(tempRoot, 'queue.db'),
+      mediaDir: path.join(tempRoot, 'media'),
+    });
+    try {
+      await adapter.init();
+      const exec = vi.spyOn(Database.prototype, 'exec').mockImplementationOnce(() => {
+        throw new Error('Savepoint unavailable');
+      });
+      try {
+        await expect(adapter.runInTransaction(async () => 'first')).rejects.toThrow(
+          'Savepoint unavailable',
+        );
+      } finally {
+        exec.mockRestore();
+      }
+      await expect(adapter.runInTransaction(async () => 'recovered')).resolves.toBe('recovered');
+    } finally {
+      await adapter.close();
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('closes the SQLite handle if migration fails during init()', async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'hts-sqlite-fail-'));
     const dbPath = path.join(tempRoot, 'broken.db');

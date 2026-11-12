@@ -1,23 +1,28 @@
+'use client';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateLearningSessionInput,
   LearningRoomStats,
   LearningSession,
 } from '@/contracts/learning-room';
+import { apiRequest } from '../api-client';
 
 export interface LearningRoomResponse {
   sessions: LearningSession[];
   stats: LearningRoomStats;
 }
 
+export const learningRoomKeys = {
+  all: ['learning-room'] as const,
+};
+
 export function useLearningRoomData() {
   return useQuery<LearningRoomResponse>({
-    queryKey: ['learning-room'],
+    queryKey: learningRoomKeys.all,
     queryFn: async () => {
-      const res = await fetch('/api/learning-room');
-      if (!res.ok) throw new Error('Failed to load learning room data');
-      const json = await res.json();
-      return json.data;
+      const res = await apiRequest<{ success: boolean; data: LearningRoomResponse }>('/api/learning-room');
+      return res.data;
     },
   });
 }
@@ -27,21 +32,14 @@ export function useCreateLearningSession() {
 
   return useMutation({
     mutationFn: async (input: CreateLearningSessionInput) => {
-      const res = await fetch('/api/learning-room', {
+      const res = await apiRequest<{ success: boolean; data: LearningSession }>('/api/learning-room', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: input,
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to save session');
-      }
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['learning-room'] });
+      queryClient.invalidateQueries({ queryKey: learningRoomKeys.all });
     },
   });
 }
-

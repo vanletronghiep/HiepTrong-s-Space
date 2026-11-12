@@ -58,7 +58,7 @@
   color: var(--daily-priority-normal);
   background: color-mix(in srgb, var(--daily-planet-normal) 12%, transparent);
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   width: fit-content;
 }
 
@@ -162,9 +162,9 @@
   flex-direction: column;
   justify-content: space-between;
   gap: var(--space-4);
-  transition: transform var(--timing-fast) var(--motion-standard),
-    box-shadow var(--timing-fast) var(--motion-standard),
-    border-color var(--timing-fast) var(--motion-standard);
+  transition: transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
   position: relative;
   overflow: hidden;
 }
@@ -258,7 +258,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  transition: background var(--timing-fast) var(--motion-standard);
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .browseBtn:hover {
@@ -317,7 +317,7 @@
   border: 1px solid var(--ws-border);
   border-radius: var(--radius-md);
   outline: none;
-  transition: border-color var(--timing-fast) var(--motion-standard);
+  transition: border-color var(--dur-fast) var(--ease);
 }
 
 .searchInput:focus {
@@ -326,6 +326,8 @@
 }
 
 .categoryFilter {
+  flex-wrap: wrap;
+  max-width: 100%;
   display: flex;
   gap: var(--space-1);
   overflow-x: auto;
@@ -335,15 +337,15 @@
 .filterChip {
   font-size: var(--text-xs);
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   background: transparent;
   border: 1px solid var(--ws-border);
   color: var(--ws-text-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--timing-fast) var(--motion-standard),
-    border-color var(--timing-fast) var(--motion-standard),
-    color var(--timing-fast) var(--motion-standard);
+  transition: background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .filterChip:hover {
@@ -378,7 +380,7 @@
   font-size: var(--text-xs);
   cursor: pointer;
   border-radius: var(--radius-sm);
-  transition: background var(--timing-fast) var(--motion-standard);
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .breadcrumbBtn:hover {
@@ -412,7 +414,7 @@
 
 .fileRow {
   border-bottom: 1px solid color-mix(in srgb, var(--ws-border) 60%, transparent);
-  transition: background var(--timing-fast) var(--motion-standard);
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .fileRow:hover {
@@ -483,9 +485,9 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transition: background var(--timing-fast) var(--motion-standard),
-    border-color var(--timing-fast) var(--motion-standard),
-    color var(--timing-fast) var(--motion-standard);
+  transition: background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .actionBtn:hover {

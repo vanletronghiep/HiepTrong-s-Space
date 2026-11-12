@@ -52,7 +52,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     title: 'Events',
     label: 'Schedule',
     href: '/events',
-    status: 'blank',
+    status: 'built',
     thumbnail: { preset: 'meridian-grid', accent: 'lavender' },
   },
   {
@@ -61,7 +61,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     title: 'AI Engineering',
     label: 'Learning',
     href: '/ai-engineering',
-    status: 'blank',
+    status: 'built',
     thumbnail: { preset: 'neural-lattice', accent: 'blue' },
   },
   {
@@ -70,7 +70,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     title: 'Blogs Hub',
     label: 'Writing',
     href: '/blogs',
-    status: 'blank',
+    status: 'built',
     thumbnail: { preset: 'manuscript-lines', accent: 'lavender' },
   },
   {
@@ -79,7 +79,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     title: 'APCS Hub',
     label: 'University',
     href: '/apcs',
-    status: 'blank',
+    status: 'built',
     thumbnail: { preset: 'academic-compass', accent: 'blue' },
   },
   {
@@ -88,7 +88,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     title: 'Flashcards',
     label: 'Learning',
     href: '/flashcards',
-    status: 'blank',
+    status: 'built',
     thumbnail: { preset: 'paired-cards', accent: 'lavender' },
   },
   {
@@ -97,7 +97,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     title: 'Entertainment Hub',
     label: 'Personal',
     href: '/entertainment',
-    status: 'blank',
+    status: 'built',
     thumbnail: { preset: 'harmonic-waves', accent: 'blue' },
   },
   {
@@ -106,7 +106,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     title: 'Tracking',
     label: 'Tracking',
     href: '/tracking',
-    status: 'blank',
+    status: 'built',
     thumbnail: { preset: 'pulse-timeline', accent: 'lavender' },
   },
   {
@@ -115,7 +115,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     title: 'In Progress Projects',
     label: 'Projects',
     href: '/projects',
-    status: 'blank',
+    status: 'built',
     thumbnail: { preset: 'blueprint-vectors', accent: 'blue' },
   },
   {
@@ -124,7 +124,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     title: 'Annual Milestones',
     label: 'Personal',
     href: '/milestones',
-    status: 'blank',
+    status: 'built',
     thumbnail: { preset: 'summit-trajectory', accent: 'lavender' },
   },
   {
@@ -133,7 +133,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     title: 'Learning Room',
     label: 'Learning',
     href: '/learning-room',
-    status: 'blank',
+    status: 'built',
     thumbnail: { preset: 'focus-aperture', accent: 'blue' },
   },
   {
@@ -142,7 +142,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     title: 'Personal Achievements',
     label: 'Personal',
     href: '/achievements',
-    status: 'blank',
+    status: 'built',
     thumbnail: { preset: 'zenith-crown', accent: 'lavender' },
   },
 ] as const;

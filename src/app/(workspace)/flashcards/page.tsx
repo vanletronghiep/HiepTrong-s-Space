@@ -1,3 +1,4 @@
+import { PageReady } from '@/features/transitions/TransitionProvider';
 import type { Metadata } from 'next';
 import { FlashcardsView } from '@/features/flashcards/FlashcardsView';
 import { getFeatureById } from '@/features/registry';
@@ -9,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function FlashcardsPage() {
-  return <FlashcardsView />;
+  return <><PageReady /><FlashcardsView /></>;
 }

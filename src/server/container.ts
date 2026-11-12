@@ -1,3 +1,4 @@
+import { listTimedSources } from '@/services/timed-sources';
 import type { HealthResponse } from '@/contracts';
 import { systemClock, type Clock } from '@/domain/clock';
 import { NotificationService } from '@/services/notification-service';
@@ -41,6 +42,7 @@ async function buildContainer(): Promise<AppContainer> {
     storage,
     clock: systemClock,
     timeZone: config.appTimezone,
+    timedSources: listTimedSources,
   });
 
   return {

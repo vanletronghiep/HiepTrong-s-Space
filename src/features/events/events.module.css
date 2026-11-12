@@ -16,7 +16,7 @@
   pointer-events: none;
   background: radial-gradient(
     ellipse 70% 60% at 50% 0%,
-    color-mix(in srgb, var(--status-optional) 10%, transparent) 0%,
+    color-mix(in srgb, var(--text-accent) 10%, transparent) 0%,
     transparent 75%
   );
   z-index: 0;
@@ -43,7 +43,7 @@
   align-items: center;
   gap: 6px;
   font-size: var(--fs-small);
-  color: var(--status-optional);
+  color: var(--text-accent);
   font-weight: 600;
 }
 
@@ -62,8 +62,8 @@
   gap: 8px;
   padding: 6px 14px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--status-optional) 8%, var(--ws-surface));
-  border: 1px solid color-mix(in srgb, var(--status-optional) 22%, var(--ws-border));
+  background: color-mix(in srgb, var(--text-accent) 8%, var(--ws-surface));
+  border: 1px solid color-mix(in srgb, var(--text-accent) 22%, var(--ws-border));
   color: var(--ws-text);
   font-size: var(--fs-small);
   font-variant-numeric: tabular-nums;
@@ -91,7 +91,7 @@
 }
 
 .statCard:hover {
-  border-color: color-mix(in srgb, var(--status-optional) 40%, var(--ws-border));
+  border-color: color-mix(in srgb, var(--text-accent) 40%, var(--ws-border));
 }
 
 .statValue {
@@ -114,8 +114,8 @@
   gap: 12px;
   padding: 20px 24px;
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--status-warn) 6%, var(--ws-surface));
-  border: 1px solid color-mix(in srgb, var(--status-warn) 30%, var(--ws-border));
+  background: color-mix(in srgb, var(--text-due-soon) 6%, var(--ws-surface));
+  border: 1px solid color-mix(in srgb, var(--text-due-soon) 30%, var(--ws-border));
   box-shadow: var(--shadow-sm);
 }
 
@@ -132,15 +132,15 @@
   gap: 6px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--status-warn) 16%, var(--ws-surface));
-  color: var(--status-warn);
+  background: color-mix(in srgb, var(--text-due-soon) 16%, var(--ws-surface));
+  color: var(--text-due-soon);
   font-size: var(--fs-micro, 11px);
   font-weight: 700;
 }
 
 .examCardsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: 12px;
 }
 
@@ -151,7 +151,7 @@
   padding: 14px 16px;
   border-radius: var(--radius-md);
   background: var(--ws-surface);
-  border: 1px solid color-mix(in srgb, var(--status-warn) 25%, var(--ws-border));
+  border: 1px solid color-mix(in srgb, var(--text-due-soon) 25%, var(--ws-border));
   cursor: pointer;
   transition: transform var(--dur-fast) ease-out, box-shadow var(--dur-fast) ease-out;
 }
@@ -173,7 +173,7 @@
   gap: 6px;
   font-size: var(--fs-small);
   font-weight: 600;
-  color: var(--status-warn);
+  color: var(--text-due-soon);
 }
 
 .controlsBar {
@@ -185,12 +185,14 @@
 }
 
 .filterTabs {
+  flex-wrap: wrap;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 4px;
   border-radius: var(--radius-pill);
-  background: var(--ws-bg-alt);
+  background: var(--ws-accent-soft);
   border: 1px solid var(--ws-border);
 }
 
@@ -214,7 +216,7 @@
 
 .eventGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -234,7 +236,7 @@
 
 .eventCard:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--status-optional) 35%, var(--ws-border));
+  border-color: color-mix(in srgb, var(--text-accent) 35%, var(--ws-border));
 }
 
 .eventCardTop {
@@ -261,8 +263,8 @@
 }
 
 .categoryTag_school {
-  background: color-mix(in srgb, var(--status-optional) 12%, var(--ws-surface));
-  color: var(--status-optional);
+  background: color-mix(in srgb, var(--text-accent) 12%, var(--ws-surface));
+  color: var(--text-accent);
 }
 
 .categoryTag_meeting {
@@ -271,8 +273,8 @@
 }
 
 .categoryTag_exam {
-  background: color-mix(in srgb, var(--status-warn) 14%, var(--ws-surface));
-  color: var(--status-warn);
+  background: color-mix(in srgb, var(--text-due-soon) 14%, var(--ws-surface));
+  color: var(--text-due-soon);
 }
 
 .categoryTag_deadline {
@@ -313,11 +315,12 @@
 
 .weekGrid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 8px;
 }
 
 .dayColumn {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -342,7 +345,7 @@
   inset: 0;
   background: color-mix(in srgb, var(--cosmos-bg) 50%, transparent);
   backdrop-filter: blur(4px);
-  z-index: var(--z-modal);
+  z-index: var(--z-drawer);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -377,5 +380,10 @@
 
 .modalCloseButton:hover {
   color: var(--ws-text);
-  background: var(--ws-bg-alt);
+  background: var(--ws-accent-soft);
+}
+
+@media (max-width: 640px) {
+  .weekGrid { grid-template-columns: 1fr; }
+  .dayColumn { min-height: 80px; }
 }

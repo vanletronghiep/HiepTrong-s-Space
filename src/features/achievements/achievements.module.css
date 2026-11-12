@@ -38,7 +38,7 @@
   color: var(--daily-heading-accent);
   background: color-mix(in srgb, var(--cosmos-lavender) 15%, transparent);
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   width: fit-content;
 }
 
@@ -82,15 +82,15 @@
 .filterChip {
   font-size: var(--text-xs);
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   background: var(--ws-surface);
   border: 1px solid var(--ws-border);
   color: var(--ws-text-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: border-color var(--timing-fast) var(--motion-standard),
-    background var(--timing-fast) var(--motion-standard),
-    color var(--timing-fast) var(--motion-standard);
+  transition: border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .filterChip:hover {
@@ -116,21 +116,21 @@
   display: flex;
   background: color-mix(in srgb, var(--ws-bg) 60%, var(--ws-surface));
   padding: 3px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   border: 1px solid var(--ws-border);
 }
 
 .modeToggleBtn {
   font-size: var(--text-xs);
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   border: none;
   background: transparent;
   color: var(--ws-text-muted);
   cursor: pointer;
   font-weight: 500;
-  transition: background var(--timing-fast) var(--motion-standard),
-    color var(--timing-fast) var(--motion-standard);
+  transition: background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .modeToggleBtnActive {
@@ -177,8 +177,8 @@
   justify-content: space-between;
   gap: var(--space-3);
   box-shadow: 0 2px 10px color-mix(in srgb, var(--ws-text) 3%, transparent);
-  transition: transform var(--timing-fast) var(--motion-standard),
-    box-shadow var(--timing-fast) var(--motion-standard);
+  transition: transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .achievementCard:hover {
@@ -208,7 +208,7 @@
   font-size: 11px;
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--daily-shooting-star) 12%, transparent);
   color: var(--daily-shooting-star);
 }
@@ -320,7 +320,7 @@
   border: 1px solid var(--ws-border);
   border-radius: var(--radius-md);
   outline: none;
-  transition: border-color var(--timing-fast) var(--motion-standard);
+  transition: border-color var(--dur-fast) var(--ease);
 }
 
 .inputField:focus,

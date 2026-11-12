@@ -16,6 +16,12 @@
   --cosmos-star-pale: #cfe3ff;
   --cosmos-engine-glow: #a9cfff;
   --cosmos-exhaust: #a99aef;
+  --cosmos-bg: var(--cosmos-bg-0);
+  --cosmos-surface: var(--cosmos-bg-2);
+  --cosmos-border: color-mix(in srgb, var(--cosmos-lavender) 25%, transparent);
+  --cosmos-star: var(--cosmos-star-pale);
+  --cosmos-accent: var(--cosmos-lavender);
+  --shadow-cosmos: var(--shadow-popover);
 
   /* ─── Workspace theme (all working pages, popover, drawers, dialogs) ─── */
   --ws-bg: #f0eff8;

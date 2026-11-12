@@ -1,35 +1,43 @@
+'use client';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   BlogArticle,
   CreateBlogArticleInput,
   PatchBlogArticleInput,
 } from '@/contracts/blog';
+import { apiRequest } from '../api-client';
+
+export const blogKeys = {
+  all: ['blogs'] as const,
+  list: (category?: string, authorship?: string, tag?: string) =>
+    ['blogs', category, authorship, tag] as const,
+  detail: (id?: string) => ['blogs', 'article', id] as const,
+};
 
 export function useBlogArticles(category?: string, authorship?: string, tag?: string) {
   return useQuery<BlogArticle[]>({
-    queryKey: ['blogs', category, authorship, tag],
+    queryKey: blogKeys.list(category, authorship, tag),
     queryFn: async () => {
       const params = new URLSearchParams();
       if (category && category !== 'all') params.set('category', category);
       if (authorship && authorship !== 'all') params.set('authorship', authorship);
       if (tag && tag !== 'all') params.set('tag', tag);
 
-      const res = await fetch(`/api/blogs?${params.toString()}`);
-      if (!res.ok) throw new Error('Failed to load articles');
-      const json = await res.json();
-      return json.data;
+      const query = params.toString();
+      const url = query ? `/api/blogs?${query}` : '/api/blogs';
+      const res = await apiRequest<{ success: boolean; data: BlogArticle[] }>(url);
+      return res.data;
     },
   });
 }
 
 export function useBlogArticle(id?: string) {
   return useQuery<BlogArticle>({
-    queryKey: ['blogs', 'article', id],
+    queryKey: blogKeys.detail(id),
     queryFn: async () => {
-      const res = await fetch(`/api/blogs/${id}`);
-      if (!res.ok) throw new Error('Failed to load article');
-      const json = await res.json();
-      return json.data;
+      const res = await apiRequest<{ success: boolean; data: BlogArticle }>(`/api/blogs/${id}`);
+      return res.data;
     },
     enabled: Boolean(id),
   });
@@ -40,20 +48,14 @@ export function useCreateBlogArticle() {
 
   return useMutation({
     mutationFn: async (input: CreateBlogArticleInput) => {
-      const res = await fetch('/api/blogs', {
+      const res = await apiRequest<{ success: boolean; data: BlogArticle }>('/api/blogs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: input,
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to publish article');
-      }
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      queryClient.invalidateQueries({ queryKey: blogKeys.all });
     },
   });
 }
@@ -63,20 +65,14 @@ export function useUpdateBlogArticle() {
 
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: PatchBlogArticleInput }) => {
-      const res = await fetch(`/api/blogs/${id}`, {
+      const res = await apiRequest<{ success: boolean; data: BlogArticle }>(`/api/blogs/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
+        body: patch,
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to update article');
-      }
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      queryClient.invalidateQueries({ queryKey: blogKeys.all });
     },
   });
 }
@@ -86,14 +82,12 @@ export function useDeleteBlogArticle() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/blogs/${id}`, {
+      await apiRequest<void>(`/api/blogs/${id}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Failed to delete article');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      queryClient.invalidateQueries({ queryKey: blogKeys.all });
     },
   });
 }
-

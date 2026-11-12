@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useId } from 'react';
+import { Dialog } from '@/ui/Dialog';
+
+import React, { useRef, useState, useEffect, useId } from 'react';
 import type { BlogArticle, BlogAuthorship, BlogCategory } from '@/contracts/blog';
-import { useBlogArticles, useCreateBlogArticle } from '@/client/queries/blogs';
+import { useBlogArticles, useCreateBlogArticle, useUpdateBlogArticle } from '@/client/queries/blogs';
 import styles from './writing-room.module.css';
 
 const CATEGORIES: { label: string; value: BlogCategory | 'all' }[] = [
@@ -20,6 +22,7 @@ const AUTHORSHIP_FILTERS: { label: string; value: BlogAuthorship | 'all' }[] = [
 const TOPIC_TAGS = ['Habits', 'Human Behavior', 'Communication', 'Learning', 'Focus', 'Technology'];
 
 export function WritingRoomView() {
+  const writeLocks = useRef(new Set<string>());
   const [selectedCategory, setSelectedCategory] = useState<BlogCategory | 'all'>('all');
   const [selectedAuthorship, setSelectedAuthorship] = useState<BlogAuthorship | 'all'>('all');
   const [selectedTag, setSelectedTag] = useState<string>('all');
@@ -37,6 +40,8 @@ export function WritingRoomView() {
   const [draftShortVersion, setDraftShortVersion] = useState<string>('');
   const [draftContent, setDraftContent] = useState<string>('');
   const [draftTags, setDraftTags] = useState<string>('');
+  const [draftSourceUrl, setDraftSourceUrl] = useState('');
+  const sourceInputId = useId();
 
   const searchInputId = useId();
   const titleInputId = useId();
@@ -50,19 +55,60 @@ export function WritingRoomView() {
   const tagsInputId = useId();
 
   // Queries & Mutations
-  const { data: articles = [], isLoading } = useBlogArticles(
+  const { data: articles = [], isLoading, isError: loadFailed, refetch } = useBlogArticles(
     selectedCategory !== 'all' ? selectedCategory : undefined,
     selectedAuthorship !== 'all' ? selectedAuthorship : undefined,
     selectedTag !== 'all' ? selectedTag : undefined,
   );
   const createArticle = useCreateBlogArticle();
+  const updateArticle = useUpdateBlogArticle();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [unsaved, setUnsaved] = useState(false);
+  const closeWriting = () => {
+    if (!unsaved || window.confirm('Close with unsaved changes? Save a draft first to keep it after reloading.')) setIsWriting(false);
+  };
+  const startNewPiece = () => {
+    setEditingId(null);
+    setDraftTitle('');
+    setDraftSubtitle('');
+    setDraftCategory('ideas_and_perspectives');
+    setDraftAuthorship('by_hiep');
+    setDraftAuthorName('Hiep Trong');
+    setDraftCommentary('');
+    setDraftShortVersion('');
+    setDraftContent('');
+    setDraftTags('');
+    setDraftSourceUrl('');
+    setUnsaved(false);
+    setIsWriting(true);
+  };
+  const editArticle = (article: BlogArticle) => {
+    setEditingId(article.id);
+    setDraftTitle(article.title);
+    setDraftSubtitle(article.subtitle);
+    setDraftCategory(article.category);
+    setDraftAuthorship(article.authorship);
+    setDraftAuthorName(article.authorName);
+    setDraftCommentary(article.commentary ?? '');
+    setDraftShortVersion(article.shortVersion);
+    setDraftContent(article.content);
+    setDraftTags(article.tags.join(', '));
+    setDraftSourceUrl(article.originalSourceUrl ?? '');
+    setUnsaved(false);
+    setIsWriting(true);
+  };
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [unsaved]);
 
   // Escape to close modals or exit reading view
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (isWriting) setIsWriting(false);
-        else if (activeArticle) setActiveArticle(null);
+        if (!isWriting && activeArticle) setActiveArticle(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -81,8 +127,9 @@ export function WritingRoomView() {
     );
   });
 
-  const handleSaveDraft = async (e: React.FormEvent) => {
+  const handleSaveDraft = async (e: React.FormEvent, status: BlogArticle['status'] = 'published') => {
     e.preventDefault();
+    if (!(e.currentTarget as HTMLElement).closest('form')?.reportValidity()) return;
     if (!draftTitle.trim() || !draftContent.trim()) return;
 
     const tagsArray = draftTags
@@ -90,18 +137,34 @@ export function WritingRoomView() {
       .map((t) => t.trim())
       .filter(Boolean);
 
-    await createArticle.mutateAsync({
-      title: draftTitle.trim(),
-      subtitle: draftSubtitle.trim(),
-      category: draftCategory,
-      authorship: draftAuthorship,
-      authorName: draftAuthorship === 'by_hiep' ? 'Hiep Trong' : draftAuthorName.trim() || 'External author',
-      commentary: draftCommentary.trim() || null,
-      shortVersion: draftShortVersion.trim(),
-      content: draftContent.trim(),
-      tags: tagsArray,
-      status: 'published',
-    });
+    if (writeLocks.current.has('createArticle')) return;
+    writeLocks.current.add('createArticle');
+    try {
+      const input = {
+        title: draftTitle.trim(),
+        subtitle: draftSubtitle.trim(),
+        category: draftCategory,
+        authorship: draftAuthorship,
+        authorName:
+          draftAuthorship === 'by_hiep' ? 'Hiep Trong' : draftAuthorName.trim() || 'External author',
+        commentary: draftCommentary.trim() || null,
+        shortVersion: draftShortVersion.trim(),
+        content: draftContent.trim(),
+        tags: tagsArray,
+        originalSourceUrl: draftSourceUrl.trim() || null,
+        status,
+      };
+      const saved = editingId
+        ? await updateArticle.mutateAsync({ id: editingId, patch: input })
+        : await createArticle.mutateAsync(input);
+      if (activeArticle?.id === editingId) setActiveArticle(saved);
+      setEditingId(null);
+      setUnsaved(false);
+    } catch {
+      return;
+    } finally {
+      writeLocks.current.delete('createArticle');
+    }
 
     setIsWriting(false);
     setDraftTitle('');
@@ -110,6 +173,7 @@ export function WritingRoomView() {
     setDraftContent('');
     setDraftCommentary('');
     setDraftTags('');
+    setDraftSourceUrl('');
   };
 
   // Render prose paragraphs with basic markdown headers and blockquotes
@@ -137,8 +201,11 @@ export function WritingRoomView() {
     });
   };
 
+  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+
   return (
     <div className={styles.container}>
+      {[createArticle, updateArticle].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Your input is retained; retry the action.</p>}
       {/* Editorial Header */}
       {!activeArticle && (
         <header className={styles.header}>
@@ -195,10 +262,11 @@ export function WritingRoomView() {
             <span>All articles</span>
           </button>
 
+          <button type="button" className={styles.backBtn} onClick={() => editArticle(activeArticle)}>Edit piece</button>
           {/* Dateline Banner */}
           <div className={styles.datelineBanner}>
             <span>
-              Published{' '}
+              {activeArticle.status === 'draft' ? 'Draft saved' : 'Published'}{' '}
               {new Date(activeArticle.publishedAt).toLocaleDateString(undefined, {
                 year: 'numeric',
                 month: 'long',
@@ -254,6 +322,9 @@ export function WritingRoomView() {
             </div>
           )}
 
+          {activeArticle.originalSourceUrl && /^https?:\/\//i.test(activeArticle.originalSourceUrl) && (
+            <a href={activeArticle.originalSourceUrl} target="_blank" rel="noopener noreferrer">Original source</a>
+          )}
           {/* Full Prose Body */}
           <div className={styles.proseContent}>{renderProse(activeArticle.content)}</div>
 
@@ -317,7 +388,7 @@ export function WritingRoomView() {
             <button
               type="button"
               className={styles.writeActionBtn}
-              onClick={() => setIsWriting(true)}
+              onClick={startNewPiece}
             >
               <svg
                 width="14"
@@ -409,7 +480,7 @@ export function WritingRoomView() {
             ) : (
               <div className={styles.articlesGrid}>
                 {filteredArticles.map((article) => (
-                  <article
+                  <article role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); (() => setActiveArticle(article))(); } }}
                     key={article.id}
                     className={styles.articleCard}
                     onClick={() => setActiveArticle(article)}
@@ -425,6 +496,7 @@ export function WritingRoomView() {
                       </div>
 
                       <h3 className={styles.cardTitle}>{article.title}</h3>
+                      {article.status === 'draft' && <span>Draft</span>}
                       {article.subtitle && (
                         <p className={styles.cardSubtitle}>{article.subtitle}</p>
                       )}
@@ -457,29 +529,22 @@ export function WritingRoomView() {
 
       {/* Write / Draft Modal */}
       {isWriting && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="write-modal-title"
-          onClick={() => setIsWriting(false)}
-        >
-          <div className={styles.editorModal} onClick={(e) => e.stopPropagation()}>
+        <Dialog open portal title={editingId ? "Edit piece" : "Draft a new piece"} className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={closeWriting}>
+{[createArticle, updateArticle].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h2 id="write-modal-title" className={styles.modalTitle}>
-                Draft a new piece
-              </h2>
+
               <button
                 type="button"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}
-                onClick={() => setIsWriting(false)}
+                onClick={closeWriting}
                 aria-label="Close modal"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveDraft} className={styles.editorBody}>
+            <form onChange={() => setUnsaved(true)} onSubmit={handleSaveDraft} className={styles.editorBody}>
               <div className={styles.formGroup}>
                 <label htmlFor={titleInputId} className={styles.formLabel}>
                   Title
@@ -615,25 +680,32 @@ export function WritingRoomView() {
                 />
               </div>
 
+              <div className={styles.formGroup}>
+                <label htmlFor={sourceInputId} className={styles.formLabel}>Original source URL (optional)</label>
+                <input id={sourceInputId} type="url" className={styles.inputField} value={draftSourceUrl} onChange={event => setDraftSourceUrl(event.target.value)} />
+              </div>
+              <p>Save drafts and publish locally in this Writing Room.</p>
               <div className={styles.modalFooter}>
                 <button
                   type="button"
                   className={styles.cancelBtn}
-                  onClick={() => setIsWriting(false)}
+                  onClick={closeWriting}
                 >
-                  Discard
+                  Close
                 </button>
+                <button type="button" className={styles.cancelBtn} disabled={createArticle.isPending || updateArticle.isPending}
+                  onClick={(event) => void handleSaveDraft(event, 'draft')}>Save draft</button>
                 <button
                   type="submit"
                   className={styles.publishBtn}
-                  disabled={createArticle.isPending}
+                  disabled={createArticle.isPending || updateArticle.isPending}
                 >
-                  {createArticle.isPending ? 'Publishing...' : 'Publish to Writing Room'}
+                  {createArticle.isPending || updateArticle.isPending ? 'Saving...' : 'Publish to Writing Room'}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

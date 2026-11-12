@@ -1,3 +1,4 @@
+import { formatScheduledDate, shiftScheduledDate } from './time';
 import type { EventItem } from '@/contracts/event';
 
 export interface EventStats {
@@ -9,6 +10,7 @@ export interface EventStats {
 export function computeEventStats(events: EventItem[], now: Date = new Date()): EventStats {
   const nowMs = now.getTime();
   const oneWeekLaterMs = nowMs + 7 * 24 * 60 * 60 * 1000;
+  const days = getEventWeekDates(now);
 
   let upcomingCount = 0;
   let thisWeekCount = 0;
@@ -17,10 +19,10 @@ export function computeEventStats(events: EventItem[], now: Date = new Date()): 
   for (const event of events) {
     const startMs = Date.parse(event.startAt);
     if (!Number.isNaN(startMs)) {
+      if (days.includes(formatScheduledDate(event.startAt))) thisWeekCount += 1;
       if (startMs >= nowMs) {
         upcomingCount += 1;
         if (startMs <= oneWeekLaterMs) {
-          thisWeekCount += 1;
           if (event.isExam || event.category === 'exam') {
             approachingExamsCount += 1;
           }
@@ -68,3 +70,16 @@ export function getUpcomingExams(events: EventItem[], now: Date = new Date()): E
     .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
 }
 
+
+/** Monday-first calendar dates in the application's timezone. */
+export function getEventWeekDates(now: Date = new Date()): string[] {
+  const today = formatScheduledDate(now);
+  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
+  const monday = shiftScheduledDate(today, -((weekday + 6) % 7));
+  return Array.from({ length: 7 }, (_, index) => shiftScheduledDate(monday, index));
+}
+
+export function eventsForWeekday(events: EventItem[], index: number, now = new Date()): EventItem[] {
+  const date = getEventWeekDates(now)[index];
+  return events.filter(event => formatScheduledDate(event.startAt) === date);
+}

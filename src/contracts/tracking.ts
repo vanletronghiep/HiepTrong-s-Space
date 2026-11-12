@@ -61,10 +61,10 @@ export const createHabitInputSchema = z.object({
 export type CreateHabitInput = z.infer<typeof createHabitInputSchema>;
 
 export const logSleepInputSchema = z.object({
-  date: z.string(),
+  date: z.string().date(),
   bedTime: z.string(),
   wakeTime: z.string(),
-  durationHours: z.number(),
+  durationHours: z.number().min(0).max(24),
   qualityRating: z.number().min(1).max(5).default(4),
   notes: z.string().optional().default(''),
 });
@@ -72,12 +72,12 @@ export const logSleepInputSchema = z.object({
 export type LogSleepInput = z.input<typeof logSleepInputSchema>;
 
 export const logScreenTimeInputSchema = z.object({
-  date: z.string(),
-  totalMinutes: z.number(),
-  productiveMinutes: z.number(),
-  leisureMinutes: z.number(),
+  date: z.string().date(),
+  totalMinutes: z.number().min(0).max(1440),
+  productiveMinutes: z.number().min(0).max(1440),
+  leisureMinutes: z.number().min(0).max(1440),
   notes: z.string().optional().default(''),
-});
+}).refine(value => value.productiveMinutes + value.leisureMinutes <= value.totalMinutes, { message: 'Categories cannot exceed total screen time', path: ['totalMinutes'] });
 
 export type LogScreenTimeInput = z.input<typeof logScreenTimeInputSchema>;
 

@@ -135,7 +135,7 @@ export function UniverseMenu({ open, onClose }: UniverseMenuProps) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleInputKeyDown}
-                className="w-full bg-transparent text-[length:var(--fs-ui)] text-ws-text placeholder:text-ws-text-muted focus:outline-none"
+                className="w-full border-0 border-none bg-transparent text-[length:var(--fs-ui)] text-ws-text placeholder:text-ws-text-muted outline-none focus:outline-none focus:ring-0 shadow-none"
               />
             </div>
 

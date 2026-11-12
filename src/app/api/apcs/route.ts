@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleApiError } from '@/server/api-response';
 import { apcsService } from '@/services/apcs-service';
 
 export async function GET(request: NextRequest) {
@@ -14,8 +15,7 @@ export async function GET(request: NextRequest) {
     const overview = apcsService.getOverview();
     return NextResponse.json({ success: true, data: overview });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to retrieve APCS resources';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return handleApiError(err);
   }
 }
 

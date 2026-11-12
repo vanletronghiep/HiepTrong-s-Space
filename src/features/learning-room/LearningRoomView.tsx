@@ -1,5 +1,7 @@
 'use client';
 
+import { Dialog } from '@/ui/Dialog';
+
 import React, { useState, useEffect, useRef, useId } from 'react';
 import type { FocusMode } from '@/contracts/learning-room';
 import { useCreateLearningSession, useLearningRoomData } from '@/client/queries/learning-room';
@@ -21,6 +23,7 @@ const SUBJECTS = [
 ];
 
 export function LearningRoomView() {
+  const writeLocks = useRef(new Set<string>());
   const [selectedMode, setSelectedMode] = useState<FocusMode>('pomodoro');
   const [selectedSubject, setSelectedSubject] = useState<string>('Calculus I');
   const [intentionTitle, setIntentionTitle] = useState<string>('');
@@ -42,9 +45,16 @@ export function LearningRoomView() {
   const reflectionTextareaId = useId();
 
   // Queries & Mutations
-  const { data, isLoading } = useLearningRoomData();
+  const { data, isLoading, isError: loadFailed, refetch } = useLearningRoomData();
   const createSession = useCreateLearningSession();
 
+  const startedAt = useRef<number | null>(null);
+  const finishedAt = useRef<number | null>(null);
+  const pausedAt = useRef<number | null>(null);
+  const pausedMs = useRef(0);
+  const breakStartedAt = useRef<number | null>(null);
+  const breakPausedMs = useRef(0);
+  const deadline = useRef(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Switch mode
@@ -61,24 +71,26 @@ export function LearningRoomView() {
   useEffect(() => {
     if (isActive && !isPaused) {
       timerRef.current = setInterval(() => {
-        setSecondsRemaining((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current!);
-            setIsActive(false);
-            if (!isBreak) {
-              // Focus ended -> show reflection
-              setShowReflectionModal(true);
-            } else {
-              // Break ended -> reset to focus
-              setIsBreak(false);
-              const secs = PRESETS[selectedMode].minutes * 60;
-              setSecondsRemaining(secs);
-              setTotalSeconds(secs);
-            }
-            return 0;
+        const now = Date.now();
+        if (now < deadline.current) {
+          setSecondsRemaining(Math.ceil((deadline.current - now) / 1000));
+          return;
+        }
+        if (!isBreak) {
+          breakStartedAt.current = deadline.current;
+          deadline.current += 5 * 60 * 1000;
+          setIsBreak(true);
+          setTotalSeconds(5 * 60);
+          if (now < deadline.current) {
+            setSecondsRemaining(Math.ceil((deadline.current - now) / 1000));
+            return;
           }
-          return prev - 1;
-        });
+        }
+        clearInterval(timerRef.current!);
+        finishedAt.current = deadline.current;
+        setIsActive(false);
+        setShowReflectionModal(true);
+        setSecondsRemaining(0);
       }, 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -90,15 +102,28 @@ export function LearningRoomView() {
   }, [isActive, isPaused, isBreak, selectedMode]);
 
   const handleStart = () => {
+    startedAt.current = Date.now();
+    finishedAt.current = null;
+    pausedMs.current = 0;
+    breakStartedAt.current = null;
+    breakPausedMs.current = 0;
+    pausedAt.current = null;
+    deadline.current = Date.now() + secondsRemaining * 1000;
     setIsActive(true);
     setIsPaused(false);
   };
 
   const handlePause = () => {
+    pausedAt.current = Date.now();
     setIsPaused(true);
   };
 
   const handleResume = () => {
+    const pause = pausedAt.current === null ? 0 : Date.now() - pausedAt.current;
+    pausedMs.current += pause;
+    if (isBreak) breakPausedMs.current += pause;
+    deadline.current += pause;
+    pausedAt.current = null;
     setIsPaused(false);
   };
 
@@ -112,25 +137,49 @@ export function LearningRoomView() {
   };
 
   const handleFinishEarly = () => {
+    finishedAt.current = Date.now();
+    if (pausedAt.current !== null) {
+      const pause = Date.now() - pausedAt.current;
+      pausedMs.current += pause;
+      if (isBreak) breakPausedMs.current += pause;
+      pausedAt.current = null;
+    }
     setIsActive(false);
     setIsPaused(false);
     setShowReflectionModal(true);
   };
 
   const handleSaveReflection = async () => {
-    const elapsedMinutes = Math.max(1, Math.round((totalSeconds - secondsRemaining) / 60));
-    await createSession.mutateAsync({
-      title: intentionTitle.trim() || `${selectedSubject} - Focused session`,
-      mode: selectedMode,
-      targetSubject: selectedSubject,
-      durationMinutes: PRESETS[selectedMode].minutes,
-      focusMinutes: elapsedMinutes,
-      breakMinutes: 5,
-      pausedMinutes: 0,
-      reflectionNotes: reflectionNotes.trim(),
-      rating,
-      status: 'completed',
-    });
+    if (createSession.isPending) return;
+    const end = finishedAt.current ?? Date.now();
+    const start = startedAt.current ?? end;
+    const breakMinutes =
+      breakStartedAt.current === null
+        ? 0
+        : Math.max(0, (end - breakStartedAt.current - breakPausedMs.current) / 60000);
+    const elapsedMinutes = Math.max(0, (end - start - pausedMs.current) / 60000 - breakMinutes);
+    if (writeLocks.current.has('createSession')) return;
+    writeLocks.current.add('createSession');
+    try {
+      await createSession.mutateAsync({
+        title: intentionTitle.trim() || `${selectedSubject} - Focused session`,
+        mode: selectedMode,
+        targetSubject: selectedSubject,
+        durationMinutes: Math.max(0.001, (end - start) / 60000),
+        startedAt: new Date(start).toISOString(),
+        completedAt: new Date(end).toISOString(),
+        focusMinutes: elapsedMinutes,
+        breakMinutes,
+        pausedMinutes: pausedMs.current / 60000,
+        reflectionNotes: reflectionNotes.trim(),
+        rating,
+        status: 'completed',
+      });
+    } catch {
+      return;
+    } finally {
+      writeLocks.current.delete('createSession');
+    }
 
     setShowReflectionModal(false);
     setReflectionNotes('');
@@ -151,8 +200,13 @@ export function LearningRoomView() {
   const stats = data?.stats;
   const sessions = data?.sessions ?? [];
 
+
+
+  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+
   return (
     <div className={styles.container}>
+      {[createSession].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Retry the action.</p>}
       {/* Header (hidden in zen mode for deep calm) */}
       {!isZenMode && (
         <header className={styles.header}>
@@ -375,7 +429,7 @@ export function LearningRoomView() {
               </div>
 
               <div className={styles.statCard}>
-                <div className={styles.statValue}>{stats?.streakDays ?? 5} days</div>
+                <div className={styles.statValue}>{stats?.streakDays ?? 0} days</div>
                 <div className={styles.statLabel}>Study streak</div>
               </div>
 
@@ -496,17 +550,10 @@ export function LearningRoomView() {
 
       {/* Reflection & Logging Modal */}
       {showReflectionModal && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="reflection-modal-title"
-        >
-          <div className={styles.modalContent}>
+        <Dialog open portal className="max-h-[90svh] overflow-y-auto" title="Session reflection" onClose={() => void handleSaveReflection()}>
+          <div className="flex flex-col gap-4">
             <div className={styles.modalHeader}>
-              <h3 id="reflection-modal-title" className={styles.modalTitle}>
-                Session reflection
-              </h3>
+
             </div>
 
             <div>
@@ -551,13 +598,13 @@ export function LearningRoomView() {
               />
             </div>
 
+            {createSession.isError && <p role="alert">Could not save this session. Your notes are retained; retry saving.</p>}
             <div className={styles.modalFooter}>
               <button
                 type="button"
                 className={styles.secondaryBtn}
                 onClick={() => {
-                  setShowReflectionModal(false);
-                  handleReset();
+                  void handleSaveReflection();
                 }}
               >
                 Skip notes
@@ -572,7 +619,7 @@ export function LearningRoomView() {
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

@@ -1,6 +1,10 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useItemAnchor } from '@/ui/use-item-anchor';
+
+import { Dialog } from '@/ui/Dialog';
+
+import { useMemo, useState } from 'react';
 import {
   Compass,
   Plus,
@@ -21,7 +25,7 @@ import { Button } from '@/ui/Button';
 import styles from './milestones.module.css';
 
 export function MilestonesView() {
-  const { data: milestones = [], isLoading } = useMilestones();
+  const { data: milestones = [], isLoading, isError: loadFailed, refetch } = useMilestones();
   const createMutation = useCreateMilestone();
   const toggleMutation = useToggleLandmark();
   const deleteMutation = useDeleteMilestone();
@@ -29,17 +33,7 @@ export function MilestonesView() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<MilestoneItem | null>(null);
 
-  // Close modal on Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSelectedMilestone(null);
-        setIsCreateOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  useItemAnchor(milestones);
 
   const totalLandmarks = useMemo(
     () => milestones.reduce((sum, m) => sum + (m.landmarks?.length || 0), 0),
@@ -101,8 +95,13 @@ export function MilestonesView() {
     );
   };
 
+
+
+  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+
   return (
     <div className={styles.container}>
+      {[createMutation, toggleMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Retry the action.</p>}
       <div className={styles.horizonGlow} aria-hidden="true" />
 
       {/* Header */}
@@ -115,13 +114,13 @@ export function MilestonesView() {
           <h1 className={styles.title}>Milestone</h1>
         </div>
 
-        <Button
+        <Button leftIcon={<Plus size={16} className="mr-1" />}
           variant="primary"
           size="sm"
           onClick={() => setIsCreateOpen(true)}
-          className="bg-ws-accent hover:bg-ws-accent-hover text-white"
+          className="bg-ws-text hover:bg-text-accent text-white"
         >
-          <Plus size={16} className="mr-1" />
+
           <span>New milestone</span>
         </Button>
       </header>
@@ -133,7 +132,7 @@ export function MilestonesView() {
           <span className={styles.statLabel}>Core ambitions</span>
         </div>
         <div className={styles.statCard}>
-          <span className={styles.statValue} style={{ color: 'var(--status-done)' }}>
+          <span className={styles.statValue} style={{ color: 'var(--text-completed)' }}>
             {completedLandmarks} / {totalLandmarks}
           </span>
           <span className={styles.statLabel}>Landmarks reached</span>
@@ -160,7 +159,7 @@ export function MilestonesView() {
               const progress = computeLandmarkProgress(milestone);
 
               return (
-                <article key={milestone.id} className={styles.milestoneCard}>
+                <article id={`item-${milestone.id}`} tabIndex={-1} key={milestone.id} className={styles.milestoneCard}>
                   <div className={styles.cardHeaderRow}>
                     <div className="flex flex-col gap-1.5 max-w-[80%]">
                       <div className="flex items-center gap-2">
@@ -233,7 +232,7 @@ export function MilestonesView() {
                             }}
                           >
                             {landmark.completed ? (
-                              <CheckCircle2 size={16} className="text-status-done shrink-0" />
+                              <CheckCircle2 size={16} className="text-text-completed shrink-0" />
                             ) : (
                               <Circle size={16} className="text-ws-text-muted shrink-0" />
                             )}
@@ -258,13 +257,9 @@ export function MilestonesView() {
 
       {/* Delete / Options Modal */}
       {selectedMilestone && (
-        <div
-          className={styles.modalBackdrop}
-          onClick={() => setSelectedMilestone(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className={styles.modalWindow} onClick={(e) => e.stopPropagation()}>
+        <Dialog open portal className="max-h-[90svh] overflow-y-auto" title={selectedMilestone.title} onClose={() => setSelectedMilestone(null)}>
+          {[createMutation, toggleMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               className={styles.modalCloseButton}
@@ -274,9 +269,7 @@ export function MilestonesView() {
               <X size={18} />
             </button>
 
-            <h2 className="font-display text-2xl font-semibold text-ws-text">
-              {selectedMilestone.title}
-            </h2>
+
 
             <p className="text-sm text-ws-text-muted">{selectedMilestone.meaning}</p>
 
@@ -284,7 +277,7 @@ export function MilestonesView() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-status-urgent hover:bg-status-urgent-soft"
+                className="text-text-overdue hover:bg-ws-accent-soft"
                 onClick={() => {
                   deleteMutation.mutate(selectedMilestone.id);
                   setSelectedMilestone(null);
@@ -297,18 +290,14 @@ export function MilestonesView() {
               </Button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Create Milestone Modal Dialog */}
       {isCreateOpen && (
-        <div
-          className={styles.modalBackdrop}
-          onClick={() => setIsCreateOpen(false)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className={styles.modalWindow} onClick={(e) => e.stopPropagation()}>
+        <Dialog open portal className="max-h-[90svh] overflow-y-auto" title="Set new ambition" onClose={() => setIsCreateOpen(false)}>
+          {[createMutation, toggleMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               className={styles.modalCloseButton}
@@ -318,14 +307,12 @@ export function MilestonesView() {
               <X size={18} />
             </button>
 
-            <h2 className="font-display text-2xl font-semibold text-ws-text">
-              Set new ambition
-            </h2>
+
 
             <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Ambition title</label>
-                <input
+                <label htmlFor="milestones-field-1" className="text-xs font-semibold text-ws-text">Ambition title</label>
+                <input id="milestones-field-1"
                   type="text"
                   required
                   placeholder="e.g. Master Machine Learning Foundations"
@@ -336,8 +323,8 @@ export function MilestonesView() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Meaning & significance</label>
-                <textarea
+                <label htmlFor="milestones-field-2" className="text-xs font-semibold text-ws-text">Meaning & significance</label>
+                <textarea id="milestones-field-2"
                   rows={2}
                   required
                   placeholder="Why is this meaningful to you and your long-term journey?"
@@ -349,8 +336,8 @@ export function MilestonesView() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-ws-text">Timeframe</label>
-                  <input
+                  <label htmlFor="milestones-field-3" className="text-xs font-semibold text-ws-text">Timeframe</label>
+                  <input id="milestones-field-3"
                     type="text"
                     required
                     placeholder="e.g. Year I, 2026, or Next 6 months"
@@ -361,8 +348,8 @@ export function MilestonesView() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-ws-text">Category</label>
-                  <select
+                  <label htmlFor="milestones-field-4" className="text-xs font-semibold text-ws-text">Category</label>
+                  <select id="milestones-field-4"
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value as MilestoneCategory)}
                     className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none"
@@ -376,10 +363,10 @@ export function MilestonesView() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">
+                <label htmlFor="milestones-field-5" className="text-xs font-semibold text-ws-text">
                   Landmarks (one checkpoint per line)
                 </label>
-                <textarea
+                <textarea id="milestones-field-5"
                   rows={3}
                   placeholder={`Pass Calculus midterm\nComplete PyTorch bot\nPublish writeup`}
                   value={newLandmarksInput}
@@ -389,8 +376,8 @@ export function MilestonesView() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Reflection</label>
-                <textarea
+                <label htmlFor="milestones-field-6" className="text-xs font-semibold text-ws-text">Reflection</label>
+                <textarea id="milestones-field-6"
                   rows={2}
                   placeholder="Where do things stand right now?"
                   value={newReflection}
@@ -408,14 +395,14 @@ export function MilestonesView() {
                   variant="primary"
                   size="sm"
                   disabled={createMutation.isPending}
-                  className="bg-ws-accent hover:bg-ws-accent-hover text-white"
+                  className="bg-ws-text hover:bg-text-accent text-white"
                 >
                   Save milestone
                 </Button>
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+import { PageReady } from '@/features/transitions/TransitionProvider';
 import type { Metadata } from 'next';
 import { ProjectsView } from '@/features/projects/ProjectsView';
 import { getFeatureById } from '@/features/registry';
@@ -9,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function ProjectsPage() {
-  return <ProjectsView />;
+  return <><PageReady /><ProjectsView /></>;
 }

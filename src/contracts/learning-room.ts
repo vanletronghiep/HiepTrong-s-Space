@@ -13,9 +13,9 @@ export const learningSessionSchema = z.object({
   startedAt: z.string(),
   completedAt: z.string().nullable().default(null),
   durationMinutes: z.number().default(25),
-  focusMinutes: z.number().default(0),
-  breakMinutes: z.number().default(0),
-  pausedMinutes: z.number().default(0),
+  focusMinutes: z.number().nonnegative().default(0),
+  breakMinutes: z.number().nonnegative().default(0),
+  pausedMinutes: z.number().nonnegative().default(0),
   status: z.enum(['active', 'completed', 'abandoned']).default('active'),
   reflectionNotes: z.string().default(''),
   rating: z.number().min(1).max(5).default(4),
@@ -24,18 +24,24 @@ export const learningSessionSchema = z.object({
 export type LearningSession = z.infer<typeof learningSessionSchema>;
 
 export const createLearningSessionInputSchema = z.object({
+  startedAt: z.string().datetime({ offset: true }).optional(),
+  completedAt: z.string().datetime({ offset: true }).optional(),
   title: z.string().min(1, 'Title is required'),
   mode: z.enum(['pomodoro', 'deep_focus', 'quick_review']).default('pomodoro'),
   targetSubject: z.string().default('General'),
   relatedProjectId: z.string().nullable().optional(),
   relatedTaskId: z.string().nullable().optional(),
   durationMinutes: z.number().positive().default(25),
-  focusMinutes: z.number().default(0),
-  breakMinutes: z.number().default(0),
-  pausedMinutes: z.number().default(0),
+  focusMinutes: z.number().nonnegative().default(0),
+  breakMinutes: z.number().nonnegative().default(0),
+  pausedMinutes: z.number().nonnegative().default(0),
   reflectionNotes: z.string().default(''),
   rating: z.number().min(1).max(5).default(4),
   status: z.enum(['active', 'completed', 'abandoned']).default('completed'),
+ }).refine(value => value.focusMinutes + value.breakMinutes + value.pausedMinutes <= value.durationMinutes + 0.0001, {
+  message: 'Recorded phases cannot exceed session duration', path: ['durationMinutes'],
+}).refine(value => !value.startedAt || !value.completedAt || Date.parse(value.completedAt) >= Date.parse(value.startedAt), {
+  message: 'Completion must not precede start', path: ['completedAt'],
 });
 
 export type CreateLearningSessionInput = z.input<typeof createLearningSessionInputSchema>;

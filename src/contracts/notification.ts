@@ -11,6 +11,9 @@ export const notificationKindSchema = z.enum([
 export type NotificationKind = z.infer<typeof notificationKindSchema>;
 
 export const notificationPayloadSchema = z.object({
+  sourceKey: z.string().optional(),
+  deadlineAt: isoInstantSchema.optional(),
+  targetUrl: z.string().optional(),
   title: z.string().optional(),
   message: z.string().optional(),
 });

@@ -1,18 +1,25 @@
+'use client';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  BookItem,
   CreateBookInput,
   CreateGameInput,
   EntertainmentData,
+  GameItem,
 } from '@/contracts/entertainment';
+import { apiRequest } from '../api-client';
+
+export const entertainmentKeys = {
+  all: ['entertainment'] as const,
+};
 
 export function useEntertainmentData() {
   return useQuery<EntertainmentData>({
-    queryKey: ['entertainment'],
+    queryKey: entertainmentKeys.all,
     queryFn: async () => {
-      const res = await fetch('/api/entertainment');
-      if (!res.ok) throw new Error('Failed to load entertainment data');
-      const json = await res.json();
-      return json.data;
+      const res = await apiRequest<{ success: boolean; data: EntertainmentData }>('/api/entertainment');
+      return res.data;
     },
   });
 }
@@ -22,17 +29,14 @@ export function useCreateBook() {
 
   return useMutation({
     mutationFn: async (input: CreateBookInput) => {
-      const res = await fetch('/api/entertainment?action=book', {
+      const res = await apiRequest<{ success: boolean; data: BookItem }>('/api/entertainment?action=book', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: input,
       });
-      if (!res.ok) throw new Error('Failed to add book');
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['entertainment'] });
+      queryClient.invalidateQueries({ queryKey: entertainmentKeys.all });
     },
   });
 }
@@ -42,17 +46,14 @@ export function useCreateGame() {
 
   return useMutation({
     mutationFn: async (input: CreateGameInput) => {
-      const res = await fetch('/api/entertainment?action=game', {
+      const res = await apiRequest<{ success: boolean; data: GameItem }>('/api/entertainment?action=game', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: input,
       });
-      if (!res.ok) throw new Error('Failed to add game');
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['entertainment'] });
+      queryClient.invalidateQueries({ queryKey: entertainmentKeys.all });
     },
   });
 }
@@ -61,19 +62,23 @@ export function useUpdateBookProgress() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ bookId, progressPercentage, status }: { bookId: string; progressPercentage: number; status?: string }) => {
-      const res = await fetch('/api/entertainment?action=update-book', {
+    mutationFn: async ({
+      bookId,
+      progressPercentage,
+      status,
+    }: {
+      bookId: string;
+      progressPercentage: number;
+      status?: string;
+    }) => {
+      const res = await apiRequest<{ success: boolean; data: BookItem }>('/api/entertainment?action=update-book', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookId, progressPercentage, status }),
+        body: { bookId, progressPercentage, status },
       });
-      if (!res.ok) throw new Error('Failed to update progress');
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['entertainment'] });
+      queryClient.invalidateQueries({ queryKey: entertainmentKeys.all });
     },
   });
 }
-

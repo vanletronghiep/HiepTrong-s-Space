@@ -16,7 +16,7 @@
   pointer-events: none;
   background: radial-gradient(
     ellipse 70% 60% at 50% 0%,
-    color-mix(in srgb, var(--daily-sky) 10%, transparent) 0%,
+    color-mix(in srgb, var(--daily-priority-normal) 10%, transparent) 0%,
     transparent 75%
   );
   z-index: 0;
@@ -43,7 +43,7 @@
   align-items: center;
   gap: 6px;
   font-size: var(--fs-small);
-  color: var(--daily-sky);
+  color: var(--daily-priority-normal);
   font-weight: 600;
 }
 
@@ -77,7 +77,7 @@
 }
 
 .statCard:hover {
-  border-color: color-mix(in srgb, var(--daily-sky) 40%, var(--ws-border));
+  border-color: color-mix(in srgb, var(--daily-priority-normal) 40%, var(--ws-border));
 }
 
 .statValue {
@@ -103,12 +103,14 @@
 }
 
 .filterTabs {
+  flex-wrap: wrap;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 4px;
   border-radius: var(--radius-pill);
-  background: var(--ws-bg-alt);
+  background: var(--ws-accent-soft);
   border: 1px solid var(--ws-border);
 }
 
@@ -152,7 +154,7 @@
 
 .projectCard:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--daily-sky) 40%, var(--ws-border));
+  border-color: color-mix(in srgb, var(--daily-priority-normal) 40%, var(--ws-border));
   box-shadow: var(--shadow-md);
 }
 
@@ -189,22 +191,22 @@
 }
 
 .statusBadge_active {
-  background: color-mix(in srgb, var(--daily-sky) 14%, var(--ws-surface));
-  color: var(--daily-sky);
+  background: color-mix(in srgb, var(--daily-priority-normal) 14%, var(--ws-surface));
+  color: var(--daily-priority-normal);
 }
 
 .statusBadge_in_progress {
-  background: color-mix(in srgb, var(--status-warn) 14%, var(--ws-surface));
-  color: var(--status-warn);
+  background: color-mix(in srgb, var(--text-due-soon) 14%, var(--ws-surface));
+  color: var(--text-due-soon);
 }
 
 .statusBadge_completed {
-  background: color-mix(in srgb, var(--status-done) 14%, var(--ws-surface));
-  color: var(--status-done);
+  background: color-mix(in srgb, var(--text-completed) 14%, var(--ws-surface));
+  color: var(--text-completed);
 }
 
 .statusBadge_on_hold {
-  background: var(--ws-bg-alt);
+  background: var(--ws-accent-soft);
   color: var(--ws-text-muted);
 }
 
@@ -237,14 +239,14 @@
   width: 100%;
   height: 8px;
   border-radius: var(--radius-pill);
-  background: var(--ws-bg-alt);
+  background: var(--ws-accent-soft);
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
   border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--daily-sky), var(--cosmos-accent));
+  background: linear-gradient(90deg, var(--daily-priority-normal), var(--cosmos-accent));
   transition: width 0.4s ease-out;
 }
 
@@ -254,15 +256,15 @@
   gap: 4px;
   padding: 10px 14px;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--daily-sky) 6%, var(--ws-surface));
-  border: 1px solid color-mix(in srgb, var(--daily-sky) 18%, var(--ws-border));
+  background: color-mix(in srgb, var(--daily-priority-normal) 6%, var(--ws-surface));
+  border: 1px solid color-mix(in srgb, var(--daily-priority-normal) 18%, var(--ws-border));
   font-size: var(--fs-small);
 }
 
 .nextStepLabel {
   font-size: var(--fs-micro, 11px);
   font-weight: 700;
-  color: var(--daily-sky);
+  color: var(--daily-priority-normal);
 }
 
 .blockerBox {
@@ -271,15 +273,15 @@
   gap: 4px;
   padding: 10px 14px;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--status-urgent) 6%, var(--ws-surface));
-  border: 1px solid color-mix(in srgb, var(--status-urgent) 20%, var(--ws-border));
+  background: color-mix(in srgb, var(--text-overdue) 6%, var(--ws-surface));
+  border: 1px solid color-mix(in srgb, var(--text-overdue) 20%, var(--ws-border));
   font-size: var(--fs-small);
 }
 
 .blockerLabel {
   font-size: var(--fs-micro, 11px);
   font-weight: 700;
-  color: var(--status-urgent);
+  color: var(--text-overdue);
 }
 
 .techTags {
@@ -291,7 +293,7 @@
 .techTag {
   padding: 2px 8px;
   border-radius: var(--radius-pill);
-  background: var(--ws-bg-alt);
+  background: var(--ws-accent-soft);
   border: 1px solid var(--ws-border);
   font-size: var(--fs-micro, 11px);
   color: var(--ws-text-muted);
@@ -302,7 +304,7 @@
   inset: 0;
   background: color-mix(in srgb, var(--cosmos-bg) 50%, transparent);
   backdrop-filter: blur(4px);
-  z-index: var(--z-modal);
+  z-index: var(--z-drawer);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -339,6 +341,6 @@
 
 .modalCloseButton:hover {
   color: var(--ws-text);
-  background: var(--ws-bg-alt);
+  background: var(--ws-accent-soft);
 }
 

@@ -9,7 +9,7 @@ export type EventLocationType = z.infer<typeof eventLocationTypeSchema>;
 export const eventRecurrenceSchema = z.object({
   frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly']),
   daysOfWeek: z.array(z.number().min(0).max(6)).optional(),
-  until: z.string().optional(),
+  until: z.string().datetime({ offset: true }).optional(),
 });
 export type EventRecurrence = z.infer<typeof eventRecurrenceSchema>;
 
@@ -18,8 +18,8 @@ export const eventItemSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().nullable().default(null),
   category: eventCategorySchema,
-  startAt: z.string(),
-  endAt: z.string().nullable().default(null),
+  startAt: z.string().datetime({ offset: true }),
+  endAt: z.string().datetime({ offset: true }).nullable().default(null),
   locationType: eventLocationTypeSchema.default('in_person'),
   location: z.string().nullable().default(null),
   url: z.string().nullable().default(null),
@@ -36,8 +36,8 @@ export const createEventInputSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().nullable().optional().default(null),
   category: eventCategorySchema,
-  startAt: z.string(),
-  endAt: z.string().nullable().optional().default(null),
+  startAt: z.string().datetime({ offset: true }),
+  endAt: z.string().datetime({ offset: true }).nullable().optional().default(null),
   locationType: eventLocationTypeSchema.default('in_person'),
   location: z.string().nullable().optional().default(null),
   url: z.string().nullable().optional().default(null),

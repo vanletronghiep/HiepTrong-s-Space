@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useId } from 'react';
+import { Dialog } from '@/ui/Dialog';
+
+import React, { useRef, useState, useEffect, useCallback, useId } from 'react';
 import type { FlashcardDeck, FlashcardItem } from '@/contracts/flashcard';
 import {
   useCreateCard,
@@ -11,6 +13,8 @@ import {
 import styles from './flashcards.module.css';
 
 export function FlashcardsView() {
+  const writeLocks = useRef(new Set<string>());
+  const [reviewComplete, setReviewComplete] = useState(false);
   const [activeDeck, setActiveDeck] = useState<FlashcardDeck | null>(null);
   const [studyCardIndex, setStudyCardIndex] = useState<number>(0);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState<boolean>(false);
@@ -39,7 +43,7 @@ export function FlashcardsView() {
   const deckDescId = useId();
 
   // Queries & Mutations
-  const { data, isLoading } = useFlashcardsData();
+  const { data, isLoading, isError: loadFailed, refetch } = useFlashcardsData();
   const createCard = useCreateCard();
   const createDeck = useCreateDeck();
   const reviewCard = useReviewCard();
@@ -55,6 +59,8 @@ export function FlashcardsView() {
   const currentStudyCard: FlashcardItem | undefined = activeDeckCards[studyCardIndex];
 
   const handleStartStudy = (deck: FlashcardDeck) => {
+    if (!cards.some(card => card.deckId === deck.id)) return;
+    setReviewComplete(false);
     setActiveDeck(deck);
     setStudyCardIndex(0);
     setIsAnswerRevealed(false);
@@ -62,12 +68,21 @@ export function FlashcardsView() {
 
   const handleRateConfidence = async (confidence: number) => {
     if (!currentStudyCard) return;
-    await reviewCard.mutateAsync({ cardId: currentStudyCard.id, confidence });
+    if (writeLocks.current.has('reviewCard')) return;
+    writeLocks.current.add('reviewCard');
+    try {
+      await reviewCard.mutateAsync({ cardId: currentStudyCard.id, confidence });
+    } catch {
+      return;
+    } finally {
+      writeLocks.current.delete('reviewCard');
+    }
     setIsAnswerRevealed(false);
     if (studyCardIndex < activeDeckCards.length - 1) {
       setStudyCardIndex(studyCardIndex + 1);
     } else {
-      setStudyCardIndex(0);
+      setActiveDeck(null);
+      setReviewComplete(true);
     }
   };
 
@@ -76,12 +91,20 @@ export function FlashcardsView() {
     const targetDeckId = selectedDeckId || activeDeck?.id || (data?.decks[0]?.id ?? '');
     if (!targetDeckId) return;
 
-    await createCard.mutateAsync({
-      deckId: targetDeckId,
-      prompt: newPrompt.trim(),
-      answer: newAnswer.trim(),
-      notes: newNotes.trim(),
-    });
+    if (writeLocks.current.has('createCard')) return;
+    writeLocks.current.add('createCard');
+    try {
+      await createCard.mutateAsync({
+        deckId: targetDeckId,
+        prompt: newPrompt.trim(),
+        answer: newAnswer.trim(),
+        notes: newNotes.trim(),
+      });
+    } catch {
+      return;
+    } finally {
+      writeLocks.current.delete('createCard');
+    }
 
     setNewPrompt('');
     setNewAnswer('');
@@ -110,19 +133,33 @@ export function FlashcardsView() {
     e.preventDefault();
     if (!newDeckName.trim()) return;
 
-    await createDeck.mutateAsync({
-      name: newDeckName.trim(),
-      topic: newDeckTopic.trim(),
-      description: newDeckDesc.trim(),
-    });
+    if (writeLocks.current.has('createDeck')) return;
+    writeLocks.current.add('createDeck');
+    try {
+      await createDeck.mutateAsync({
+        name: newDeckName.trim(),
+        topic: newDeckTopic.trim(),
+        description: newDeckDesc.trim(),
+      });
+    } catch {
+      return;
+    } finally {
+      writeLocks.current.delete('createDeck');
+    }
 
     setNewDeckName('');
     setNewDeckDesc('');
     setShowAddDeck(false);
   };
 
+
+
+  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+
   return (
     <div className={styles.container}>
+      {reviewComplete && <p role="status">Review complete.</p>}
+      {[createCard, createDeck, reviewCard].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Retry the action.</p>}
       {/* Ancient History / Norse Atmosphere Header */}
       {!activeDeck && (
         <header className={styles.header}>
@@ -132,7 +169,7 @@ export function FlashcardsView() {
 
           <h1 className={styles.title}>Flashcards</h1>
           <p className={styles.description}>
-            Deliberate spaced repetition for English vocabulary and classical discourse.
+            Review English vocabulary and classical discourse at your own pace.
             Refine mastery with prompt-and-answer recall and active confidence rating.
           </p>
 
@@ -294,18 +331,11 @@ export function FlashcardsView() {
 
       {/* Add Card Modal with Ctrl+S shortcut */}
       {showAddCard && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-card-modal-title"
-          onClick={() => setShowAddCard(false)}
-        >
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <Dialog open portal title="Add new flashcard" className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setShowAddCard(false)}>
+{[createCard, createDeck, reviewCard].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 id="add-card-modal-title" className={styles.sectionTitle}>
-                Add new flashcard
-              </h2>
+
               <span className={styles.shortcutHint}>Press Ctrl+S to save</span>
             </div>
 
@@ -390,22 +420,15 @@ export function FlashcardsView() {
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Add Deck Modal */}
       {showAddDeck && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-deck-modal-title"
-          onClick={() => setShowAddDeck(false)}
-        >
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2 id="add-deck-modal-title" className={styles.sectionTitle}>
-              Create vocabulary deck
-            </h2>
+        <Dialog open portal title="Create vocabulary deck" className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setShowAddDeck(false)}>
+{[createCard, createDeck, reviewCard].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+
             <form onSubmit={handleSaveDeck} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label htmlFor={deckNameId} style={{ display: 'block', fontSize: 'var(--text-xs)', marginBottom: '4px' }}>
@@ -467,7 +490,7 @@ export function FlashcardsView() {
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

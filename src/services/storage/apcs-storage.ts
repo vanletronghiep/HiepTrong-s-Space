@@ -2,6 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ApcsCourse, ApcsDirectoryListing, ApcsFileCategory, ApcsFileItem, ApcsOverview } from '@/contracts/apcs';
 
+function contained(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return relative === '' || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`));
+}
+
 const APCS_ROOT = 'D:\\APCS\\University\\Year I';
 
 function formatBytes(bytes: number): string {
@@ -88,7 +93,7 @@ export class ApcsStorage {
       const entries = fs.readdirSync(dirPath, { withFileTypes: true });
       for (const entry of entries) {
         // Skip hidden or system folders like .vscode, .git
-        if (entry.name.startsWith('.')) continue;
+        if (entry.name.startsWith('.') || entry.isSymbolicLink()) continue;
 
         const fullEntryPath = path.join(dirPath, entry.name);
         const relPath = relativeBase ? `${relativeBase}/${entry.name}` : entry.name;
@@ -139,7 +144,7 @@ export class ApcsStorage {
 
   getOverview(): ApcsOverview {
     if (!this.isRootAccessible()) {
-      return this.getMockOverview();
+      throw new Error('APCS root is missing or inaccessible');
     }
 
     try {
@@ -200,7 +205,7 @@ export class ApcsStorage {
         recentFiles,
       };
     } catch {
-      return this.getMockOverview();
+      throw new Error('APCS root is missing or inaccessible');
     }
   }
 
@@ -211,12 +216,12 @@ export class ApcsStorage {
     // Security check: ensure targetDir starts with rootPath
     const resolvedTarget = path.resolve(targetDir);
     const resolvedRoot = path.resolve(this.rootPath);
-    if (!resolvedTarget.startsWith(resolvedRoot)) {
+    if (!contained(resolvedRoot, resolvedTarget) || (fs.existsSync(resolvedTarget) && !contained(fs.realpathSync(resolvedRoot), fs.realpathSync(resolvedTarget)))) {
       throw new Error('Access denied: path outside APCS root');
     }
 
     if (!this.isRootAccessible()) {
-      return this.getMockDirectoryListing(cleanSub);
+      throw new Error('APCS root is missing or inaccessible');
     }
 
     const items = this.scanFolder(targetDir, cleanSub);
@@ -267,7 +272,7 @@ export class ApcsStorage {
     const cleanSub = relPath.replace(/^[/\\]+/, '');
     const target = path.resolve(this.rootPath, cleanSub);
     const resolvedRoot = path.resolve(this.rootPath);
-    if (!target.startsWith(resolvedRoot)) return null;
+    if (!contained(resolvedRoot, target) || (fs.existsSync(target) && !contained(fs.realpathSync(resolvedRoot), fs.realpathSync(target)))) return null;
 
     if (!fs.existsSync(target) || fs.statSync(target).isDirectory()) return null;
 
@@ -300,42 +305,7 @@ export class ApcsStorage {
     return { buffer, fileName: info.fileName, mimeType };
   }
 
-  private getMockOverview(): ApcsOverview {
-    const courses: ApcsCourse[] = Object.entries(COURSE_METADATA).map(([folder, meta]) => ({
-      id: folder.toLowerCase().replace(/\s+/g, '-'),
-      code: meta.code,
-      name: meta.name,
-      description: meta.description,
-      folderName: folder,
-      semester: meta.semester,
-      fileCount: 12,
-      totalSizeBytes: 14500000,
-      formattedSize: '14.5 MB',
-      tags: meta.tags,
-      topics: meta.topics,
-    }));
 
-    return {
-      courses,
-      stats: {
-        totalCourses: courses.length,
-        totalFiles: 60,
-        totalSizeBytes: 72500000,
-        formattedSize: '72.5 MB',
-      },
-      recentFiles: [],
-    };
-  }
-
-  private getMockDirectoryListing(cleanSub: string): ApcsDirectoryListing {
-    return {
-      currentPath: cleanSub,
-      breadcrumbs: [{ name: 'Year I Root', path: '' }],
-      parentPath: null,
-      courseId: null,
-      items: [],
-    };
-  }
 }
 
 export const apcsStorage = new ApcsStorage();

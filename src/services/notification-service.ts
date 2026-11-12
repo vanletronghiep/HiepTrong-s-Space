@@ -1,3 +1,4 @@
+import type { TimedSource } from './timed-sources';
 import { addDays, differenceInMilliseconds } from 'date-fns';
 import type {
   NotificationDto,
@@ -17,10 +18,12 @@ export class NotificationService {
   private readonly storage: StorageAdapter;
   private readonly clock: Clock;
   private readonly timeZone: string;
+  private readonly timedSources: () => Promise<TimedSource[]>;
   private lastTickAt: Date | null = null;
   private inFlightTick: Promise<{ createdCount: number }> | null = null;
 
-  constructor(deps: { storage: StorageAdapter; clock: Clock; timeZone?: string }) {
+  constructor(deps: { storage: StorageAdapter; clock: Clock; timeZone?: string; timedSources?: () => Promise<TimedSource[]> }) {
+    this.timedSources = deps.timedSources ?? (async () => []);
     this.storage = deps.storage;
     this.clock = deps.clock;
     this.timeZone = deps.timeZone ?? DEFAULT_APP_TIMEZONE;
@@ -79,6 +82,37 @@ export class NotificationService {
       }
     }
 
+    for (const source of await this.timedSources()) {
+      const remaining = Date.parse(source.deadlineAt) - now.getTime();
+      if (remaining > 86400000) continue;
+      const kind = remaining <= 0 ? 'overdue' : 'due_soon';
+      const dedupeKey = `${source.key}:${source.deadlineAt}:${kind}`;
+      if (existingDedupeKeys.has(dedupeKey)) continue;
+      try {
+        await this.storage.notifications.saveItem({
+          id: crypto.randomUUID(),
+          kind,
+          taskId: null,
+          dedupeKey,
+          payload: {
+            sourceKey: source.key,
+            deadlineAt: source.deadlineAt,
+            targetUrl: source.targetUrl,
+            title: source.title,
+            message: `${source.title}: ${kind === 'overdue' ? 'overdue' : 'due within 24 hours'}`,
+          },
+          createdAt: nowIso,
+          readAt: null,
+        });
+        existingDedupeKeys.add(dedupeKey);
+        createdCount += 1;
+      } catch (error: unknown) {
+        if (!(error instanceof ConflictError)) {
+          throw error;
+        }
+      }
+    }
+
     this.lastTickAt = now;
     return { createdCount };
   }
@@ -115,14 +149,17 @@ export class NotificationService {
       taskMap.set(task.id, task);
     }
 
+    const sources = new Map((await this.timedSources()).map(source => [source.key, source]));
     const items: NotificationDto[] = [];
     for (const record of records) {
+      if (record.payload?.sourceKey && sources.get(record.payload.sourceKey)?.deadlineAt !== record.payload.deadlineAt) continue;
       if (record.createdAt <= cutoffIso) {
         continue;
       }
       const linkedTask = record.taskId ? (taskMap.get(record.taskId) ?? null) : null;
+      const source = record.payload?.sourceKey ? sources.get(record.payload.sourceKey) : undefined;
       const dto = buildNotificationDto({
-        record,
+        record: source ? { ...record, payload: { ...record.payload, title: source.title, targetUrl: source.targetUrl } } : record,
         task: linkedTask,
         now,
         timeZone: this.timeZone,

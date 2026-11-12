@@ -28,7 +28,7 @@ export async function apiRequest<TResponse>(
 
   if (init?.body !== undefined) {
     headers.set('Content-Type', 'application/json');
-    serializedBody = JSON.stringify(init.body);
+    serializedBody = typeof init.body === 'string' ? init.body : JSON.stringify(init.body);
   }
 
   const response = await fetch(path, {
@@ -49,9 +49,18 @@ export async function apiRequest<TResponse>(
         fields: parsedError.data.error.fields,
       });
     }
+
+    const legacyErrorMessage =
+      typeof rawJson === 'object' &&
+        rawJson !== null &&
+        'error' in rawJson &&
+        typeof (rawJson as { error: unknown }).error === 'string'
+        ? (rawJson as { error: string }).error
+        : undefined;
+
     throw new ClientApiError({
       code: 'HTTP_ERROR',
-      message: `Request failed with status ${response.status}`,
+      message: legacyErrorMessage ?? `Request failed with status ${response.status}`,
       httpStatus: response.status,
     });
   }

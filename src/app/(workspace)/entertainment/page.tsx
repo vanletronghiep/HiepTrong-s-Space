@@ -1,3 +1,4 @@
+import { PageReady } from '@/features/transitions/TransitionProvider';
 import type { Metadata } from 'next';
 import { EntertainmentView } from '@/features/entertainment/EntertainmentView';
 import { getFeatureById } from '@/features/registry';
@@ -9,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function EntertainmentPage() {
-  return <EntertainmentView />;
+  return <><PageReady /><EntertainmentView /></>;
 }

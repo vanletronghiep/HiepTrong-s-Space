@@ -28,6 +28,8 @@ describe('Daily dashboard clock', () => {
   it('resets the day arc at local midnight', () => {
     expect(clock('2026-11-05', '00:00')).toEqual({
       time: '00:00',
+      timeSeconds: '00:00:00',
+      countdown: '-24:00:00 until 00:00',
       progress: 0,
     });
   });

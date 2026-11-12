@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useId } from 'react';
+import { Dialog } from '@/ui/Dialog';
+
+import React, { useRef, useState, useId } from 'react';
 import type { BookStatus, GameStatus } from '@/contracts/entertainment';
 import {
   useCreateBook,
@@ -11,6 +13,7 @@ import {
 import styles from './entertainment.module.css';
 
 export function EntertainmentView() {
+  const writeLocks = useRef(new Set<string>());
   const [showAddBook, setShowAddBook] = useState<boolean>(false);
   const [showAddGame, setShowAddGame] = useState<boolean>(false);
 
@@ -40,36 +43,32 @@ export function EntertainmentView() {
   const gameHoursId = useId();
 
   // Queries & Mutations
-  const { data, isLoading } = useEntertainmentData();
+  const { data, isLoading, isError: loadFailed, refetch } = useEntertainmentData();
   const createBook = useCreateBook();
   const createGame = useCreateGame();
   const updateProgress = useUpdateBookProgress();
-
-  // Escape to close modals
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowAddBook(false);
-        setShowAddGame(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   const handleBookSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bookTitle.trim() || !bookAuthor.trim()) return;
 
-    await createBook.mutateAsync({
-      title: bookTitle.trim(),
-      author: bookAuthor.trim(),
-      genre: bookGenre.trim(),
-      status: bookStatus,
-      progressPercentage: Number(bookProgress),
-      thoughts: bookThoughts.trim(),
-      rating: 5,
-    });
+    if (writeLocks.current.has('createBook')) return;
+    writeLocks.current.add('createBook');
+    try {
+      await createBook.mutateAsync({
+        title: bookTitle.trim(),
+        author: bookAuthor.trim(),
+        genre: bookGenre.trim(),
+        status: bookStatus,
+        progressPercentage: Number(bookProgress),
+        thoughts: bookThoughts.trim(),
+        rating: 5,
+      });
+    } catch {
+      return;
+    } finally {
+      writeLocks.current.delete('createBook');
+    }
 
     setShowAddBook(false);
     setBookTitle('');
@@ -82,13 +81,21 @@ export function EntertainmentView() {
     e.preventDefault();
     if (!gameTitle.trim()) return;
 
-    await createGame.mutateAsync({
-      title: gameTitle.trim(),
-      platform: gamePlatform.trim(),
-      status: gameStatus,
-      hoursPlayed: Number(gameHours),
-      rating: 5,
-    });
+    if (writeLocks.current.has('createGame')) return;
+    writeLocks.current.add('createGame');
+    try {
+      await createGame.mutateAsync({
+        title: gameTitle.trim(),
+        platform: gamePlatform.trim(),
+        status: gameStatus,
+        hoursPlayed: Number(gameHours),
+        rating: 5,
+      });
+    } catch {
+      return;
+    } finally {
+      writeLocks.current.delete('createGame');
+    }
 
     setShowAddGame(false);
     setGameTitle('');
@@ -100,8 +107,13 @@ export function EntertainmentView() {
   const music = data?.musicTracks ?? [];
   const stats = data?.stats;
 
+
+
+  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+
   return (
     <div className={styles.container}>
+      {[createBook, createGame, updateProgress].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Your input is retained; retry the action.</p>}
       {/* Relaxed Lounge Header */}
       <header className={styles.header}>
         <div className={styles.eyebrow}>
@@ -343,17 +355,10 @@ export function EntertainmentView() {
 
       {/* Add Book Modal */}
       {showAddBook && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-book-modal-title"
-          onClick={() => setShowAddBook(false)}
-        >
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2 id="add-book-modal-title" style={{ fontSize: 'var(--text-base)', margin: 0 }}>
-              Add book to library
-            </h2>
+        <Dialog open portal title="Add book to library" className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setShowAddBook(false)}>
+{[createBook, createGame, updateProgress].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+
             <form onSubmit={handleBookSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label htmlFor={bookTitleId} style={{ display: 'block', fontSize: 'var(--text-xs)', marginBottom: '4px' }}>
@@ -466,22 +471,15 @@ export function EntertainmentView() {
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Add Game Modal */}
       {showAddGame && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-game-modal-title"
-          onClick={() => setShowAddGame(false)}
-        >
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2 id="add-game-modal-title" style={{ fontSize: 'var(--text-base)', margin: 0 }}>
-              Add game
-            </h2>
+        <Dialog open portal title="Add game" className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setShowAddGame(false)}>
+{[createBook, createGame, updateProgress].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+
             <form onSubmit={handleGameSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label htmlFor={gameTitleId} style={{ display: 'block', fontSize: 'var(--text-xs)', marginBottom: '4px' }}>
@@ -562,7 +560,7 @@ export function EntertainmentView() {
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

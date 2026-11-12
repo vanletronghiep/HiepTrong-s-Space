@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useId } from 'react';
+import { Dialog } from '@/ui/Dialog';
+
+import React, { useState, useId } from 'react';
 import type { ApcsCourse, ApcsFileCategory, ApcsFileItem } from '@/contracts/apcs';
 import { useApcsDirectory, useApcsOverview, useApcsSearch } from '@/client/queries/apcs';
 import styles from './apcs.module.css';
@@ -24,24 +26,13 @@ export function ApcsView() {
   const searchInputId = useId();
 
   // Queries
-  const { data: overview, isLoading: isOverviewLoading } = useApcsOverview();
-  const { data: directory, isLoading: isDirLoading } = useApcsDirectory(currentPath);
-  const { data: searchResults, isLoading: isSearchLoading } = useApcsSearch(
+  const { data: overview, isLoading: isOverviewLoading, isError: overviewFailed, refetch: retryOverview } = useApcsOverview();
+  const { data: directory, isLoading: isDirLoading, isError: directoryFailed, refetch: retryDirectory } = useApcsDirectory(currentPath);
+  const { data: searchResults, isLoading: isSearchLoading, isError: searchFailed, refetch: retrySearch } = useApcsSearch(
     searchQuery,
     activeCourseId ? activeCourseId : undefined,
     selectedCategory !== 'all' ? selectedCategory : undefined,
   );
-
-  // Close modal on Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && previewFile) {
-        setPreviewFile(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [previewFile]);
 
   const handleSelectCourse = (course: ApcsCourse) => {
     setActiveCourseId(course.folderName);
@@ -57,6 +48,8 @@ export function ApcsView() {
 
   const isSearching = searchQuery.trim().length > 0 || selectedCategory !== 'all';
   const displayedItems = isSearching ? searchResults ?? [] : directory?.items ?? [];
+
+  if (overviewFailed || directoryFailed || searchFailed) return <div role="alert">Could not access study materials. <button type="button" onClick={() => { void retryOverview(); void retryDirectory(); void retrySearch(); }}>Retry</button></div>;
 
   return (
     <div className={styles.container}>
@@ -107,7 +100,7 @@ export function ApcsView() {
 
           <div className={styles.statsRow}>
             <div className={styles.statCard}>
-              <div className={styles.statValue}>{overview?.stats.totalCourses ?? 5}</div>
+              <div className={styles.statValue}>{overview?.stats.totalCourses ?? 0}</div>
               <div className={styles.statLabel}>Core subjects</div>
             </div>
             <div className={styles.statCard}>
@@ -425,18 +418,10 @@ export function ApcsView() {
 
       {/* File Preview & Details Dialog */}
       {previewFile && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="preview-modal-title"
-          onClick={() => setPreviewFile(null)}
-        >
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <Dialog open portal title={previewFile.name} className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setPreviewFile(null)}>
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 id="preview-modal-title" className={styles.modalTitle}>
-                {previewFile.name}
-              </h3>
+
               <button
                 type="button"
                 className={styles.modalCloseBtn}
@@ -512,7 +497,7 @@ export function ApcsView() {
               </a>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

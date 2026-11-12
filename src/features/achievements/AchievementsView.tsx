@@ -1,6 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useId } from 'react';
+import { Dialog } from '@/ui/Dialog';
+
+import { useItemAnchor } from '@/ui/use-item-anchor';
+
+import React, { useRef, useState, useId } from 'react';
 import type { AchievementEra, AchievementItem } from '@/contracts/achievement';
 import {
   useAchievements,
@@ -18,6 +22,7 @@ const ERAS: { label: string; value: AchievementEra | 'all' }[] = [
 ];
 
 export function AchievementsView() {
+  const writeLocks = useRef(new Set<string>());
   const [selectedEra, setSelectedEra] = useState<AchievementEra | 'all'>('all');
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
@@ -43,38 +48,38 @@ export function AchievementsView() {
   const futureDateInputId = useId();
 
   // Queries & Mutations
-  const { data: achievements = [], isLoading } = useAchievements(
+  const { data: achievements = [], isLoading, isError: loadFailed, refetch } = useAchievements(
     selectedEra !== 'all' ? selectedEra : undefined,
   );
   const createAchievement = useCreateAchievement();
   const deleteAchievement = useDeleteAchievement();
 
-  // Escape closes modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showAddModal) {
-        setShowAddModal(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAddModal]);
+  // Focus anchor
+  useItemAnchor(achievements);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim() || !formYear.trim()) return;
 
-    await createAchievement.mutateAsync({
-      title: formTitle.trim(),
-      era: formEra,
-      year: formYear.trim(),
-      awardOrRole: formAward.trim(),
-      organization: formOrg.trim(),
-      description: formDesc.trim(),
-      lessonsLearned: formLessons.trim(),
-      futureDate: formEra === 'future_contest' && formFutureDate ? formFutureDate : null,
-      reminderEnabled: formReminder,
-    });
+    if (writeLocks.current.has('createAchievement')) return;
+    writeLocks.current.add('createAchievement');
+    try {
+      await createAchievement.mutateAsync({
+        title: formTitle.trim(),
+        era: formEra,
+        year: formYear.trim(),
+        awardOrRole: formAward.trim(),
+        organization: formOrg.trim(),
+        description: formDesc.trim(),
+        lessonsLearned: formLessons.trim(),
+        futureDate: formEra === 'future_contest' && formFutureDate ? formFutureDate : null,
+        reminderEnabled: formReminder,
+      });
+    } catch {
+      return;
+    } finally {
+      writeLocks.current.delete('createAchievement');
+    }
 
     setShowAddModal(false);
     setFormTitle('');
@@ -91,8 +96,13 @@ export function AchievementsView() {
     }
   };
 
+
+
+  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+
   return (
     <div className={styles.container}>
+      {[createAchievement, deleteAchievement].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Your input is retained; retry the action.</p>}
       {/* Portfolio Header */}
       <header className={styles.header}>
         <div className={styles.eyebrow}>
@@ -184,7 +194,7 @@ export function AchievementsView() {
         ) : (
           <div className={styles.galleryGrid}>
             {achievements.map((item: AchievementItem) => (
-              <article key={item.id} className={styles.achievementCard}>
+              <article id={`item-${item.id}`} tabIndex={-1} key={item.id} className={styles.achievementCard}>
                 <div>
                   <div className={styles.cardHeaderLine}>
                     <span className={styles.eraBadge}>{item.era.replace('_', ' ')}</span>
@@ -253,17 +263,10 @@ export function AchievementsView() {
 
       {/* Add Achievement Record Modal */}
       {showAddModal && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-ach-modal-title"
-          onClick={() => setShowAddModal(false)}
-        >
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h2 id="add-ach-modal-title" style={{ fontSize: 'var(--text-base)', margin: 0 }}>
-              Add achievement or contest
-            </h2>
+        <Dialog open portal title="Add achievement or contest" className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setShowAddModal(false)}>
+{[createAchievement, deleteAchievement].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+
             <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label htmlFor={titleInputId} style={{ display: 'block', fontSize: 'var(--text-xs)', marginBottom: '4px' }}>
@@ -414,7 +417,7 @@ export function AchievementsView() {
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

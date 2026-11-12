@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleApiError } from '@/server/api-response';
+import { NotFoundError, ValidationError } from '@/services/errors';
 import { apcsService } from '@/services/apcs-service';
 
 export async function GET(request: NextRequest) {
@@ -8,12 +10,12 @@ export async function GET(request: NextRequest) {
     const download = searchParams.get('download') === 'true';
 
     if (!relPath) {
-      return NextResponse.json({ success: false, error: 'Path is required' }, { status: 400 });
+      throw new ValidationError('Path is required', { path: 'Path is required' });
     }
 
     const file = apcsService.getFileBuffer(relPath);
     if (!file) {
-      return NextResponse.json({ success: false, error: 'File not found or inaccessible' }, { status: 404 });
+      throw new NotFoundError('File not found or inaccessible');
     }
 
     const headers = new Headers();
@@ -31,7 +33,6 @@ export async function GET(request: NextRequest) {
       headers,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Error accessing file';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return handleApiError(err);
   }
 }

@@ -76,7 +76,12 @@ function DayArc({ timeZone }: { timeZone: string }) {
       <div className={styles.arcHeader}>
         <h2 className={styles.eyebrow}>Day arc</h2>
         <div className={styles.clock}>
-          <time>{clock?.time ?? '––:––'}</time>
+          <time>{clock?.timeSeconds ?? '––:––:––'}</time>
+          {clock?.countdown && (
+            <span className={styles.countdown} aria-label={`Remaining today: ${clock.countdown}`}>
+              {clock.countdown}
+            </span>
+          )}
         </div>
       </div>
       <div className={styles.timeline} aria-hidden="true">

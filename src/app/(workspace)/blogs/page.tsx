@@ -1,3 +1,4 @@
+import { PageReady } from '@/features/transitions/TransitionProvider';
 import type { Metadata } from 'next';
 import { WritingRoomView } from '@/features/blogs/WritingRoomView';
 import { getFeatureById } from '@/features/registry';
@@ -9,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function BlogsPage() {
-  return <WritingRoomView />;
+  return <><PageReady /><WritingRoomView /></>;
 }

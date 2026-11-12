@@ -1,3 +1,6 @@
+import { z } from 'zod';
+import { parseJsonBody, handleApiError } from '@/server/api-response';
+import { NotFoundError, ValidationError } from '@/services/errors';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   createBookInputSchema,
@@ -10,8 +13,7 @@ export async function GET() {
     const data = await entertainmentService.getData();
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to retrieve entertainment data';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return handleApiError(err);
   }
 }
 
@@ -19,39 +21,40 @@ export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
-    const body = await request.json();
+    const body = await parseJsonBody(request);
 
     if (action === 'book') {
-      const parsed = createBookInputSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
-      }
-      const created = await entertainmentService.createBook(parsed.data);
+      const validated = createBookInputSchema.parse(body);
+      const created = await entertainmentService.createBook(validated);
       return NextResponse.json({ success: true, data: created }, { status: 201 });
     }
 
     if (action === 'game') {
-      const parsed = createGameInputSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
-      }
-      const created = await entertainmentService.createGame(parsed.data);
+      const validated = createGameInputSchema.parse(body);
+      const created = await entertainmentService.createGame(validated);
       return NextResponse.json({ success: true, data: created }, { status: 201 });
     }
 
     if (action === 'update-book') {
-      const { bookId, progressPercentage, status } = body;
-      if (!bookId) {
-        return NextResponse.json({ success: false, error: 'bookId required' }, { status: 400 });
-      }
-      const updated = await entertainmentService.updateBookProgress(bookId, Number(progressPercentage), status);
+      const { bookId, progressPercentage, status } = z
+        .object({
+          bookId: z.string().min(1, 'bookId is required'),
+          progressPercentage: z.number().min(0).max(100),
+          status: z.enum(['reading', 'completed', 'want_to_read']).optional(),
+        })
+        .parse(body);
+      const updated = await entertainmentService.updateBookProgress(
+        bookId,
+        progressPercentage,
+        status,
+      );
+      if (!updated) throw new NotFoundError('Record not found');
       return NextResponse.json({ success: true, data: updated });
     }
 
-    return NextResponse.json({ success: false, error: 'Unknown action' }, { status: 400 });
+    throw new ValidationError('Unknown action');
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to process entertainment request';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return handleApiError(err);
   }
 }
 

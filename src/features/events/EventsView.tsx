@@ -1,5 +1,9 @@
 'use client';
 
+import { useItemAnchor } from '@/ui/use-item-anchor';
+
+import { Dialog } from '@/ui/Dialog';
+
 import { useEffect, useMemo, useState } from 'react';
 import {
   Calendar as CalendarIcon,
@@ -14,13 +18,13 @@ import {
 } from 'lucide-react';
 import { useEvents, useCreateEvent, useDeleteEvent } from '@/client/queries/events';
 import type { EventCategory, EventItem } from '@/contracts/event';
-import { computeEventStats, formatRelativeEventTime, getUpcomingExams } from '@/domain/event-domain';
-import { DEFAULT_APP_TIMEZONE } from '@/domain/time';
+import { computeEventStats, formatRelativeEventTime, getUpcomingExams, eventsForWeekday } from '@/domain/event-domain';
+import { buildZonedInstant, DEFAULT_APP_TIMEZONE } from '@/domain/time';
 import { Button } from '@/ui/Button';
 import styles from './events.module.css';
 
 export function EventsView() {
-  const { data: events = [], isLoading } = useEvents();
+  const { data: events = [], isLoading, isError: loadFailed, refetch } = useEvents();
   const createMutation = useCreateEvent();
   const deleteMutation = useDeleteEvent();
 
@@ -31,6 +35,8 @@ export function EventsView() {
   const [currentTime, setCurrentTime] = useState<string>('');
 
   // Clock without seconds in Asia/Ho_Chi_Minh
+  useItemAnchor(events);
+
   useEffect(() => {
     const update = () => {
       const now = new Date();
@@ -48,18 +54,6 @@ export function EventsView() {
     update();
     const interval = setInterval(update, 10000);
     return () => clearInterval(interval);
-  }, []);
-
-  // Close modal on Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSelectedEvent(null);
-        setIsCreateOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const stats = useMemo(() => computeEventStats(events), [events]);
@@ -83,7 +77,14 @@ export function EventsView() {
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newDate) return;
-    const startIso = new Date(`${newDate}T${newTime}:00+07:00`).toISOString();
+    const normalizedTime = newTime.includes(':')
+      ? newTime
+          .split(':')
+          .map((part) => part.padStart(2, '0'))
+          .slice(0, 2)
+          .join(':')
+      : '09:00';
+    const startIso = buildZonedInstant(newDate, normalizedTime);
     createMutation.mutate(
       {
         title: newTitle.trim(),
@@ -108,8 +109,13 @@ export function EventsView() {
     );
   };
 
+
+
+  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+
   return (
     <div className={styles.container}>
+      {[createMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Your input is retained; retry the action.</p>}
       <div className={styles.forestGlow} aria-hidden="true" />
 
       {/* Header */}
@@ -124,17 +130,17 @@ export function EventsView() {
         <div className="flex items-center gap-3">
           {currentTime && (
             <div className={styles.dateClock}>
-              <Clock size={15} className="text-status-optional" />
+              <Clock size={15} className="text-ws-text" />
               <span>{currentTime}</span>
             </div>
           )}
-          <Button
+          <Button leftIcon={<Plus size={16} className="mr-1" />}
             variant="primary"
             size="sm"
             onClick={() => setIsCreateOpen(true)}
-            className="bg-status-optional hover:bg-status-done text-white"
+            className="bg-ws-text hover:bg-text-accent text-white"
           >
-            <Plus size={16} className="mr-1" />
+
             <span>New event</span>
           </Button>
         </div>
@@ -151,7 +157,7 @@ export function EventsView() {
           <span className={styles.statLabel}>Events this week</span>
         </div>
         <div className={styles.statCard}>
-          <span className={styles.statValue} style={{ color: 'var(--status-warn)' }}>
+          <span className={styles.statValue} style={{ color: 'var(--text-due-soon)' }}>
             {stats.approachingExamsCount}
           </span>
           <span className={styles.statLabel}>Approaching exams</span>
@@ -163,7 +169,7 @@ export function EventsView() {
         <section className={styles.examSection} aria-labelledby="exams-heading">
           <div className={styles.examHeader}>
             <div className="flex items-center gap-2">
-              <AlertTriangle size={18} className="text-status-warn" />
+              <AlertTriangle size={18} className="text-text-due-soon" />
               <h2 id="exams-heading" className="font-semibold text-ws-text text-base">
                 Upcoming examinations
               </h2>
@@ -233,7 +239,7 @@ export function EventsView() {
           ))}
         </div>
 
-        <div className="inline-flex items-center gap-1 p-1 rounded-pill bg-ws-bg-alt border border-ws-border">
+        <div className="inline-flex items-center gap-1 p-1 rounded-pill bg-ws-accent-soft border border-ws-border">
           <button
             type="button"
             className={`px-3 py-1 text-xs font-medium rounded-pill transition-colors ${
@@ -286,7 +292,7 @@ export function EventsView() {
 
               return (
                 <article
-                  key={event.id}
+                  id={`item-${event.id}`} key={event.id}
                   className={styles.eventCard}
                   onClick={() => setSelectedEvent(event)}
                   role="button"
@@ -360,15 +366,18 @@ export function EventsView() {
             <span className="text-xs text-ws-text-muted">Monday – Sunday</span>
           </div>
           <div className={styles.weekGrid}>
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, dayIndex) => (
               <div key={day} className={styles.dayColumn}>
                 <div className={styles.dayHeader}>{day}</div>
                 <div className="flex flex-col gap-2 flex-1">
-                  {filteredEvents.map((evt) => (
+                  {eventsForWeekday(filteredEvents, dayIndex).map((evt) => (
                     <div
                       key={evt.id}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(key) => { if (key.key === 'Enter' || key.key === ' ') { key.preventDefault(); setSelectedEvent(evt); } }}
                       onClick={() => setSelectedEvent(evt)}
-                      className="p-1.5 rounded-sm bg-ws-surface border border-ws-border text-xs cursor-pointer hover:border-status-optional transition-colors"
+                      className="p-1.5 rounded-sm bg-ws-surface border border-ws-border text-xs cursor-pointer hover:border-ws-text transition-colors"
                     >
                       <div className="font-medium text-ws-text truncate">{evt.title}</div>
                       <div className="text-[10px] text-ws-text-muted">
@@ -390,13 +399,9 @@ export function EventsView() {
 
       {/* Event Details Centered Modal */}
       {selectedEvent && (
-        <div
-          className={styles.modalBackdrop}
-          onClick={() => setSelectedEvent(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className={styles.modalWindow} onClick={(e) => e.stopPropagation()}>
+        <Dialog open portal className="max-h-[90svh] overflow-y-auto" title={selectedEvent.title} onClose={() => setSelectedEvent(null)}>
+          {[createMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               className={styles.modalCloseButton}
@@ -414,14 +419,12 @@ export function EventsView() {
               >
                 {selectedEvent.category}
               </span>
-              <h2 className="font-display text-2xl font-semibold text-ws-text leading-tight">
-                {selectedEvent.title}
-              </h2>
+
             </div>
 
             <div className="flex flex-col gap-2.5 text-sm text-ws-text-muted border-y border-ws-border py-4">
               <div className="flex items-center gap-2 text-ws-text">
-                <CalendarIcon size={16} className="text-status-optional" />
+                <CalendarIcon size={16} className="text-ws-text" />
                 <span>
                   {new Intl.DateTimeFormat('en-US', {
                     timeZone: DEFAULT_APP_TIMEZONE,
@@ -437,7 +440,7 @@ export function EventsView() {
                 </div>
               )}
               {selectedEvent.isExam && (
-                <div className="flex items-center gap-2 text-status-warn font-medium">
+                <div className="flex items-center gap-2 text-text-due-soon font-medium">
                   <AlertTriangle size={16} />
                   <span>High priority examination</span>
                 </div>
@@ -457,10 +460,9 @@ export function EventsView() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-status-urgent hover:bg-status-urgent-soft"
+                className="text-text-overdue hover:bg-ws-accent-soft"
                 onClick={() => {
-                  deleteMutation.mutate(selectedEvent.id);
-                  setSelectedEvent(null);
+                  deleteMutation.mutate(selectedEvent.id, { onSuccess: () => setSelectedEvent(null) });
                 }}
               >
                 Delete event
@@ -470,18 +472,14 @@ export function EventsView() {
               </Button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Create Event Modal Dialog */}
       {isCreateOpen && (
-        <div
-          className={styles.modalBackdrop}
-          onClick={() => setIsCreateOpen(false)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className={styles.modalWindow} onClick={(e) => e.stopPropagation()}>
+        <Dialog open portal className="max-h-[90svh] overflow-y-auto" title="Add new event" onClose={() => setIsCreateOpen(false)}>
+          {[createMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               className={styles.modalCloseButton}
@@ -491,28 +489,28 @@ export function EventsView() {
               <X size={18} />
             </button>
 
-            <h2 className="font-display text-2xl font-semibold text-ws-text">Add new event</h2>
+
 
             <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Title</label>
-                <input
+                <label htmlFor="events-field-1" className="text-xs font-semibold text-ws-text">Title</label>
+                <input id="events-field-1"
                   type="text"
                   required
                   placeholder="e.g. Calculus I Midterm or Project Sync"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-status-optional"
+                  className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-ws-text"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-ws-text">Category</label>
-                  <select
+                  <label htmlFor="events-field-2" className="text-xs font-semibold text-ws-text">Category</label>
+                  <select id="events-field-2"
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value as EventCategory)}
-                    className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-status-optional"
+                    className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-ws-text"
                   >
                     <option value="school">School</option>
                     <option value="exam">Exam</option>
@@ -522,13 +520,13 @@ export function EventsView() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-ws-text">Date</label>
-                  <input
+                  <label htmlFor="events-field-3" className="text-xs font-semibold text-ws-text">Date</label>
+                  <input id="events-field-3"
                     type="date"
                     required
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
-                    className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-status-optional"
+                    className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-ws-text"
                   >
                   </input>
                 </div>
@@ -536,23 +534,23 @@ export function EventsView() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-ws-text">Time</label>
-                  <input
+                  <label htmlFor="events-field-4" className="text-xs font-semibold text-ws-text">Time</label>
+                  <input id="events-field-4"
                     type="time"
                     value={newTime}
                     onChange={(e) => setNewTime(e.target.value)}
-                    className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-status-optional"
+                    className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-ws-text"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-ws-text">Location</label>
-                  <input
+                  <label htmlFor="events-field-5" className="text-xs font-semibold text-ws-text">Location</label>
+                  <input id="events-field-5"
                     type="text"
                     placeholder="Room or link"
                     value={newLocation}
                     onChange={(e) => setNewLocation(e.target.value)}
-                    className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-status-optional"
+                    className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-ws-text"
                   />
                 </div>
               </div>
@@ -563,7 +561,7 @@ export function EventsView() {
                     type="checkbox"
                     checked={newIsOnline}
                     onChange={(e) => setNewIsOnline(e.target.checked)}
-                    className="rounded border-ws-border text-status-optional"
+                    className="rounded border-ws-border text-ws-text"
                   />
                   <span>Online meeting</span>
                 </label>
@@ -573,20 +571,20 @@ export function EventsView() {
                     type="checkbox"
                     checked={newIsExam}
                     onChange={(e) => setNewIsExam(e.target.checked)}
-                    className="rounded border-ws-border text-status-warn"
+                    className="rounded border-ws-border text-text-due-soon"
                   />
                   <span>Mark as examination</span>
                 </label>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Notes</label>
-                <textarea
+                <label htmlFor="events-field-6" className="text-xs font-semibold text-ws-text">Notes</label>
+                <textarea id="events-field-6"
                   rows={3}
                   placeholder="Preparation notes, requirements, or agenda…"
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
-                  className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-status-optional resize-none"
+                  className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none focus:border-ws-text resize-none"
                 />
               </div>
 
@@ -599,14 +597,14 @@ export function EventsView() {
                   variant="primary"
                   size="sm"
                   disabled={createMutation.isPending}
-                  className="bg-status-optional hover:bg-status-done text-white"
+                  className="bg-ws-text hover:bg-text-accent text-white"
                 >
                   Create event
                 </Button>
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

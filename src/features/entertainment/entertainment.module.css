@@ -38,7 +38,7 @@
   color: var(--daily-priority-normal);
   background: color-mix(in srgb, var(--daily-planet-normal) 12%, transparent);
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   width: fit-content;
 }
 
@@ -167,8 +167,8 @@
   justify-content: space-between;
   gap: var(--space-3);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--ws-text) 3%, transparent);
-  transition: transform var(--timing-fast) var(--motion-standard),
-    box-shadow var(--timing-fast) var(--motion-standard);
+  transition: transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .bookCard:hover {
@@ -191,7 +191,7 @@
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
 }
 
 .statusReading {
@@ -233,7 +233,7 @@
 .progressTrack {
   height: 6px;
   background: color-mix(in srgb, var(--ws-border) 80%, transparent);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   overflow: hidden;
   margin-top: var(--space-2);
 }
@@ -387,7 +387,7 @@
   border: 1px solid var(--ws-border);
   border-radius: var(--radius-md);
   outline: none;
-  transition: border-color var(--timing-fast) var(--motion-standard);
+  transition: border-color var(--dur-fast) var(--ease);
 }
 
 .inputField:focus,

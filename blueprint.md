@@ -201,6 +201,29 @@ Authorship is separate from category. Show the original author and source for sa
 
 **Proposed:** A **By me / Saved from others** filter and an uncluttered writing mode. Keep music optional and user-controlled. Writing remains personal/local unless public sharing is requested later.
 
+Implement the Blog feature for Hiep Trong Space using this website as a UI/UX reference:
+
+Reference URL: https://codexinsider.com/guides/codex-usage-dashboard/
+
+First, inspect the reference website through the available browser tools. Analyze its layout, typography, spacing, color system, responsive behavior, navigation and interactions.
+
+Identify which design patterns are worth adapting to our Blog feature.
+
+Then inspect the existing Hiep Trong Space codebase, design system and relevant requirements.
+
+Implement a polished, responsive Blog interface that:
+- Adapts the reference's strongest UI/UX patterns without blindly copying its branding, assets or distinctive visual design.
+- Preserves Hiep Trong Space's cosmic visual identity.
+- Integrates naturally with the existing architecture.
+- Uses smooth, purposeful transitions and interactions.
+- Works well on desktop and mobile.
+
+Verify the implementation with appropriate tests and browser-based visual inspection.
+
+If the reference website is inaccessible, report the limitation and use provided screenshots or request visual references instead of guessing.
+
+Work end-to-end and avoid unnecessary architectural changes.
+
 ### Tracking
 
 **Confirmed:** Keep the name **Tracking** and its Japanese cultural direction. Include daily habits, a sleep calculator, sleep tracking, and manually entered screen-time records. Use charts to reveal patterns, including phone-use tendencies.

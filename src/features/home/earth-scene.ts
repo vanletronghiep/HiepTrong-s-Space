@@ -124,7 +124,14 @@ export async function createEarthScene(
   globe.rotation.y = INITIAL_EARTH_YAW;
   scene.add(globe);
 
-  function render(width: number, height: number, diameter: number, centerY: number, yaw: number) {
+  function render(
+    width: number,
+    height: number,
+    diameter: number,
+    centerY: number,
+    yaw: number,
+    centerX?: number,
+  ) {
     if (canvas.width !== width || canvas.height !== height || camera.right !== width / 2) {
       renderer.setSize(width, height, false);
       camera.left = -width / 2;
@@ -134,7 +141,7 @@ export async function createEarthScene(
       camera.updateProjectionMatrix();
     }
     globe.rotation.y = yaw;
-    globe.position.set(0, height / 2 - centerY, 0);
+    globe.position.set(centerX !== undefined ? centerX - width / 2 : 0, height / 2 - centerY, 0);
     globe.scale.setScalar(diameter / 2);
     renderer.render(scene, camera);
   }

@@ -27,8 +27,7 @@ export function useCreateMilestone() {
     mutationFn: async (input: CreateMilestoneInput) => {
       const res = await apiRequest<{ item: MilestoneItem }>('/api/milestones', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: input,
       });
       return res.item;
     },
@@ -44,8 +43,7 @@ export function useUpdateMilestone() {
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<CreateMilestoneInput> }) => {
       const res = await apiRequest<{ item: MilestoneItem }>(`/api/milestones/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
+        body: patch,
       });
       return res.item;
     },
@@ -69,8 +67,7 @@ export function useToggleLandmark() {
         `/api/milestones/${milestoneId}/toggle-landmark`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ landmarkId }),
+          body: { landmarkId },
         },
       );
       return res.item;

@@ -1,3 +1,5 @@
+import { formatScheduledDate } from '@/domain/time';
+import { consecutiveDays } from '@/domain/activity-days';
 import { randomUUID } from 'node:crypto';
 import type {
   CreateLearningSessionInput,
@@ -6,98 +8,7 @@ import type {
 } from '@/contracts/learning-room';
 import { JsonFileStore } from '@/services/storage/json-store';
 
-const initialSessions: LearningSession[] = [
-  {
-    id: 'lr-seed-1',
-    title: 'Calculus I - Derivatives and limits problem set',
-    mode: 'pomodoro',
-    targetSubject: 'Calculus I',
-    relatedProjectId: null,
-    relatedTaskId: null,
-    startedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-    completedAt: new Date(Date.now() - 86400000 * 2 + 1500000).toISOString(),
-    durationMinutes: 25,
-    focusMinutes: 25,
-    breakMinutes: 5,
-    pausedMinutes: 0,
-    status: 'completed',
-    reflectionNotes: 'Solved 8 derivative chain rule problems. Concept is solid.',
-    rating: 5,
-  },
-  {
-    id: 'lr-seed-2',
-    title: 'CS160 - Go game engine board representation in C++',
-    mode: 'deep_focus',
-    targetSubject: 'CS160',
-    relatedProjectId: 'proj-gogame',
-    relatedTaskId: null,
-    startedAt: new Date(Date.now() - 86400000 * 2 + 7200000).toISOString(),
-    completedAt: new Date(Date.now() - 86400000 * 2 + 10200000).toISOString(),
-    durationMinutes: 50,
-    focusMinutes: 50,
-    breakMinutes: 10,
-    pausedMinutes: 2,
-    status: 'completed',
-    reflectionNotes: 'Implemented 19x19 board array and liberty checking logic.',
-    rating: 5,
-  },
-  {
-    id: 'lr-seed-3',
-    title: 'Physics I - Rotational kinematics and moment of inertia',
-    mode: 'pomodoro',
-    targetSubject: 'Physics I',
-    relatedProjectId: null,
-    relatedTaskId: null,
-    startedAt: new Date(Date.now() - 86400000).toISOString(),
-    completedAt: new Date(Date.now() - 86400000 + 1500000).toISOString(),
-    durationMinutes: 25,
-    focusMinutes: 25,
-    breakMinutes: 5,
-    pausedMinutes: 1,
-    status: 'completed',
-    reflectionNotes: 'Clarified parallel axis theorem with textbook problems.',
-    rating: 4,
-  },
-  {
-    id: 'lr-seed-4',
-    title: 'AI Engineering - Transformer attention heads architecture review',
-    mode: 'deep_focus',
-    targetSubject: 'AI Engineering',
-    relatedProjectId: 'proj-agent-core',
-    relatedTaskId: null,
-    startedAt: new Date(Date.now() - 86400000 + 7200000).toISOString(),
-    completedAt: new Date(Date.now() - 86400000 + 10200000).toISOString(),
-    durationMinutes: 50,
-    focusMinutes: 48,
-    breakMinutes: 10,
-    pausedMinutes: 2,
-    status: 'completed',
-    reflectionNotes: 'Read Vaswani et al. Section 3. Key takeaway: multi-head projection spaces.',
-    rating: 5,
-  },
-  {
-    id: 'lr-seed-5',
-    title: 'CM102 - Scientific presentation slides drafting',
-    mode: 'quick_review',
-    targetSubject: 'CM102',
-    relatedProjectId: null,
-    relatedTaskId: null,
-    startedAt: new Date().toISOString(),
-    completedAt: new Date().toISOString(),
-    durationMinutes: 15,
-    focusMinutes: 15,
-    breakMinutes: 0,
-    pausedMinutes: 0,
-    status: 'completed',
-    reflectionNotes: 'Outlined 5 core slides for next week presentation.',
-    rating: 4,
-  },
-];
-
-const sessionStore = new JsonFileStore<LearningSession>(
-  'learning-room-sessions.json',
-  initialSessions,
-);
+const sessionStore = new JsonFileStore<LearningSession>('learning-room-sessions.json');
 
 export class LearningRoomService {
   async getSessions(): Promise<LearningSession[]> {
@@ -117,11 +28,11 @@ export class LearningRoomService {
       targetSubject: input.targetSubject ?? 'General',
       relatedProjectId: input.relatedProjectId ?? null,
       relatedTaskId: input.relatedTaskId ?? null,
-      startedAt: now,
-      completedAt: now,
+      startedAt: input.startedAt ?? new Date(Date.parse(now) - ((input.focusMinutes ?? 0) + (input.breakMinutes ?? 0) + (input.pausedMinutes ?? 0)) * 60000).toISOString(),
+      completedAt: input.completedAt ?? now,
       durationMinutes: input.durationMinutes ?? 25,
-      focusMinutes: input.focusMinutes ?? input.durationMinutes ?? 25,
-      breakMinutes: input.breakMinutes ?? 5,
+      focusMinutes: input.focusMinutes ?? 0,
+      breakMinutes: input.breakMinutes ?? 0,
       pausedMinutes: input.pausedMinutes ?? 0,
       status: input.status ?? 'completed',
       reflectionNotes: input.reflectionNotes ?? '',
@@ -164,12 +75,12 @@ export class LearningRoomService {
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const dateKey = d.toISOString().slice(0, 10);
+      const dateKey = formatScheduledDate(d);
       dailyMap[dateKey] = { focus: 0, break: 0, count: 0 };
     }
 
     for (const s of completed) {
-      const dateKey = s.startedAt.slice(0, 10);
+      const dateKey = formatScheduledDate(s.startedAt);
       if (dailyMap[dateKey]) {
         dailyMap[dateKey].focus += s.focusMinutes;
         dailyMap[dateKey].break += s.breakMinutes;
@@ -190,7 +101,7 @@ export class LearningRoomService {
       totalPausedMinutes,
       totalSessions: sessions.length,
       completedSessions: completed.length,
-      streakDays: 5,
+      streakDays: consecutiveDays(completed.map(s => formatScheduledDate(s.startedAt)), formatScheduledDate(new Date())),
       subjectBreakdown,
       dailyHistory,
     };

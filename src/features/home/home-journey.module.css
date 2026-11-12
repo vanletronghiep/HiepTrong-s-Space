@@ -9,7 +9,7 @@
 }
 
 .intro {
-  height: 300svh;
+  height: 400svh;
 }
 
 .stage {
@@ -34,11 +34,12 @@
 .poster,
 .globeInput {
   position: absolute;
-  left: 50%;
+  left: var(--earth-x, 50%);
   top: var(--earth-y, calc(58svh + 200vw / 2));
   width: var(--earth-size, 200vw);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
+  opacity: var(--earth-opacity, 1);
 }
 
 .poster {
@@ -183,13 +184,118 @@
   margin-top: 16px;
 }
 
+.meetHiep {
+  position: fixed;
+  right: clamp(24px, 8vw, 120px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(520px, 46vw);
+  z-index: 2;
+  pointer-events: auto;
+  opacity: var(--intro-opacity, 0);
+  mask-image: linear-gradient(
+    to left,
+    black calc(var(--intro-progress, 0) * 125%),
+    transparent calc(var(--intro-progress, 0) * 125% + 15%)
+  );
+  -webkit-mask-image: linear-gradient(
+    to left,
+    black calc(var(--intro-progress, 0) * 125%),
+    transparent calc(var(--intro-progress, 0) * 125% + 15%)
+  );
+}
+
+.meetHiepInner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--cosmos-surface);
+  border: 1px solid var(--cosmos-border);
+  backdrop-filter: blur(16px);
+  padding: 32px 36px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-cosmos);
+}
+
+.meetHiepHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.meetHiepTitle {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.2vw, 2.75rem);
+  font-weight: 600;
+  color: var(--cosmos-text);
+  line-height: 1.1;
+  margin: 0;
+}
+
+.meetHiepStar {
+  color: var(--cosmos-star);
+  flex-shrink: 0;
+}
+
+.meetHiepRole {
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  font-weight: 500;
+  color: var(--cosmos-accent);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.meetHiepBio {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  color: var(--cosmos-text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.meetHiepMotto {
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--cosmos-border);
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  color: var(--cosmos-text);
+}
+
+.meetHiepMotto strong {
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--cosmos-text) 30%, var(--cosmos-accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 @media (max-width: 767px) {
   .page {
     --journey-safe-top: 72px;
   }
 
   .intro {
-    height: 250svh;
+    height: 320svh;
+  }
+
+  .meetHiep {
+    right: 16px;
+    left: 16px;
+    top: auto;
+    bottom: 24px;
+    transform: none;
+    width: auto;
+  }
+
+  .meetHiepInner {
+    padding: 20px 22px;
+    gap: 12px;
+  }
+
+  .meetHiepTitle {
+    font-size: 1.75rem;
   }
 
   .intro:not([style]) .wordmark {

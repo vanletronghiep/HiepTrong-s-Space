@@ -89,8 +89,8 @@ export class LocalStorageAdapter implements StorageAdapter {
 
     this.savepointSeq += 1;
     const spName = `hts_sp_${this.savepointSeq}`;
-    sqlite.exec(`SAVEPOINT ${spName}`);
     try {
+      sqlite.exec(`SAVEPOINT ${spName}`);
       const result = await work();
       sqlite.exec(`RELEASE SAVEPOINT ${spName}`);
       return result;

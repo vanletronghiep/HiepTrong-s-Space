@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Clock } from '@/domain/clock';
 import { formatRelativeAgeLabel } from '@/domain/notification-rules';
 import { NotificationService } from '@/services/notification-service';
@@ -53,6 +53,55 @@ describe('NotificationService (§6.9, §6.10, Epic 4)', () => {
   afterEach(async () => {
     await storage.close();
     await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('deduplicates timed sources, retains read state and suppresses rescheduled/deleted sources', async () => {
+    let sources = [{ key: 'event:exam', title: 'Exam', deadlineAt: '2026-10-30T11:00:00.000Z', targetUrl: '/events?item=exam' }];
+    const service = new NotificationService({ storage, clock, timedSources: async () => sources });
+    await service.runReminderTick();
+    await service.runReminderTick();
+    const first = await service.listNotifications();
+    expect(first.items).toHaveLength(1);
+    expect(first.items[0]?.targetUrl).toBe('/events?item=exam');
+    await service.markRead(first.items[0]!.id);
+    expect((await service.listNotifications()).unreadCount).toBe(0);
+    sources = [{ ...sources[0]!, deadlineAt: '2026-11-02T11:00:00.000Z' }];
+    expect((await service.listNotifications()).items).toHaveLength(0);
+    sources = [];
+    expect((await service.listNotifications()).items).toHaveLength(0);
+  });
+
+  it('deduplicates timed reminders across independent service instances', async () => {
+    let release!: () => void;
+    const ready = new Promise<void>((resolve) => { release = resolve; });
+    let readers = 0;
+    const timedSources = async () => {
+      readers += 1;
+      if (readers === 2) release();
+      await ready;
+      return [{ key: 'event:exam', title: 'Exam', deadlineAt: '2026-10-30T11:00:00.000Z', targetUrl: '/events?item=exam' }];
+    };
+    const first = new NotificationService({ storage, clock, timedSources });
+    const second = new NotificationService({ storage, clock, timedSources });
+
+    const results = await Promise.all([first.runReminderTick(), second.runReminderTick()]);
+
+    expect(results.map(result => result.createdCount).sort()).toEqual([0, 1]);
+    expect(await storage.notifications.listItems()).toHaveLength(1);
+  });
+
+  it('propagates timed reminder write failures and allows an immediate retry', async () => {
+    const service = new NotificationService({ storage, clock, timedSources: async () => [
+      { key: 'project:work', title: 'Work', deadlineAt: '2026-10-30T11:00:00.000Z', targetUrl: '/projects?item=work' },
+    ] });
+    const save = vi.spyOn(storage.notifications, 'saveItem').mockRejectedValueOnce(new Error('Disk failure'));
+    try {
+      await expect(service.runReminderTickIfStale()).rejects.toThrow('Disk failure');
+      await service.runReminderTickIfStale();
+      expect(await storage.notifications.listItems()).toHaveLength(1);
+    } finally {
+      save.mockRestore();
+    }
   });
 
   it('yields exactly one due_soon at 1m30s and one overdue at 2m00s for a task due in 2 minutes, with zero duplicates', async () => {

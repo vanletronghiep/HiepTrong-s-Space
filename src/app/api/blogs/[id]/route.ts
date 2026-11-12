@@ -1,5 +1,7 @@
+import { parseJsonBody, handleApiError, assertSameOriginMutation } from '@/server/api-response';
 import { NextRequest, NextResponse } from 'next/server';
 import { patchBlogArticleInputSchema } from '@/contracts/blog';
+import { NotFoundError } from '@/services/errors';
 import { blogService } from '@/services/blog-service';
 
 export async function GET(
@@ -10,12 +12,11 @@ export async function GET(
     const { id } = await params;
     const article = await blogService.getArticleById(id);
     if (!article) {
-      return NextResponse.json({ success: false, error: 'Article not found' }, { status: 404 });
+      throw new NotFoundError('Article not found');
     }
     return NextResponse.json({ success: true, data: article });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to fetch article';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return handleApiError(err);
   }
 }
 
@@ -25,24 +26,15 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
-    const parsed = patchBlogArticleInputSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' },
-        { status: 400 },
-      );
-    }
-
-    const updated = await blogService.updateArticle(id, parsed.data);
+    const body = await parseJsonBody(request);
+    const patch = patchBlogArticleInputSchema.parse(body);
+    const updated = await blogService.updateArticle(id, patch);
     if (!updated) {
-      return NextResponse.json({ success: false, error: 'Article not found' }, { status: 404 });
+      throw new NotFoundError('Article not found');
     }
     return NextResponse.json({ success: true, data: updated });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to update article';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return handleApiError(err);
   }
 }
 
@@ -51,15 +43,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    assertSameOriginMutation(_request);
     const { id } = await params;
     const deleted = await blogService.deleteArticle(id);
     if (!deleted) {
-      return NextResponse.json({ success: false, error: 'Article not found' }, { status: 404 });
+      throw new NotFoundError('Article not found');
     }
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to delete article';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return handleApiError(err);
   }
 }
 

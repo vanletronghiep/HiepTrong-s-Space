@@ -68,6 +68,7 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
         daily && dailyStyles.workspace,
       )}
     >
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:bg-ws-surface focus:text-ws-text focus:p-3">Skip to content</a>
       {/* Faint top lavender ambient wash (≤ 8%, fading by ~40vh) per ui_readme.md §13.1 */}
       {daily ? (
         <DailySky />
@@ -141,7 +142,7 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
         </div>
       </header>
 
-      <main
+      <main id="main-content" tabIndex={-1}
         style={{ zIndex: 'var(--z-content)' }}
         className={cn(
           'relative flex-1 mx-auto flex flex-col w-full max-w-[var(--max-content)] px-[var(--gutter)] lg:px-[var(--gutter-lg)] py-8',

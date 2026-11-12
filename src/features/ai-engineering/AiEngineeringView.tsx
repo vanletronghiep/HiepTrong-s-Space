@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { Dialog } from '@/ui/Dialog';
+
+import React, { useState } from 'react';
 import type { AiNotionNote } from '@/contracts/ai-engineering';
 import { useAiEngineeringData, useToggleAiTopic } from '@/client/queries/ai-engineering';
 import styles from './ai-engineering.module.css';
@@ -8,19 +10,8 @@ import styles from './ai-engineering.module.css';
 export function AiEngineeringView() {
   const [activeNote, setActiveNote] = useState<AiNotionNote | null>(null);
 
-  const { data, isLoading } = useAiEngineeringData();
+  const { data, isLoading, isError: loadFailed, refetch } = useAiEngineeringData();
   const toggleTopic = useToggleAiTopic();
-
-  // Escape to close active note modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && activeNote) {
-        setActiveNote(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeNote]);
 
   const handleToggle = (stageId: string, topicId: string) => {
     toggleTopic.mutate({ stageId, topicId });
@@ -30,8 +21,13 @@ export function AiEngineeringView() {
   const notes = data?.notes ?? [];
   const stats = data?.stats;
 
+
+
+  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+
   return (
     <div className={styles.container}>
+      {[toggleTopic].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Your input is retained; retry the action.</p>}
       {/* Calm Technical Header */}
       <header className={styles.header}>
         <svg
@@ -103,10 +99,10 @@ export function AiEngineeringView() {
           <span>Current learning priority</span>
         </div>
         <h2 id="focus-step-heading" className={styles.nextStepTitle}>
-          {stats?.currentFocusTopic ?? 'Transformer attention layers'}
+          {stats?.currentFocusTopic ?? 'No active focus topic'}
         </h2>
         <p className={styles.nextStepText}>
-          Next recommended step: {stats?.nextRecommendedStep ?? 'Complete derivation and benchmark implementation.'}
+          Next recommended step: {stats?.nextRecommendedStep ?? 'Choose a learning topic to plan the next step.'}
         </p>
       </section>
 
@@ -117,7 +113,7 @@ export function AiEngineeringView() {
             Engineering roadmap
           </h2>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--ws-text-muted)' }}>
-            {stats?.completedTopics ?? 0} of {stats?.totalTopics ?? 16} topics completed
+            {stats?.completedTopics ?? 0} of {stats?.totalTopics ?? 0} topics completed
           </span>
         </div>
 
@@ -177,13 +173,13 @@ export function AiEngineeringView() {
       <section aria-labelledby="notes-heading" className={styles.notesSection}>
         <div className={styles.sectionHeader}>
           <h2 id="notes-heading" className={styles.sectionTitle}>
-            Imported Notion notes & research
+            Local notes & research
           </h2>
         </div>
 
         <div className={styles.notesGrid}>
           {notes.map((note) => (
-            <article
+            <article role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); (() => setActiveNote(note))(); } }}
               key={note.id}
               className={styles.noteCard}
               onClick={() => setActiveNote(note)}
@@ -213,7 +209,7 @@ export function AiEngineeringView() {
                   <span>Notion copy</span>
                 </span>
                 <span>
-                  Synced{' '}
+                  Saved{' '}
                   {new Date(note.lastSyncedAt).toLocaleDateString(undefined, {
                     month: 'short',
                     day: 'numeric',
@@ -227,18 +223,11 @@ export function AiEngineeringView() {
 
       {/* Note Reader Modal */}
       {activeNote && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="note-modal-title"
-          onClick={() => setActiveNote(null)}
-        >
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <Dialog open portal title={activeNote.title} className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setActiveNote(null)}>
+{[toggleTopic].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h2 id="note-modal-title" style={{ fontSize: 'var(--text-base)', margin: 0 }}>
-                {activeNote.title}
-              </h2>
+
               <button
                 type="button"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}
@@ -314,7 +303,7 @@ export function AiEngineeringView() {
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

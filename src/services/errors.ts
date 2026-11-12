@@ -1,7 +1,10 @@
+const APP_ERROR_BRAND = Symbol.for('hiep-trong-space.AppError');
+
 export type AppErrorCode =
   'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'NOT_IMPLEMENTED' | 'INTERNAL_ERROR';
 
 export class AppError extends Error {
+  readonly [APP_ERROR_BRAND] = true;
   public readonly code: AppErrorCode;
   public readonly httpStatus: number;
   public readonly fields?: Record<string, string>;
@@ -46,4 +49,9 @@ export class NotImplementedError extends AppError {
     super({ code: 'NOT_IMPLEMENTED', message, httpStatus: 501 });
     this.name = 'NotImplementedError';
   }
+}
+
+/** Next instrumentation and route bundles may load distinct class instances. */
+export function isAppError(error: unknown): error is AppError {
+  return typeof error === 'object' && error !== null && APP_ERROR_BRAND in error && error[APP_ERROR_BRAND] === true;
 }

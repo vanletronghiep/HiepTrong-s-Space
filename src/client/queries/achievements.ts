@@ -1,19 +1,25 @@
+'use client';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AchievementItem,
   CreateAchievementInput,
   PatchAchievementInput,
 } from '@/contracts/achievement';
+import { apiRequest } from '../api-client';
+
+export const achievementKeys = {
+  all: ['achievements'] as const,
+  list: (era?: string) => ['achievements', era ?? 'all'] as const,
+};
 
 export function useAchievements(era?: string) {
   return useQuery<AchievementItem[]>({
-    queryKey: ['achievements', era],
+    queryKey: achievementKeys.list(era),
     queryFn: async () => {
       const url = era && era !== 'all' ? `/api/achievements?era=${era}` : '/api/achievements';
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to load achievements');
-      const json = await res.json();
-      return json.data;
+      const res = await apiRequest<{ success: boolean; data: AchievementItem[] }>(url);
+      return res.data;
     },
   });
 }
@@ -23,17 +29,14 @@ export function useCreateAchievement() {
 
   return useMutation({
     mutationFn: async (input: CreateAchievementInput) => {
-      const res = await fetch('/api/achievements', {
+      const res = await apiRequest<{ success: boolean; data: AchievementItem }>('/api/achievements', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: input,
       });
-      if (!res.ok) throw new Error('Failed to create achievement');
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['achievements'] });
+      queryClient.invalidateQueries({ queryKey: achievementKeys.all });
     },
   });
 }
@@ -43,17 +46,14 @@ export function useUpdateAchievement() {
 
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: PatchAchievementInput }) => {
-      const res = await fetch(`/api/achievements/${id}`, {
+      const res = await apiRequest<{ success: boolean; data: AchievementItem }>(`/api/achievements/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
+        body: patch,
       });
-      if (!res.ok) throw new Error('Failed to update achievement');
-      const json = await res.json();
-      return json.data;
+      return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['achievements'] });
+      queryClient.invalidateQueries({ queryKey: achievementKeys.all });
     },
   });
 }
@@ -63,14 +63,12 @@ export function useDeleteAchievement() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/achievements/${id}`, {
+      await apiRequest<void>(`/api/achievements/${id}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Failed to delete achievement');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['achievements'] });
+      queryClient.invalidateQueries({ queryKey: achievementKeys.all });
     },
   });
 }
-

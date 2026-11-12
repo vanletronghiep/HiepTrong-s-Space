@@ -38,7 +38,7 @@
   color: var(--daily-shooting-star);
   background: color-mix(in srgb, var(--daily-shooting-star) 12%, transparent);
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   width: fit-content;
 }
 
@@ -120,7 +120,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  transition: background var(--timing-fast) var(--motion-standard);
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .actionBtn:hover {
@@ -149,9 +149,9 @@
   flex-direction: column;
   justify-content: space-between;
   gap: var(--space-4);
-  transition: transform var(--timing-fast) var(--motion-standard),
-    box-shadow var(--timing-fast) var(--motion-standard),
-    border-color var(--timing-fast) var(--motion-standard);
+  transition: transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .deckCard:hover {
@@ -183,7 +183,7 @@
 .deckProgressTrack {
   height: 6px;
   background: color-mix(in srgb, var(--ws-border) 80%, transparent);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   overflow: hidden;
   margin-top: var(--space-2);
 }
@@ -208,9 +208,9 @@
   font-size: var(--text-xs);
   font-weight: 600;
   padding: var(--space-1) var(--space-4);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: background var(--timing-fast) var(--motion-standard);
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .studyBtn:hover {
@@ -262,9 +262,9 @@
   font-size: var(--text-sm);
   font-weight: 600;
   padding: var(--space-2) var(--space-5);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: background var(--timing-fast) var(--motion-standard);
+  transition: background var(--dur-fast) var(--ease);
 }
 
 .revealBtn:hover {
@@ -312,7 +312,7 @@
 .rateBtn {
   width: 44px;
   height: 44px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   border: 1px solid var(--ws-border);
   background: var(--ws-surface);
   color: var(--ws-text);
@@ -324,9 +324,9 @@
   align-items: center;
   justify-content: center;
   gap: 1px;
-  transition: border-color var(--timing-fast) var(--motion-standard),
-    background var(--timing-fast) var(--motion-standard),
-    color var(--timing-fast) var(--motion-standard);
+  transition: border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .rateBtn:hover {
@@ -371,7 +371,7 @@
   border: 1px solid var(--ws-border);
   border-radius: var(--radius-md);
   outline: none;
-  transition: border-color var(--timing-fast) var(--motion-standard);
+  transition: border-color var(--dur-fast) var(--ease);
 }
 
 .inputField:focus,

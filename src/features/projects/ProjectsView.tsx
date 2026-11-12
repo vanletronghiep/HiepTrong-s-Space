@@ -1,6 +1,10 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useItemAnchor } from '@/ui/use-item-anchor';
+
+import { Dialog } from '@/ui/Dialog';
+
+import { useMemo, useState } from 'react';
 import {
   Code,
   Plus,
@@ -22,7 +26,7 @@ import { Button } from '@/ui/Button';
 import styles from './projects.module.css';
 
 export function ProjectsView() {
-  const { data: projects = [], isLoading } = useProjects();
+  const { data: projects = [], isLoading, isError: loadFailed, refetch } = useProjects();
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
   const deleteMutation = useDeleteProject();
@@ -31,17 +35,7 @@ export function ProjectsView() {
   const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  // Close modal on Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSelectedProject(null);
-        setIsCreateOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  useItemAnchor(projects);
 
   const stats = useMemo(() => computeProjectStats(projects), [projects]);
 
@@ -105,8 +99,13 @@ export function ProjectsView() {
     });
   };
 
+
+
+  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+
   return (
     <div className={styles.container}>
+      {[createMutation, updateMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Retry the action.</p>}
       <div className={styles.techGlow} aria-hidden="true" />
 
       {/* Header */}
@@ -119,13 +118,13 @@ export function ProjectsView() {
           <h1 className={styles.title}>In Progress Projects</h1>
         </div>
 
-        <Button
+        <Button leftIcon={<Plus size={16} className="mr-1" />}
           variant="primary"
           size="sm"
           onClick={() => setIsCreateOpen(true)}
-          className="bg-ws-accent hover:bg-ws-accent-hover text-white"
+          className="bg-ws-text hover:bg-text-accent text-white"
         >
-          <Plus size={16} className="mr-1" />
+
           <span>New project</span>
         </Button>
       </header>
@@ -137,13 +136,13 @@ export function ProjectsView() {
           <span className={styles.statLabel}>Total projects</span>
         </div>
         <div className={styles.statCard}>
-          <span className={styles.statValue} style={{ color: 'var(--daily-sky)' }}>
+          <span className={styles.statValue} style={{ color: 'var(--daily-priority-normal)' }}>
             {stats.activeCount}
           </span>
           <span className={styles.statLabel}>Active development</span>
         </div>
         <div className={styles.statCard}>
-          <span className={styles.statValue} style={{ color: 'var(--status-done)' }}>
+          <span className={styles.statValue} style={{ color: 'var(--text-completed)' }}>
             {stats.completedCount}
           </span>
           <span className={styles.statLabel}>Completed</span>
@@ -188,7 +187,7 @@ export function ProjectsView() {
             </div>
           ) : (
             filteredProjects.map((project) => (
-              <article key={project.id} className={styles.projectCard}>
+              <article id={`item-${project.id}`} tabIndex={-1} key={project.id} className={styles.projectCard}>
                 <div className={styles.projectCardTop}>
                   <div className={styles.cardHeaderRow}>
                     <h2 className={styles.cardTitle}>{project.title}</h2>
@@ -212,7 +211,7 @@ export function ProjectsView() {
                         <button
                           type="button"
                           onClick={() => handleProgressChange(project, -5)}
-                          className="px-1.5 py-0.5 rounded text-xs bg-ws-bg-alt hover:bg-ws-border text-ws-text"
+                          className="px-1.5 py-0.5 rounded text-xs bg-ws-accent-soft hover:bg-ws-border text-ws-text"
                           title="-5%"
                         >
                           -5%
@@ -221,7 +220,7 @@ export function ProjectsView() {
                         <button
                           type="button"
                           onClick={() => handleProgressChange(project, 5)}
-                          className="px-1.5 py-0.5 rounded text-xs bg-ws-bg-alt hover:bg-ws-border text-ws-text"
+                          className="px-1.5 py-0.5 rounded text-xs bg-ws-accent-soft hover:bg-ws-border text-ws-text"
                           title="+5%"
                         >
                           +5%
@@ -250,7 +249,7 @@ export function ProjectsView() {
                   {/* Blocker (if any) */}
                   {project.blockers && (
                     <div className={styles.blockerBox}>
-                      <div className="flex items-center gap-1.5 text-status-urgent">
+                      <div className="flex items-center gap-1.5 text-text-overdue">
                         <AlertCircle size={13} />
                         <span className={styles.blockerLabel}>Current blocker</span>
                       </div>
@@ -313,13 +312,9 @@ export function ProjectsView() {
 
       {/* Edit Details Dialog */}
       {selectedProject && (
-        <div
-          className={styles.modalBackdrop}
-          onClick={() => setSelectedProject(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className={styles.modalWindow} onClick={(e) => e.stopPropagation()}>
+        <Dialog open portal className="max-h-[90svh] overflow-y-auto" title="Edit" onClose={() => setSelectedProject(null)}>
+          {[createMutation, updateMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               className={styles.modalCloseButton}
@@ -329,9 +324,7 @@ export function ProjectsView() {
               <X size={18} />
             </button>
 
-            <h2 className="font-display text-2xl font-semibold text-ws-text">
-              Edit {selectedProject.title}
-            </h2>
+
 
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
@@ -372,10 +365,9 @@ export function ProjectsView() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-status-urgent hover:bg-status-urgent-soft"
+                  className="text-text-overdue hover:bg-ws-accent-soft"
                   onClick={() => {
-                    deleteMutation.mutate(selectedProject.id);
-                    setSelectedProject(null);
+                    deleteMutation.mutate(selectedProject.id, { onSuccess: () => setSelectedProject(null) });
                   }}
                 >
                   Delete project
@@ -406,8 +398,7 @@ export function ProjectsView() {
                           blockers: blockers?.trim() || null,
                           status,
                         },
-                      });
-                      setSelectedProject(null);
+                      }, { onSuccess: () => setSelectedProject(null) });
                     }}
                   >
                     Save changes
@@ -416,18 +407,14 @@ export function ProjectsView() {
               </div>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Create Project Modal Dialog */}
       {isCreateOpen && (
-        <div
-          className={styles.modalBackdrop}
-          onClick={() => setIsCreateOpen(false)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className={styles.modalWindow} onClick={(e) => e.stopPropagation()}>
+        <Dialog open portal className="max-h-[90svh] overflow-y-auto" title="Create new project" onClose={() => setIsCreateOpen(false)}>
+          {[createMutation, updateMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
+          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               className={styles.modalCloseButton}
@@ -437,12 +424,12 @@ export function ProjectsView() {
               <X size={18} />
             </button>
 
-            <h2 className="font-display text-2xl font-semibold text-ws-text">Create new project</h2>
+
 
             <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Project title</label>
-                <input
+                <label htmlFor="projects-field-1" className="text-xs font-semibold text-ws-text">Project title</label>
+                <input id="projects-field-1"
                   type="text"
                   required
                   placeholder="e.g. Go Game AI or Compiler"
@@ -453,8 +440,8 @@ export function ProjectsView() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Overview & description</label>
-                <textarea
+                <label htmlFor="projects-field-2" className="text-xs font-semibold text-ws-text">Overview & description</label>
+                <textarea id="projects-field-2"
                   rows={2}
                   required
                   placeholder="What is this project and what problem does it solve?"
@@ -466,8 +453,8 @@ export function ProjectsView() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-ws-text">Initial progress (%)</label>
-                  <input
+                  <label htmlFor="projects-field-3" className="text-xs font-semibold text-ws-text">Initial progress (%)</label>
+                  <input id="projects-field-3"
                     type="number"
                     min={0}
                     max={100}
@@ -478,8 +465,8 @@ export function ProjectsView() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-ws-text">Status</label>
-                  <select
+                  <label htmlFor="projects-field-4" className="text-xs font-semibold text-ws-text">Status</label>
+                  <select id="projects-field-4"
                     value={newStatus}
                     onChange={(e) => setNewStatus(e.target.value as ProjectStatus)}
                     className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none"
@@ -493,8 +480,8 @@ export function ProjectsView() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Next meaningful step</label>
-                <input
+                <label htmlFor="projects-field-5" className="text-xs font-semibold text-ws-text">Next meaningful step</label>
+                <input id="projects-field-5"
                   type="text"
                   placeholder="The next concrete action to take"
                   value={newNextStep}
@@ -504,8 +491,8 @@ export function ProjectsView() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Tech stack (comma-separated)</label>
-                <input
+                <label htmlFor="projects-field-6" className="text-xs font-semibold text-ws-text">Tech stack (comma-separated)</label>
+                <input id="projects-field-6"
                   type="text"
                   placeholder="e.g. Python, Pygame, NumPy"
                   value={newTechStack}
@@ -523,14 +510,13 @@ export function ProjectsView() {
                   variant="primary"
                   size="sm"
                   disabled={createMutation.isPending}
-                  className="bg-ws-accent hover:bg-ws-accent-hover text-white"
                 >
                   Create project
                 </Button>
               </div>
             </form>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

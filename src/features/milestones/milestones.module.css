@@ -196,14 +196,14 @@
   gap: 10px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  background: var(--ws-bg-alt);
+  background: var(--ws-accent-soft);
   border: 1px solid var(--ws-border);
   cursor: pointer;
   transition: background var(--dur-fast) ease-out;
 }
 
 .landmarkItem:hover {
-  background: color-mix(in srgb, var(--ws-accent-soft) 80%, var(--ws-bg-alt));
+  background: color-mix(in srgb, var(--ws-accent-soft) 80%, var(--ws-accent-soft));
 }
 
 .landmarkTitle {
@@ -222,7 +222,7 @@
   inset: 0;
   background: color-mix(in srgb, var(--cosmos-bg) 50%, transparent);
   backdrop-filter: blur(4px);
-  z-index: var(--z-modal);
+  z-index: var(--z-drawer);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -257,6 +257,6 @@
 
 .modalCloseButton:hover {
   color: var(--ws-text);
-  background: var(--ws-bg-alt);
+  background: var(--ws-accent-soft);
 }
 
