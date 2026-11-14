@@ -1,0 +1,761 @@
+.page {
+  --journey-safe-top: 100px;
+  position: relative;
+  overflow-x: clip;
+  isolation: isolate;
+  color: var(--cosmos-text);
+  background: var(--journey-space-black);
+  font-family: var(--font-ui);
+}
+
+.pilotBadge {
+  position: fixed;
+  z-index: var(--z-nav);
+  top: 25px;
+  right: 74px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--cosmos-text) 16%, transparent);
+  background: color-mix(in srgb, var(--cosmos-bg-1) 86%, transparent);
+  color: color-mix(in srgb, var(--cosmos-text) 82%, transparent);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pilotBadgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--cosmos-lavender);
+}
+
+.intro {
+  height: 400svh;
+}
+
+.stage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+}
+
+.canvas,
+.poster {
+  position: absolute;
+  pointer-events: none;
+}
+
+.canvas {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Pre-hydration static hero framing (zero layout jump prior to useLayoutEffect) */
+.poster {
+  left: 50%;
+  top: 58svh;
+  width: 200vw;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) scale(1.036);
+  opacity: var(--earth-opacity, 1);
+}
+
+.poster img {
+  width: 100%;
+  display: block;
+}
+
+.globeInput {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--globe-base, 504px);
+  height: var(--globe-base, 504px);
+  border-radius: 50%;
+  touch-action: pan-y;
+  cursor: grab;
+  transform-origin: 0 0;
+  opacity: var(--earth-opacity, 1);
+  will-change: transform, opacity;
+}
+
+/* Hydrated GPU-only positioning (no left/top/width changes on scroll frames) */
+.stage[data-pilot-hydrated='true'] .poster {
+  left: 0;
+  top: 0;
+  width: 1000px;
+  height: 1000px;
+  transform-origin: 0 0;
+  transform: translate3d(var(--poster-tx, 0px), var(--poster-ty, 0px), 0)
+    scale(var(--poster-scale, 1));
+  will-change: transform, opacity;
+}
+
+.stage[data-pilot-hydrated='true'] .globeInput {
+  transform: translate3d(var(--earth-tx, 0px), var(--earth-ty, 0px), 0) scale(var(--earth-scale, 1));
+}
+
+.stage[data-webgl='ready'] .poster {
+  visibility: hidden;
+}
+
+.stage:not([data-webgl='ready']) .globeInput {
+  visibility: hidden;
+}
+
+.globeInput[data-dragging] {
+  cursor: grabbing;
+}
+
+[data-theme='cosmos'] .globeInput:focus-visible {
+  outline: 2px solid var(--cosmos-text);
+  outline-offset: -4px;
+}
+
+.flare {
+  position: absolute;
+  left: 50%;
+  top: 58svh;
+  transform: translate(-50%, -50%);
+  opacity: var(--flare-opacity, 1);
+  width: 300px;
+  height: 300px;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    circle,
+    var(--journey-flare-light) 1%,
+    color-mix(in srgb, var(--journey-flare-gold) 80%, transparent) 3%,
+    color-mix(in srgb, var(--journey-flare-gold) 17%, transparent) 12%,
+    transparent 52%
+  );
+}
+
+.stage[data-pilot-hydrated='true'] .flare {
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  transform: translate3d(var(--flare-tx, 0px), var(--flare-ty, 0px), 0) scale(var(--flare-scale, 1));
+  will-change: transform, opacity;
+}
+
+.flare::before,
+.flare::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.flare::before {
+  width: 80%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--journey-flare-light), transparent);
+}
+
+.flare::after {
+  height: 57%;
+  width: 1px;
+  background: linear-gradient(transparent, var(--journey-flare-light), transparent);
+}
+
+.wordmark {
+  position: fixed;
+  z-index: 2;
+  margin: 0;
+  left: 0;
+  top: 0;
+  width: 1200px;
+  pointer-events: none;
+  transform-origin: top left;
+  transform: translate3d(var(--logo-x, 0px), var(--logo-y, 0px), 0) scale(var(--logo-scale, 1));
+  will-change: transform;
+}
+
+.wordmark img {
+  width: 100%;
+  height: auto;
+  max-width: none;
+}
+
+.intro:not([data-pilot-hydrated='true']) .wordmark {
+  width: min(78vw, 1120px, 106.05svh);
+  left: 50%;
+  top: 16svh;
+  transform: translateX(-50%);
+}
+
+.bell {
+  position: fixed;
+  z-index: var(--z-nav);
+  top: 16px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+}
+
+.navScrim {
+  position: fixed;
+  z-index: 1;
+  inset: 0 0 auto;
+  height: var(--journey-safe-top);
+  opacity: var(--nav-scrim, 0);
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--journey-space-black) 15%, transparent);
+}
+
+/* ─── Borderless Editorial Serif Personal Introduction ─── */
+.introColumn {
+  position: fixed;
+  z-index: 2;
+  left: 49vw;
+  right: clamp(32px, 6vw, 108px);
+  top: 50%;
+  max-width: 540px;
+  transform: translate3d(0, calc(-50% + var(--intro-shift-y, 0px)), 0);
+  opacity: var(--intro-opacity, 0);
+  pointer-events: none;
+  will-change: transform, opacity;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.introColumn[data-pilot-intro-visible='true'] {
+  pointer-events: auto;
+}
+
+/* Subtle radial ambient falloff behind text column only — zero borders, zero box, zero blur filter */
+.introColumn::before {
+  content: '';
+  position: absolute;
+  inset: -44px -52px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 72% 68% at 48% 50%,
+    color-mix(in srgb, var(--cosmos-bg-0) 80%, transparent) 0%,
+    color-mix(in srgb, var(--cosmos-bg-0) 48%, transparent) 46%,
+    transparent 78%
+  );
+}
+
+.introHeading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 4.6vw, 4.15rem);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: var(--cosmos-text);
+}
+
+.introHeadingGreeting {
+  font-weight: 300;
+  color: color-mix(in srgb, var(--cosmos-text) 88%, var(--cosmos-star-pale));
+}
+
+.introHeadingName {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--cosmos-text);
+}
+
+.introLead {
+  margin: 0;
+  max-width: 34ch;
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 2vw, 1.65rem);
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.32;
+  letter-spacing: -0.005em;
+  color: color-mix(in srgb, var(--cosmos-text) 82%, var(--cosmos-lavender));
+}
+
+.introBody {
+  margin: 0;
+  max-width: 44ch;
+  font-family: var(--font-ui);
+  font-size: 0.96875rem;
+  font-weight: 400;
+  line-height: 1.65;
+  color: color-mix(in srgb, var(--cosmos-text) 78%, var(--cosmos-text-muted));
+}
+
+.introClosing {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.375rem, 2.25vw, 1.85rem);
+  font-weight: 500;
+  font-style: italic;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--cosmos-text) 84%, var(--cosmos-star-blue));
+}
+
+/* ─── Collection heading & Ambient backdrop (zero blur filters) ─── */
+.collectionHeading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(34px, 4.3vw, 60px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.018em;
+  text-wrap: balance;
+}
+
+.collectionAmbient {
+  pointer-events: none;
+  position: absolute;
+  inset: -120px 0 0;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.collectionGlowLeft {
+  position: absolute;
+  left: 6%;
+  top: 2%;
+  width: min(68vw, 980px);
+  aspect-ratio: 1;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--cosmos-accent) 13%, transparent) 0%,
+    color-mix(in srgb, var(--cosmos-accent) 7%, transparent) 26%,
+    color-mix(in srgb, var(--cosmos-accent) 2.5%, transparent) 52%,
+    transparent 74%
+  );
+}
+
+.collectionGlowRight {
+  position: absolute;
+  right: 4%;
+  top: 26%;
+  width: min(62vw, 880px);
+  aspect-ratio: 1;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--daily-planet) 11%, transparent) 0%,
+    color-mix(in srgb, var(--daily-planet) 5.5%, transparent) 28%,
+    color-mix(in srgb, var(--daily-planet) 2%, transparent) 54%,
+    transparent 76%
+  );
+}
+
+/* ─── Expressive Feature Cards (compositor-safe, stationary hit box) ─── */
+.featureCard {
+  display: block;
+  border-radius: var(--radius-card);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  text-decoration: none;
+}
+
+[data-theme='cosmos'] .featureCard:focus-visible {
+  outline: 2px solid var(--cosmos-focus);
+  outline-offset: 4px;
+  transition: none !important;
+}
+
+.thumbSurface {
+  background: linear-gradient(
+    145deg,
+    var(--cosmos-bg-0) 0%,
+    var(--cosmos-bg-1) 58%,
+    var(--cosmos-bg-2) 100%
+  );
+}
+
+.thumbGlow {
+  pointer-events: none;
+  position: absolute;
+  inset: -12%;
+  opacity: 0.42;
+  transform: scale(0.96);
+  transform-origin: 64% 38%;
+  background:
+    radial-gradient(
+      circle at 66% 36%,
+      color-mix(in srgb, var(--card-accent, var(--cosmos-lavender)) 22%, transparent) 0%,
+      color-mix(in srgb, var(--card-accent, var(--cosmos-lavender)) 8%, transparent) 38%,
+      transparent 70%
+    ),
+    radial-gradient(
+      circle at 24% 84%,
+      color-mix(in srgb, var(--card-accent, var(--cosmos-lavender)) 11%, transparent) 0%,
+      transparent 56%
+    );
+  transition:
+    opacity 220ms var(--ease),
+    transform 260ms var(--ease);
+  will-change: opacity, transform;
+}
+
+.thumbArtwork {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  transform: scale(1);
+  transform-origin: center center;
+  opacity: 0.88;
+  transition:
+    transform 260ms var(--ease),
+    opacity 220ms var(--ease);
+  will-change: transform, opacity;
+}
+
+.thumbHairlineBase,
+.thumbHairlineAccent {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-card);
+}
+
+.thumbHairlineBase {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cosmos-text) 11%, transparent);
+}
+
+.thumbHairlineAccent {
+  opacity: 0;
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--card-accent, var(--cosmos-lavender)) 62%, var(--cosmos-text));
+  transition: opacity 220ms var(--ease);
+  will-change: opacity;
+}
+
+.categoryPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--card-accent, var(--cosmos-lavender)) 26%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--card-accent, var(--cosmos-lavender)) 10%,
+    var(--cosmos-bg-1)
+  );
+  color: color-mix(in srgb, var(--cosmos-text) 78%, var(--card-accent, var(--cosmos-lavender)));
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  transition:
+    color 220ms var(--ease),
+    border-color 220ms var(--ease),
+    background-color 220ms var(--ease);
+}
+
+.cardTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-card-title);
+  font-weight: 300;
+  line-height: 1.1;
+  color: var(--cosmos-text);
+  transition: color 220ms var(--ease);
+}
+
+.cardArrow {
+  flex-shrink: 0;
+  color: var(--cosmos-text);
+  opacity: 0.65;
+  transform: translate3d(0, 1px, 0);
+  transition:
+    opacity 220ms var(--ease),
+    transform 220ms var(--ease),
+    color 220ms var(--ease);
+  will-change: transform, opacity;
+}
+
+/* Hover (fine pointers), Focus-Visible (keyboard), and Touch Active (<=100ms) */
+@media (hover: hover) {
+  .featureCard:hover .thumbGlow {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+
+  .featureCard:hover .thumbArtwork {
+    opacity: 1;
+    transform: scale(1.035);
+  }
+
+  .featureCard:hover .thumbHairlineAccent {
+    opacity: 1;
+  }
+
+  .featureCard:hover .categoryPill {
+    border-color: color-mix(in srgb, var(--card-accent, var(--cosmos-lavender)) 56%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--card-accent, var(--cosmos-lavender)) 18%,
+      var(--cosmos-bg-1)
+    );
+    color: color-mix(in srgb, var(--cosmos-text) 92%, var(--card-accent, var(--cosmos-lavender)));
+  }
+
+  .featureCard:hover .cardTitle {
+    color: color-mix(in srgb, var(--cosmos-text) 74%, var(--card-accent, var(--cosmos-lavender)));
+  }
+
+  .featureCard:hover .cardArrow {
+    opacity: 1;
+    color: color-mix(in srgb, var(--cosmos-text) 74%, var(--card-accent, var(--cosmos-lavender)));
+    transform: translate3d(3px, -3px, 0);
+  }
+}
+
+.featureCard:focus-visible .thumbGlow {
+  opacity: 1;
+  transform: scale(1.06);
+}
+
+.featureCard:focus-visible .thumbArtwork {
+  opacity: 1;
+  transform: scale(1.035);
+}
+
+.featureCard:focus-visible .thumbHairlineAccent {
+  opacity: 1;
+}
+
+.featureCard:focus-visible .categoryPill {
+  border-color: color-mix(in srgb, var(--card-accent, var(--cosmos-lavender)) 56%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--card-accent, var(--cosmos-lavender)) 18%,
+    var(--cosmos-bg-1)
+  );
+  color: color-mix(in srgb, var(--cosmos-text) 92%, var(--card-accent, var(--cosmos-lavender)));
+}
+
+.featureCard:focus-visible .cardTitle {
+  color: color-mix(in srgb, var(--cosmos-text) 74%, var(--card-accent, var(--cosmos-lavender)));
+}
+
+.featureCard:focus-visible .cardArrow {
+  opacity: 1;
+  color: color-mix(in srgb, var(--cosmos-text) 74%, var(--card-accent, var(--cosmos-lavender)));
+  transform: translate3d(3px, -3px, 0);
+}
+
+.featureCard:active .thumbGlow,
+.featureCard:active .thumbArtwork,
+.featureCard:active .thumbHairlineAccent,
+.featureCard:active .categoryPill,
+.featureCard:active .cardTitle,
+.featureCard:active .cardArrow {
+  transition-duration: var(--dur-instant);
+}
+
+.featureCard:active .thumbGlow {
+  opacity: 1;
+  transform: scale(1.06);
+}
+
+.featureCard:active .thumbArtwork {
+  opacity: 1;
+  transform: scale(1.035);
+}
+
+.featureCard:active .thumbHairlineAccent {
+  opacity: 1;
+}
+
+.featureCard:active .categoryPill {
+  border-color: color-mix(in srgb, var(--card-accent, var(--cosmos-lavender)) 56%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--card-accent, var(--cosmos-lavender)) 18%,
+    var(--cosmos-bg-1)
+  );
+  color: color-mix(in srgb, var(--cosmos-text) 92%, var(--card-accent, var(--cosmos-lavender)));
+}
+
+.featureCard:active .cardTitle {
+  color: color-mix(in srgb, var(--cosmos-text) 74%, var(--card-accent, var(--cosmos-lavender)));
+}
+
+.featureCard:active .cardArrow {
+  opacity: 1;
+  color: color-mix(in srgb, var(--cosmos-text) 74%, var(--card-accent, var(--cosmos-lavender)));
+  transform: translate3d(3px, -3px, 0);
+}
+
+/* ─── Stacked Tablet & Mobile Framing (< 1024px) ─── */
+@media (max-width: 1023px) {
+  .introColumn {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: 44px;
+    width: min(560px, calc(100% - 80px));
+    max-width: none;
+    transform: translate3d(-50%, var(--intro-shift-y, 0px), 0);
+    gap: 14px;
+  }
+
+  .introHeading {
+    font-size: clamp(2.125rem, 5.2vw, 3rem);
+  }
+
+  .introLead {
+    font-size: clamp(1.125rem, 2.8vw, 1.375rem);
+  }
+
+  .introBody {
+    font-size: 0.9375rem;
+  }
+
+  .introClosing {
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+  }
+}
+
+@media (max-width: 767px) {
+  .page {
+    --journey-safe-top: 72px;
+  }
+
+  .pilotBadge {
+    top: 25px;
+    right: 62px;
+    padding: 0 9px;
+    font-size: 10.5px;
+  }
+
+  .intro {
+    height: 320svh;
+  }
+
+  .intro:not([data-pilot-hydrated='true']) .wordmark {
+    width: min(88vw, 106.05svh);
+    top: 18svh;
+  }
+
+  .poster {
+    top: 60svh;
+    width: 220vw;
+  }
+
+  .flare {
+    top: 60svh;
+    width: 180px;
+  }
+
+  .bell {
+    right: 10px;
+  }
+
+  .introColumn {
+    left: 16px;
+    right: 16px;
+    bottom: 28px;
+    width: auto;
+    transform: translate3d(0, var(--intro-shift-y, 0px), 0);
+    gap: 11px;
+  }
+
+  .introColumn::before {
+    inset: -28px -20px;
+  }
+
+  .introHeading {
+    font-size: clamp(2rem, 8.6vw, 2.5rem);
+  }
+
+  .introLead {
+    font-size: clamp(1.0625rem, 4.4vw, 1.25rem);
+    line-height: 1.3;
+  }
+
+  .introBody {
+    font-size: 0.875rem;
+    line-height: 1.56;
+  }
+
+  .introClosing {
+    margin-top: 2px;
+    font-size: clamp(1.15rem, 4.8vw, 1.375rem);
+  }
+}
+
+/* ─── Short Landscape / 200% Zoom on 1280px (640x360, 640x450) ─── */
+@media (max-width: 1023px) and (max-height: 519px) and (min-width: 560px) {
+  .introColumn {
+    left: 41vw;
+    right: 20px;
+    top: calc(58px + (100svh - 58px) / 2);
+    bottom: auto;
+    width: auto;
+    max-width: none;
+    transform: translate3d(0, calc(-50% + var(--intro-shift-y, 0px)), 0);
+    gap: 7px;
+  }
+
+  .introColumn::before {
+    inset: -24px -28px;
+  }
+
+  .introHeading {
+    font-size: clamp(1.5rem, 6.2svh, 1.9rem);
+  }
+
+  .introLead {
+    font-size: clamp(0.875rem, 3.6svh, 1.05rem);
+    line-height: 1.28;
+  }
+
+  .introBody {
+    font-size: 0.8125rem;
+    line-height: 1.44;
+  }
+
+  .introClosing {
+    margin-top: 0;
+    font-size: clamp(0.95rem, 4svh, 1.15rem);
+  }
+}
+
+/* ─── Reduced Motion Support ─── */
+@media (prefers-reduced-motion: reduce) {
+  .thumbGlow,
+  .thumbArtwork,
+  .thumbHairlineAccent,
+  .categoryPill,
+  .cardTitle,
+  .cardArrow {
+    transition-duration: 0ms !important;
+  }
+
+  .featureCard:hover .thumbArtwork,
+  .featureCard:focus-visible .thumbArtwork,
+  .featureCard:active .thumbArtwork,
+  .featureCard:hover .thumbGlow,
+  .featureCard:focus-visible .thumbGlow,
+  .featureCard:active .thumbGlow {
+    transform: none !important;
+  }
+
+  .featureCard:hover .cardArrow,
+  .featureCard:focus-visible .cardArrow,
+  .featureCard:active .cardArrow {
+    transform: translate3d(0, 1px, 0) !important;
+  }
+}

@@ -64,3 +64,10 @@ Run commands from the repository root with **Node.js 22+**:
 
 - **Explicit commit authorization:** Create local Git commits **only** when explicitly requested by the owner or authorized by an explicitly activated assignment in [`md/task.md`](md/task.md). Never push to a remote, rewrite history, or discard uncommitted user changes without permission.
 - When authorized to commit, use prefixes such as `feat(scope):`, `fix:`, `docs:`, or `chore(scope):`, and never stage `.env`, databases, media, or backups.
+
+---
+
+## 5. Communication & Output Rules
+
+- **Relative paths only:** Never give full/absolute directory paths unless explicitly requested by the user. Always use clean relative paths from the workspace root (e.g., `src/ui/Button.tsx`, `md/readme.md`, `review/verification.md`).
+- **Conditional `report.md` updates:** Only write or update `report.md` when explicitly instructed by the user; never update it automatically for standard responses.

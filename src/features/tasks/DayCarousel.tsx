@@ -1,6 +1,5 @@
 'use client';
 
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { animate, useMotionValue, useMotionValueEvent, useReducedMotion } from 'motion/react';
 import {
   useCallback,
@@ -43,11 +42,11 @@ export function DayCarousel({ boards }: { boards: readonly DayBoard[] }) {
   const activeRef = useRef(1);
   const carousel = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
-  const leftArrow = useRef<HTMLButtonElement>(null);
-  const rightArrow = useRef<HTMLButtonElement>(null);
-  const focusAfterMove = useRef<'arrow' | 'region' | null>(null);
+  const focusAfterMove = useRef(false);
   const drag = useRef<DragState | null>(null);
   const suppressClick = useRef(false);
+  const animationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const settleSeqRef = useRef(0);
   const motion = useMotionValue(1);
   const reducedMotion = useReducedMotion();
 
@@ -55,39 +54,68 @@ export function DayCarousel({ boards }: { boards: readonly DayBoard[] }) {
     stage.current?.style.setProperty('--carousel-position', String(value));
   });
 
+  const clearMoving = useCallback(() => {
+    if (stage.current) delete stage.current.dataset.moving;
+  }, []);
+
   const settle = useCallback(
     (next: number) => {
+      settleSeqRef.current += 1;
+      const seq = settleSeqRef.current;
+      animationRef.current?.stop();
+      animationRef.current = null;
       motion.stop();
-      if (reducedMotion) motion.set(next);
-      else void animate(motion, next, { duration: 0.8, ease: [...SETTLE_EASE] });
+      if (reducedMotion || motion.get() === next) {
+        clearMoving();
+        motion.set(next);
+        return;
+      }
+      if (stage.current) stage.current.dataset.moving = 'true';
+      const controls = animate(motion, next, { duration: 0.32, ease: [...SETTLE_EASE] });
+      animationRef.current = controls;
+      void controls.then(
+        () => {
+          if (settleSeqRef.current === seq) {
+            animationRef.current = null;
+            clearMoving();
+          }
+        },
+        () => {
+          if (settleSeqRef.current === seq) {
+            animationRef.current = null;
+            clearMoving();
+          }
+        },
+      );
     },
-    [motion, reducedMotion],
+    [clearMoving, motion, reducedMotion],
   );
 
   useEffect(() => {
     if (reducedMotion) {
+      settleSeqRef.current += 1;
+      animationRef.current?.stop();
+      animationRef.current = null;
+      clearMoving();
       motion.stop();
       motion.set(activeRef.current);
     }
-    return () => motion.stop();
-  }, [motion, reducedMotion]);
+    return () => {
+      settleSeqRef.current += 1;
+      animationRef.current?.stop();
+      animationRef.current = null;
+      clearMoving();
+      motion.stop();
+    };
+  }, [clearMoving, motion, reducedMotion]);
 
   const selectDay = useCallback(
     (requested: number) => {
       const next = bound(requested, 0, boards.length - 1);
       if (next !== activeRef.current) {
         const focused = document.activeElement;
-        if (
-          (focused === leftArrow.current && next === 0) ||
-          (focused === rightArrow.current && next === boards.length - 1)
-        ) {
-          focusAfterMove.current = 'arrow';
-        } else if (
-          focused instanceof HTMLElement &&
-          stage.current?.contains(focused) &&
-          focused.closest('[data-day]')
-        ) {
-          focusAfterMove.current = 'region';
+        if (focused instanceof HTMLElement && stage.current?.contains(focused)) {
+          focusAfterMove.current = true;
         }
         activeRef.current = next;
         setActive(next);
@@ -98,12 +126,8 @@ export function DayCarousel({ boards }: { boards: readonly DayBoard[] }) {
   );
 
   useLayoutEffect(() => {
-    if (focusAfterMove.current === 'arrow') {
-      (active === 0 ? rightArrow : leftArrow).current?.focus({ preventScroll: true });
-    } else if (focusAfterMove.current === 'region') {
-      carousel.current?.focus({ preventScroll: true });
-    }
-    focusAfterMove.current = null;
+    if (focusAfterMove.current) carousel.current?.focus({ preventScroll: true });
+    focusAfterMove.current = false;
   }, [active]);
 
   useEffect(() => {
@@ -170,6 +194,10 @@ export function DayCarousel({ boards }: { boards: readonly DayBoard[] }) {
       }
       gesture.horizontal = true;
       gesture.origin = motion.get();
+      settleSeqRef.current += 1;
+      animationRef.current?.stop();
+      animationRef.current = null;
+      clearMoving();
       motion.stop();
       event.currentTarget.setPointerCapture(event.pointerId);
       event.currentTarget.dataset.dragging = 'true';
@@ -194,9 +222,6 @@ export function DayCarousel({ boards }: { boards: readonly DayBoard[] }) {
     selectDay(cancel || !enough ? activeRef.current : activeRef.current - Math.sign(dx));
   };
 
-  const hasPrevious = active > 0;
-  const hasNext = active < boards.length - 1;
-
   return (
     <section
       ref={carousel}
@@ -207,8 +232,7 @@ export function DayCarousel({ boards }: { boards: readonly DayBoard[] }) {
       onKeyDown={(event) => {
         if (
           event.target !== event.currentTarget &&
-          event.target !== leftArrow.current &&
-          event.target !== rightArrow.current
+          !(event.target instanceof Element && event.target.closest('[data-day-selector]'))
         )
           return;
         if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
@@ -217,29 +241,17 @@ export function DayCarousel({ boards }: { boards: readonly DayBoard[] }) {
         }
       }}
     >
-      <div className={styles.controls}>
-        <button
-          ref={leftArrow}
-          type="button"
-          className={styles.previous}
-          aria-label={hasPrevious ? `Show ${boards[active - 1]?.label}` : 'Previous day'}
-          aria-hidden={!hasPrevious}
-          disabled={!hasPrevious}
-          onClick={() => selectDay(activeRef.current - 1)}
-        >
-          <ChevronLeft size={19} aria-hidden="true" />
-        </button>
-        <button
-          ref={rightArrow}
-          type="button"
-          className={styles.next}
-          aria-label={hasNext ? `Show ${boards[active + 1]?.label}` : 'Next day'}
-          aria-hidden={!hasNext}
-          disabled={!hasNext}
-          onClick={() => selectDay(activeRef.current + 1)}
-        >
-          <ChevronRight size={19} aria-hidden="true" />
-        </button>
+      <div className={styles.daySelector} data-day-selector role="group" aria-label="Select day">
+        {boards.map((board, index) => (
+          <button
+            key={board.key}
+            type="button"
+            aria-pressed={index === active}
+            onClick={() => selectDay(index)}
+          >
+            {board.label}
+          </button>
+        ))}
       </div>
       <span className="sr-only" aria-live="polite">
         {boards[active]?.label} selected
@@ -279,10 +291,18 @@ export function DayCarousel({ boards }: { boards: readonly DayBoard[] }) {
               data-day={board.key}
               data-offset={index - active}
               style={{ '--carousel-board-index': index } as CSSProperties}
-              inert={!activeBoard}
-              aria-hidden={!activeBoard}
             >
-              {board.content}
+              <div inert={!activeBoard} aria-hidden={!activeBoard}>
+                {board.content}
+              </div>
+              {!activeBoard && Math.abs(index - active) === 1 && (
+                <button
+                  type="button"
+                  className={styles.previewSelect}
+                  aria-label={`Show ${board.label}`}
+                  onClick={() => selectDay(index)}
+                />
+              )}
             </div>
           );
         })}

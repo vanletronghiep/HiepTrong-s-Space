@@ -31,6 +31,7 @@ import { Skeleton } from '@/ui/Skeleton';
 import { useToast } from '@/ui/Toast';
 import { WorkspacePageHeader } from '@/ui/WorkspaceShell';
 import { TaskCard } from './TaskCard';
+import noteStyles from './task-note.module.css';
 import { TaskForm } from './TaskForm';
 import { ScheduleDateDialog, TransferDialog } from './TransferDialog';
 
@@ -198,6 +199,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
               ? 'Removed from daily schedule.'
               : `Added to ${formatDayColumnHeader(scheduledDate, timeZone).dayMonth}.`,
             'success',
+            { durationMs: 1000 },
           );
         },
         onError: (err) => pushToast(err.message, 'error'),
@@ -211,13 +213,13 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
     window.setTimeout(() => {
       setRecentlyCreatedId((prev) => (prev === created.id ? null : prev));
     }, 1500);
-    pushToast('Task added to hub.', 'success');
+    pushToast('Task added to hub.', 'success', { durationMs: 1000 });
     return created;
   };
 
   const handleUpdateTask = async (id: string, input: UpdateTaskInput): Promise<TaskDto> => {
     const updated = await updateTask.mutateAsync({ id, input });
-    pushToast('Task updated.', 'success');
+    pushToast('Task updated.', 'success', { durationMs: 1000 });
     return updated;
   };
 
@@ -226,7 +228,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
     payload: { scheduledDate: string; deadlineAt: string },
   ) => {
     await transferTask.mutateAsync({ id: taskId, input: payload });
-    pushToast('Overdue task transferred.', 'success');
+    pushToast('Overdue task transferred.', 'success', { durationMs: 1000 });
   };
 
   const handleConfirmDelete = () => {
@@ -234,7 +236,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
     deleteTask.mutate(deleteTarget.id, {
       onSuccess: () => {
         setDeleteTarget(null);
-        pushToast('Task deleted.', 'info');
+        pushToast('Task deleted.', 'info', { durationMs: 1000 });
       },
       onError: (err) => pushToast(err.message, 'error'),
     });
@@ -269,7 +271,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className={noteStyles.grid}>
           <AnimatePresence initial={false}>
             {options.items.map((task) => (
               <TaskCard
@@ -471,6 +473,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
 
       {/* Shared TaskForm Drawer (no scheduledDate when created in Hub!) */}
       <TaskForm
+        portal
         open={formState.open}
         mode={formState.mode}
         initialTask={formState.task}
@@ -486,6 +489,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
       />
 
       <TransferDialog
+        portal
         task={transferTarget}
         open={transferTarget !== null}
         onClose={() => setTransferTarget(null)}
@@ -496,6 +500,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
       />
 
       <ScheduleDateDialog
+        portal
         task={scheduleTarget}
         open={scheduleTarget !== null}
         onClose={() => setScheduleTarget(null)}
@@ -504,6 +509,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
           pushToast(
             `Added to ${formatDayColumnHeader(scheduledDate, timeZone).dayMonth}.`,
             'success',
+            { durationMs: 1000 },
           );
         }}
         now={now}
@@ -512,6 +518,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
       />
 
       <ConfirmDialog
+        portal
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleConfirmDelete}

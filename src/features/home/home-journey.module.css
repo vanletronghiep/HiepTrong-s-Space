@@ -8,8 +8,17 @@
   font-family: var(--font-ui);
 }
 
+.page[data-home-journey]:focus,
+.page[data-home-journey]:focus-visible {
+  outline: none;
+}
+
 .intro {
   height: 400svh;
+}
+
+.intro[data-reveal-enabled='true'] {
+  height: 500svh;
 }
 
 .stage {
@@ -20,9 +29,44 @@
 }
 
 .canvas,
-.poster {
+.poster,
+.earthHalo {
   position: absolute;
   pointer-events: none;
+}
+
+.earthHalo {
+  left: 50%;
+  top: calc(58svh + 200vw / 2);
+  width: 200vw;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  opacity: var(--earth-opacity, 1);
+  will-change: transform, opacity;
+}
+
+.earthHalo::before {
+  content: '';
+  position: absolute;
+  inset: -24%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--cosmos-star-blue) 14%, transparent) 30%,
+    color-mix(in srgb, var(--cosmos-lavender) 11%, transparent) 46%,
+    color-mix(in srgb, var(--cosmos-star-blue) 4%, transparent) 60%,
+    transparent 72%
+  );
+}
+
+.stage[data-home-hydrated='true'] .earthHalo {
+  left: 0;
+  top: 0;
+  width: var(--globe-base, 504px);
+  height: var(--globe-base, 504px);
+  aspect-ratio: auto;
+  transform-origin: 0 0;
+  transform: translate3d(var(--earth-tx, 0px), var(--earth-ty, 0px), 0) scale(var(--earth-scale, 1));
 }
 
 .canvas {
@@ -31,19 +75,14 @@
   height: 100%;
 }
 
-.poster,
-.globeInput {
-  position: absolute;
-  left: var(--earth-x, 50%);
-  top: var(--earth-y, calc(58svh + 200vw / 2));
-  width: var(--earth-size, 200vw);
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  opacity: var(--earth-opacity, 1);
-}
-
+/* Pre-hydration static hero framing (zero layout jump prior to useLayoutEffect) */
 .poster {
-  scale: 1.036;
+  left: 50%;
+  top: calc(58svh + 200vw / 2);
+  width: 200vw;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) scale(1.036);
+  opacity: var(--earth-opacity, 1);
 }
 
 .poster img {
@@ -51,28 +90,51 @@
   display: block;
 }
 
+.globeInput {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--globe-base, 504px);
+  height: var(--globe-base, 504px);
+  border-radius: 50%;
+  touch-action: pan-y;
+  cursor: grab;
+  transform-origin: 0 0;
+  opacity: var(--earth-opacity, 1);
+  will-change: transform, opacity;
+}
+
+/* Hydrated GPU-only positioning (no left/top/width mutations on scroll frames) */
+.stage[data-home-hydrated='true'] .poster {
+  left: 0;
+  top: 0;
+  width: 1000px;
+  height: 1000px;
+  transform-origin: 0 0;
+  transform: translate3d(var(--poster-tx, 0px), var(--poster-ty, 0px), 0)
+    scale(var(--poster-scale, 1));
+  will-change: transform, opacity;
+}
+
+.stage[data-home-hydrated='true'] .globeInput {
+  transform: translate3d(var(--earth-tx, 0px), var(--earth-ty, 0px), 0) scale(var(--earth-scale, 1));
+}
+
 .stage[data-webgl='ready'] .poster {
   visibility: hidden;
 }
 
-.globeInput {
-  border-radius: 50%;
-  touch-action: pan-y;
-}
-
-.stage:not([data-webgl='ready']) .globeInput {
+.stage:not([data-webgl='ready']) .globeInput,
+.stage[data-earth-hidden='true'] .globeInput {
+  pointer-events: none;
   visibility: hidden;
-}
-
-.globeInput {
-  cursor: grab;
 }
 
 .globeInput[data-dragging] {
   cursor: grabbing;
 }
 
-.globeInput:focus-visible {
+[data-theme='cosmos'] .globeInput:focus-visible {
   outline: 2px solid var(--cosmos-text);
   outline-offset: -4px;
 }
@@ -80,11 +142,11 @@
 .flare {
   position: absolute;
   left: 50%;
-  top: var(--flare-y, 58svh);
+  top: 58svh;
   transform: translate(-50%, -50%);
   opacity: var(--flare-opacity, 1);
   width: 300px;
-  aspect-ratio: 1;
+  height: 300px;
   pointer-events: none;
   mix-blend-mode: screen;
   background: radial-gradient(
@@ -94,6 +156,14 @@
     color-mix(in srgb, var(--journey-flare-gold) 17%, transparent) 12%,
     transparent 52%
   );
+}
+
+.stage[data-home-hydrated='true'] .flare {
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  transform: translate3d(var(--flare-tx, 0px), var(--flare-ty, 0px), 0) scale(var(--flare-scale, 1));
+  will-change: transform, opacity;
 }
 
 .flare::before,
@@ -118,7 +188,7 @@
 }
 
 .wordmark {
-  position: fixed;
+  position: absolute;
   z-index: 2;
   margin: 0;
   left: 0;
@@ -126,7 +196,8 @@
   width: 1200px;
   pointer-events: none;
   transform-origin: top left;
-  transform: translate3d(var(--logo-x), var(--logo-y), 0) scale(var(--logo-scale));
+  transform: translate3d(var(--logo-x, 0px), var(--logo-y, 0px), 0) scale(var(--logo-scale, 1));
+  will-change: transform;
 }
 
 .wordmark img {
@@ -135,7 +206,7 @@
   max-width: none;
 }
 
-.intro:not([style]) .wordmark {
+.intro:not([data-home-hydrated='true']) .wordmark {
   width: min(78vw, 1120px, 106.05svh);
   left: 50%;
   top: 16svh;
@@ -154,7 +225,7 @@
 }
 
 .navScrim {
-  position: fixed;
+  position: absolute;
   z-index: 1;
   inset: 0 0 auto;
   height: var(--journey-safe-top);
@@ -184,91 +255,184 @@
   margin-top: 16px;
 }
 
-.meetHiep {
-  position: fixed;
-  right: clamp(24px, 8vw, 120px);
-  top: 50%;
-  transform: translateY(-50%);
-  width: min(520px, 46vw);
+/* Introduction: editorial index, dominant name, single-line lead, balanced body, signature. */
+.introColumn {
+  position: absolute;
   z-index: 2;
-  pointer-events: auto;
+  left: var(--earth-right, 42vw);
+  right: 0;
+  top: 52%;
+  width: fit-content;
+  max-width: calc(100% - var(--earth-right, 42vw) - clamp(64px, 7vw, 136px));
+  margin-inline: auto;
+  transform: translate3d(0, calc(-50% + var(--intro-shift-y, 0px)), 0);
   opacity: var(--intro-opacity, 0);
-  mask-image: linear-gradient(
-    to left,
-    black calc(var(--intro-progress, 0) * 125%),
-    transparent calc(var(--intro-progress, 0) * 125% + 15%)
-  );
-  -webkit-mask-image: linear-gradient(
-    to left,
-    black calc(var(--intro-progress, 0) * 125%),
-    transparent calc(var(--intro-progress, 0) * 125% + 15%)
+  pointer-events: none;
+  user-select: none;
+  will-change: transform, opacity;
+}
+
+.introColumn[data-home-intro-visible='true'] {
+  pointer-events: auto;
+  user-select: text;
+}
+
+.introColumn::before {
+  content: '';
+  position: absolute;
+  inset: -40px -52px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 48% 50%,
+    color-mix(in srgb, var(--journey-space-black) 88%, transparent) 0%,
+    color-mix(in srgb, var(--journey-space-black) 62%, transparent) 48%,
+    transparent 76%
   );
 }
 
-.meetHiepInner {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background: var(--cosmos-surface);
-  border: 1px solid var(--cosmos-border);
-  backdrop-filter: blur(16px);
-  padding: 32px 36px;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-cosmos);
-}
-
-.meetHiepHeader {
-  display: flex;
+.introEyebrow {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.meetHiepTitle {
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 3.2vw, 2.75rem);
-  font-weight: 600;
-  color: var(--cosmos-text);
-  line-height: 1.1;
-  margin: 0;
-}
-
-.meetHiepStar {
-  color: var(--cosmos-star);
-  flex-shrink: 0;
-}
-
-.meetHiepRole {
-  font-family: var(--font-sans);
-  font-size: var(--fs-ui);
+  gap: 10px;
+  margin: 0 0 12px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-micro);
   font-weight: 500;
-  color: var(--cosmos-accent);
-  line-height: 1.5;
-  margin: 0;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--cosmos-lavender) 58%, var(--cosmos-text-muted));
 }
 
-.meetHiepBio {
-  font-family: var(--font-sans);
-  font-size: var(--fs-small);
-  color: var(--cosmos-text-muted);
-  line-height: 1.6;
-  margin: 0;
+.introEyebrow::before {
+  content: '';
+  width: 18px;
+  height: 1px;
+  background: color-mix(in srgb, var(--cosmos-lavender) 55%, transparent);
 }
 
-.meetHiepMotto {
-  margin-top: 8px;
-  padding-top: 14px;
-  border-top: 1px solid var(--cosmos-border);
-  font-family: var(--font-sans);
-  font-size: var(--fs-ui);
+.introHeading {
+  margin: 0 0 22px;
+  font-family: var(--font-display);
+  font-weight: 400;
   color: var(--cosmos-text);
 }
 
-.meetHiepMotto strong {
+.introHeadingGreeting {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-ui);
+  font-size: clamp(0.9375rem, 1.15vw, 1.0625rem);
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--cosmos-text) 72%, var(--cosmos-text-muted));
+}
+
+.introHeadingName {
+  display: block;
+  font-size: clamp(4.75rem, 7.6vw, 7.75rem);
   font-weight: 600;
-  background: linear-gradient(135deg, var(--cosmos-text) 30%, var(--cosmos-accent));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-style: italic;
+  line-height: 0.88;
+  letter-spacing: -0.04em;
+  color: color-mix(in srgb, var(--cosmos-lavender) 46%, var(--cosmos-text));
+  text-shadow: 0 0 36px color-mix(in srgb, var(--cosmos-lavender) 24%, transparent);
+}
+
+.introLead {
+  margin: 0 0 14px;
+  width: fit-content;
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-size: clamp(1.1875rem, 1.46vw, 1.5rem);
+  font-weight: 500;
+  line-height: 1.32;
+  letter-spacing: -0.006em;
+  color: var(--cosmos-text);
+}
+
+.introLead strong {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--cosmos-lavender) 26%, var(--cosmos-text));
+}
+
+.introBody {
+  margin: 0;
+  max-width: 58ch;
+  font-family: var(--font-ui);
+  font-size: clamp(0.9375rem, 1.08vw, 1.09375rem);
+  font-weight: 400;
+  line-height: 1.68;
+  color: color-mix(in srgb, var(--cosmos-text) 82%, var(--cosmos-text-muted));
+  text-wrap: pretty;
+}
+
+.introBody strong {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  color: color-mix(in srgb, var(--cosmos-star-blue) 42%, var(--cosmos-text));
+}
+
+.introClosing {
+  position: relative;
+  margin: clamp(22px, 2.5vw, 32px) 0 0;
+  padding-left: 16px;
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-size: clamp(1.125rem, 1.55vw, 1.4375rem);
+  font-weight: 500;
+  font-style: italic;
+  line-height: 1.28;
+  letter-spacing: -0.005em;
+  color: color-mix(in srgb, var(--cosmos-lavender) 40%, var(--cosmos-text));
+  text-shadow: 0 0 20px color-mix(in srgb, var(--cosmos-lavender) 18%, transparent);
+}
+
+.introClosing::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.14em;
+  bottom: 0.14em;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--cosmos-lavender) 78%, transparent),
+    color-mix(in srgb, var(--cosmos-lavender) 24%, transparent)
+  );
+}
+
+@media (max-width: 1023px) {
+  .introColumn {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 44px;
+    width: fit-content;
+    max-width: calc(100% - 80px);
+    margin-inline: auto;
+    transform: translate3d(0, var(--intro-shift-y, 0px), 0);
+  }
+
+  .introHeadingName {
+    font-size: clamp(4.5rem, 9.5vw, 6.25rem);
+  }
+
+  .introLead {
+    font-size: clamp(1.1875rem, 2.5vw, 1.375rem);
+  }
+
+  .introBody {
+    max-width: 56ch;
+    font-size: 0.96875rem;
+  }
+
+  .introClosing {
+    font-size: clamp(1.125rem, 2.2vw, 1.3125rem);
+  }
 }
 
 @media (max-width: 767px) {
@@ -280,37 +444,23 @@
     height: 320svh;
   }
 
-  .meetHiep {
-    right: 16px;
-    left: 16px;
-    top: auto;
-    bottom: 24px;
-    transform: none;
-    width: auto;
+  .intro[data-reveal-enabled='true'] {
+    height: 420svh;
   }
 
-  .meetHiepInner {
-    padding: 20px 22px;
-    gap: 12px;
-  }
-
-  .meetHiepTitle {
-    font-size: 1.75rem;
-  }
-
-  .intro:not([style]) .wordmark {
+  .intro:not([data-home-hydrated='true']) .wordmark {
     width: min(88vw, 106.05svh);
     top: 18svh;
   }
 
   .poster,
-  .globeInput {
-    top: var(--earth-y, calc(60svh + 110vw));
-    width: var(--earth-size, 220vw);
+  .earthHalo {
+    top: calc(60svh + 110vw);
+    width: 220vw;
   }
 
   .flare {
-    top: var(--flare-y, 60svh);
+    top: 60svh;
     width: 180px;
   }
 
@@ -320,5 +470,369 @@
 
   .collection {
     padding-inline: 20px;
+  }
+
+  .introColumn {
+    left: 20px;
+    right: 20px;
+    bottom: 28px;
+    width: auto;
+    max-width: none;
+    transform: translate3d(0, var(--intro-shift-y, 0px), 0);
+  }
+
+  .introEyebrow {
+    margin-bottom: 8px;
+  }
+
+  .introHeading {
+    margin-bottom: 14px;
+  }
+
+  .introHeadingName {
+    font-size: clamp(4rem, 18vw, 5.5rem);
+  }
+
+  .introLead {
+    margin-bottom: 10px;
+    font-size: clamp(1.125rem, 4.4vw, 1.375rem);
+    line-height: 1.32;
+  }
+
+  .introBody {
+    max-width: 100%;
+    font-size: 0.90625rem;
+    line-height: 1.6;
+  }
+
+  .introClosing {
+    margin-top: 18px;
+    padding-left: 12px;
+    font-size: clamp(1.0625rem, 4.3vw, 1.25rem);
+  }
+}
+
+/* Keep the introduction beside the Earth in short landscape / browser zoom. */
+@media (max-width: 1023px) and (max-height: 519px) and (min-width: 560px) {
+  .introColumn {
+    left: var(--earth-right, 37vw);
+    right: 0;
+    top: calc(58px + (100svh - 58px) / 2);
+    bottom: auto;
+    width: fit-content;
+    max-width: calc(100% - var(--earth-right, 37vw) - 48px);
+    transform: translate3d(0, calc(-50% + var(--intro-shift-y, 0px)), 0);
+  }
+
+  .introEyebrow {
+    margin-bottom: 4px;
+    font-size: 0.6875rem;
+  }
+
+  .introHeading {
+    margin-bottom: 8px;
+  }
+
+  .introHeadingGreeting {
+    font-size: 0.8125rem;
+    margin-bottom: 2px;
+  }
+
+  .introHeadingName {
+    font-size: 3rem;
+  }
+
+  .introLead {
+    margin-bottom: 6px;
+    font-size: 0.96875rem;
+    line-height: 1.25;
+  }
+
+  .introBody {
+    max-width: 100%;
+    font-size: 0.8125rem;
+    line-height: 1.42;
+  }
+
+  .introClosing {
+    margin-top: 10px;
+    padding-left: 10px;
+    font-size: 0.9375rem;
+  }
+}
+
+/* Keyboard skip link to jump directly to the revealed collection */
+.skipLink {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skipLink:focus-visible {
+  z-index: var(--z-transition);
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip-path: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-pill);
+  background: var(--cosmos-navy-1);
+  color: var(--cosmos-text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  text-decoration: none;
+  box-shadow: var(--shadow-cosmos);
+  outline: 2px solid var(--cosmos-focus);
+  outline-offset: 2px;
+  transition: none !important;
+}
+
+/* Midnight Galaxy opaque reveal surface spanning collection + footer */
+.collectionSurface {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  min-height: 100svh;
+  isolation: isolate;
+  background-color: var(--cosmos-navy-0);
+  background-image:
+    radial-gradient(
+      ellipse 74% 48% at 16% 12%,
+      color-mix(in srgb, var(--cosmos-lavender) 12%, transparent) 0%,
+      color-mix(in srgb, var(--cosmos-lavender) 4%, transparent) 42%,
+      transparent 74%
+    ),
+    radial-gradient(
+      ellipse 68% 50% at 86% 24%,
+      color-mix(in srgb, var(--cosmos-star-blue) 11%, transparent) 0%,
+      color-mix(in srgb, var(--cosmos-star-blue) 3.5%, transparent) 44%,
+      transparent 76%
+    ),
+    radial-gradient(
+      ellipse 70% 44% at 50% 92%,
+      color-mix(in srgb, var(--cosmos-navy-1) 85%, transparent) 0%,
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      var(--cosmos-navy-0) 0%,
+      var(--cosmos-navy-1) 42%,
+      var(--cosmos-bg-1) 100%
+    );
+}
+
+.collectionSurface[data-reveal-enabled='true'] {
+  position: sticky;
+  top: 0;
+  margin-top: -500svh;
+  will-change: clip-path;
+}
+
+.collectionSurface[data-reveal-state='hidden'],
+.collectionSurface[data-reveal-state='revealing'] {
+  pointer-events: none;
+  user-select: none;
+}
+
+.collectionSurface[data-reveal-state='revealed'] {
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.collectionRevealSpacer {
+  display: none;
+  height: 0;
+  pointer-events: none;
+}
+
+.collectionRevealSpacer[data-reveal-enabled='true'] {
+  display: block;
+  height: 400svh;
+  pointer-events: none;
+}
+
+@media (max-width: 767px) {
+  .collectionSurface[data-reveal-enabled='true'] {
+    margin-top: -420svh;
+  }
+
+  .collectionRevealSpacer[data-reveal-enabled='true'] {
+    height: 320svh;
+  }
+}
+
+/* Sparse static pinpoint stars over the Midnight Galaxy canvas */
+.midnightStars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-repeat: repeat;
+  background-size:
+    347px 347px,
+    463px 463px,
+    587px 587px,
+    719px 719px,
+    409px 409px,
+    523px 523px,
+    641px 641px;
+  background-image:
+    radial-gradient(
+      1.5px 1.5px at 54px 82px,
+      color-mix(in srgb, var(--cosmos-star-white) 61%, transparent) 0%,
+      color-mix(in srgb, var(--cosmos-star-white) 27%, transparent) 35%,
+      transparent 100%
+    ),
+    radial-gradient(
+      1.5px 1.5px at 218px 164px,
+      color-mix(in srgb, var(--cosmos-star-pale) 56%, transparent) 0%,
+      color-mix(in srgb, var(--cosmos-star-pale) 23%, transparent) 35%,
+      transparent 100%
+    ),
+    radial-gradient(
+      1.75px 1.75px at 412px 320px,
+      color-mix(in srgb, var(--cosmos-star-blue) 52%, transparent) 0%,
+      color-mix(in srgb, var(--cosmos-star-blue) 22%, transparent) 35%,
+      transparent 100%
+    ),
+    radial-gradient(
+      1.75px 1.75px at 590px 140px,
+      color-mix(in srgb, var(--cosmos-lavender) 47%, transparent) 0%,
+      color-mix(in srgb, var(--cosmos-lavender) 19%, transparent) 35%,
+      transparent 100%
+    ),
+    radial-gradient(
+      1.25px 1.25px at 290px 330px,
+      color-mix(in srgb, var(--cosmos-star-white) 49%, transparent) 0%,
+      color-mix(in srgb, var(--cosmos-star-white) 20%, transparent) 35%,
+      transparent 100%
+    ),
+    radial-gradient(
+      1.5px 1.5px at 112px 418px,
+      color-mix(in srgb, var(--cosmos-star-pale) 50%, transparent) 0%,
+      color-mix(in srgb, var(--cosmos-star-pale) 20%, transparent) 35%,
+      transparent 100%
+    ),
+    radial-gradient(
+      1.5px 1.5px at 488px 512px,
+      color-mix(in srgb, var(--cosmos-star-blue) 45%, transparent) 0%,
+      color-mix(in srgb, var(--cosmos-star-blue) 17%, transparent) 35%,
+      transparent 100%
+    );
+}
+
+/* Sticky collection signature topbar aligned with the fixed top-right bell */
+.collectionTopbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 64px;
+  margin-bottom: -64px;
+  padding-top: 16px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--cosmos-navy-0) 92%, transparent) 0%,
+    color-mix(in srgb, var(--cosmos-navy-0) 58%, transparent) 62%,
+    transparent 100%
+  );
+}
+
+.collectionTopbarInner {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: var(--max-content);
+  height: 44px;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+@media (min-width: 1024px) {
+  .collectionTopbarInner {
+    padding-inline: var(--gutter-lg);
+  }
+}
+
+.collectionSignature {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 44px;
+  padding: 0.25rem 0.625rem;
+  margin-left: -0.625rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--cosmos-text);
+  cursor: pointer;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.collectionSignature:hover {
+  opacity: 0.8;
+}
+
+.collectionSignature:focus-visible {
+  outline: 2px solid var(--cosmos-focus);
+  outline-offset: 2px;
+  transition: none !important;
+}
+
+.collectionSignatureText {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+.collectionSignatureStar {
+  color: var(--cosmos-lavender);
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro[data-reveal-enabled='true'] {
+    height: 400svh;
+  }
+
+  .collectionSurface[data-reveal-enabled='true'] {
+    position: relative;
+    margin-top: 0;
+    will-change: auto;
+    clip-path: none !important;
+    transform: none !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  .collectionRevealSpacer[data-reveal-enabled='true'] {
+    display: none;
+    height: 0;
+  }
+
+  .collectionSignature {
+    transition-duration: 0ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) and (max-width: 767px) {
+  .intro[data-reveal-enabled='true'] {
+    height: 320svh;
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type Ref } from 'react';
 import { ArrowRightLeft, Clock, Pin, Trash2 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import type { TaskDto } from '@/contracts';
@@ -17,6 +17,9 @@ import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
 import { Chip } from '@/ui/Chip';
+import { Dialog } from '@/ui/Dialog';
+import { taskNoteTone } from './task-note-tone';
+import noteStyles from './task-note.module.css';
 import { cn } from '@/ui/cn';
 import { DueSoonDot } from './DueSoonDot';
 import { PriorityBadge } from './PriorityBadge';
@@ -24,6 +27,7 @@ import { TaskMenu } from './TaskMenu';
 import dailyStyles from './daily-task-card.module.css';
 
 export interface TaskCardProps {
+  ref?: Ref<HTMLElement>;
   task: TaskDto;
   now: Date;
   timeZone?: string;
@@ -41,6 +45,7 @@ export interface TaskCardProps {
 }
 
 export function TaskCard({
+  ref,
   task,
   now,
   timeZone = DEFAULT_APP_TIMEZONE,
@@ -57,8 +62,22 @@ export function TaskCard({
   onRequestDelete,
 }: TaskCardProps) {
   const [expanded, setExpanded] = useState(isHighlighted);
+  const [dialogMounted, setDialogMounted] = useState(isHighlighted);
   const cardRef = useRef<HTMLElement>(null);
   const reducedMotion = useReducedMotion();
+
+  const setCardRef = useCallback(
+    (node: HTMLElement | null) => {
+      cardRef.current = node;
+      if (typeof ref === 'function') {
+        return ref(node);
+      }
+      if (ref) {
+        ref.current = node;
+      }
+    },
+    [ref],
+  );
 
   const derived = deriveTaskState(task, now);
   const isCompleted = task.status === 'completed';
@@ -66,6 +85,7 @@ export function TaskCard({
 
   useEffect(() => {
     if (isHighlighted) {
+      setDialogMounted(true);
       setExpanded(true);
     }
   }, [isHighlighted]);
@@ -106,197 +126,279 @@ export function TaskCard({
   const cardDomId = `task-card-${context}${carousel ? '-carousel' : ''}-${task.id}`;
 
   return (
-    <motion.article
-      ref={cardRef}
-      id={cardDomId}
-      data-task-id={task.id}
-      layout={reducedMotion ? false : 'position'}
-      initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-      animate={{ opacity: isCompleted ? 0.72 : 1, y: 0 }}
-      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
-      transition={{
-        duration: reducedMotion ? 0 : MOTION_DURATION.layout,
-        ease: MOTION_EASE,
-      }}
-      onClick={carousel ? undefined : () => setExpanded((prev) => !prev)}
-      onKeyDown={
-        carousel
-          ? undefined
-          : (e) => {
-              if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
-                e.preventDefault();
-                setExpanded((prev) => !prev);
+    <>
+      <motion.article
+        ref={setCardRef}
+        id={cardDomId}
+        data-task-id={task.id}
+        data-note-tone={context === 'hub' ? taskNoteTone(task.id) : undefined}
+        layout={reducedMotion ? false : 'position'}
+        initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: isCompleted && context !== 'hub' ? 0.72 : 1, y: 0 }}
+        exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
+        transition={{
+          duration: reducedMotion ? 0 : MOTION_DURATION.layout,
+          ease: MOTION_EASE,
+        }}
+        onClick={
+          carousel
+            ? undefined
+            : (event) => {
+                if (
+                  event.target instanceof Element &&
+                  event.target.closest('button, a, input, select, textarea')
+                )
+                  return;
+                if (context === 'hub') {
+                  setDialogMounted(true);
+                  setExpanded(true);
+                } else {
+                  setExpanded((prev) => !prev);
+                }
               }
-            }
-      }
-      className={cn(
-        'group/card relative flex flex-col rounded-task border select-none',
-        carousel
-          ? dailyStyles.compact
-          : dense
-            ? 'cursor-pointer p-3.5 gap-2'
-            : 'cursor-pointer px-[18px] py-4 gap-2.5',
-        'transition-[border-color,box-shadow,transform,background-color] duration-200 ease-[var(--ease)]',
-        context === 'overdue' && dailyStyles.overdue,
-        derived.isOverdue
-          ? 'bg-tint-overdue-bg border-tint-overdue-border'
-          : task.pinned && !isCompleted
-            ? 'bg-ws-surface border-ws-accent-soft'
-            : task.priority === 'urgent' && !isCompleted
-              ? 'bg-ws-surface border-[color-mix(in_srgb,var(--status-overdue)_20%,var(--ws-border))]'
-              : 'bg-ws-surface border-ws-border',
-        isCompleted
-          ? 'shadow-none'
-          : 'shadow-task hover:shadow-task-hover hover:-translate-y-0.5 active:translate-y-0 hover:border-[color-mix(in_srgb,var(--ws-accent)_45%,var(--ws-border))] motion-reduce:hover:translate-y-0',
-        isNew && 'animate-task-new-glow',
-        isHighlighted && 'animate-task-highlight-glow',
-      )}
-    >
-      {/* Top row: Checkbox + Title + Three-dot menu */}
-      <div className="flex items-start gap-3">
-        <div className="pt-0.5">
-          <Checkbox
-            checked={isCompleted}
-            onCheckedChange={() => onToggleComplete(task)}
-            aria-label={isCompleted ? `Mark ${task.title} as active` : `Complete ${task.title}`}
+        }
+        onKeyDown={
+          carousel
+            ? undefined
+            : (e) => {
+                if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  if (context === 'hub' && !expanded) setDialogMounted(true);
+                  setExpanded((prev) => !prev);
+                }
+              }
+        }
+        className={cn(
+          'group/card relative flex flex-col rounded-task border select-none',
+          carousel
+            ? dailyStyles.compact
+            : dense
+              ? 'cursor-pointer p-3.5 gap-2'
+              : 'cursor-pointer px-[18px] py-4 gap-2.5',
+          'transition-[border-color,box-shadow,background-color] duration-200 ease-[var(--ease)] motion-reduce:transition-none motion-reduce:duration-0',
+          context === 'overdue' && dailyStyles.overdue,
+          derived.isOverdue
+            ? 'bg-tint-overdue-bg border-tint-overdue-border'
+            : task.pinned && !isCompleted
+              ? 'bg-ws-surface border-ws-accent-soft'
+              : task.priority === 'urgent' && !isCompleted
+                ? 'bg-ws-surface border-[color-mix(in_srgb,var(--status-overdue)_20%,var(--ws-border))]'
+                : 'bg-ws-surface border-ws-border',
+          isCompleted
+            ? 'shadow-none'
+            : 'shadow-task hover:shadow-task-hover hover:border-[color-mix(in_srgb,var(--ws-accent)_45%,var(--ws-border))]',
+          context === 'hub' && noteStyles.note,
+          isNew && 'animate-task-new-glow',
+          isHighlighted && 'animate-task-highlight-glow',
+        )}
+      >
+        {/* Top row: Checkbox + Title + Three-dot menu */}
+        <div className={context === 'hub' ? noteStyles.noteHeader : 'flex items-start gap-3'}>
+          <div className="pt-0.5">
+            <Checkbox
+              checked={isCompleted}
+              onCheckedChange={() => onToggleComplete(task)}
+              aria-label={isCompleted ? `Mark ${task.title} as active` : `Complete ${task.title}`}
+            />
+          </div>
+
+          <h3
+            title={carousel ? task.title : undefined}
+            className={cn(
+              'flex-1 text-[length:var(--fs-body)] font-semibold leading-snug break-words',
+              carousel ? 'min-w-0 truncate' : (context === 'hub' || !expanded) && 'line-clamp-2',
+              isCompleted
+                ? 'italic line-through decoration-text-completed decoration-1 text-text-completed font-normal'
+                : 'text-ws-text',
+            )}
+          >
+            {carousel ? (
+              task.title
+            ) : (
+              <button
+                type="button"
+                aria-expanded={expanded}
+                aria-haspopup={context === 'hub' ? 'dialog' : undefined}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (context === 'hub' && !expanded) setDialogMounted(true);
+                  setExpanded((prev) => !prev);
+                }}
+                className="w-full text-left bg-transparent border-0 p-0 font-inherit text-inherit cursor-pointer rounded-sm"
+              >
+                {task.title}
+              </button>
+            )}
+          </h3>
+
+          <TaskMenu
+            task={task}
+            isOverdue={derived.isOverdue}
+            now={now}
+            timeZone={timeZone}
+            context={context}
+            portal={carousel || context === 'hub'}
+            onEdit={onEdit}
+            onScheduleDate={onScheduleDate}
+            onOpenPickDate={onOpenPickDate}
+            onOpenTransfer={onOpenTransfer}
+            onRequestDelete={onRequestDelete}
           />
         </div>
 
-        <h3
-          title={carousel ? task.title : undefined}
+        {/* Middle row: Description (omitted completely when empty so zero extra gap appears) */}
+        {hasDescription || carousel ? (
+          <p
+            title={carousel ? task.description || undefined : undefined}
+            className={cn(
+              'pl-8 text-[length:var(--fs-ui)] leading-[1.55] whitespace-pre-line break-words',
+              isCompleted ? 'text-text-completed' : 'text-ws-text-muted',
+              carousel
+                ? dailyStyles.compactDescription
+                : context === 'hub'
+                  ? 'line-clamp-3'
+                  : !expanded && (dense ? 'line-clamp-1' : 'line-clamp-2'),
+            )}
+          >
+            {task.description}
+          </p>
+        ) : null}
+
+        {/* Bottom metadata row */}
+        <div
           className={cn(
-            'flex-1 text-[length:var(--fs-body)] font-semibold leading-snug break-words',
-            carousel ? 'min-w-0 truncate' : !expanded && 'line-clamp-2',
-            isCompleted
-              ? 'italic line-through decoration-text-completed decoration-1 text-text-completed font-normal'
-              : 'text-ws-text',
+            'pl-8 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[length:var(--fs-small)]',
+            carousel && dailyStyles.compactMetadata,
+            context === 'hub' && noteStyles.metadata,
           )}
         >
-          {carousel ? (
-            task.title
-          ) : (
-            <button
-              type="button"
-              aria-expanded={expanded}
-              onClick={(e) => {
-                e.stopPropagation();
-                setExpanded((prev) => !prev);
-              }}
-              className="w-full text-left bg-transparent border-0 p-0 font-inherit text-inherit cursor-pointer rounded-sm"
+          <PriorityBadge priority={task.priority} />
+
+          {task.pinned ? (
+            <span
+              aria-label="Pinned to top of day"
+              title="Pinned"
+              className="inline-flex items-center text-text-accent"
             >
-              {task.title}
-            </button>
-          )}
-        </h3>
-
-        <TaskMenu
-          task={task}
-          isOverdue={derived.isOverdue}
-          now={now}
-          timeZone={timeZone}
-          context={context}
-          portal={carousel}
-          onEdit={onEdit}
-          onScheduleDate={onScheduleDate}
-          onOpenPickDate={onOpenPickDate}
-          onOpenTransfer={onOpenTransfer}
-          onRequestDelete={onRequestDelete}
-        />
-      </div>
-
-      {/* Middle row: Description (omitted completely when empty so zero extra gap appears) */}
-      {hasDescription || carousel ? (
-        <p
-          title={carousel ? task.description || undefined : undefined}
-          className={cn(
-            'pl-8 text-[length:var(--fs-ui)] leading-[1.55] whitespace-pre-line break-words',
-            isCompleted ? 'text-text-completed' : 'text-ws-text-muted',
-            carousel
-              ? dailyStyles.compactDescription
-              : !expanded && (dense ? 'line-clamp-1' : 'line-clamp-2'),
-          )}
-        >
-          {task.description}
-        </p>
-      ) : null}
-
-      {/* Bottom metadata row */}
-      <div
-        className={cn(
-          'pl-8 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[length:var(--fs-small)]',
-          carousel && dailyStyles.compactMetadata,
-        )}
-      >
-        <PriorityBadge priority={task.priority} />
-
-        {task.pinned ? (
-          <span
-            aria-label="Pinned to top of day"
-            title="Pinned"
-            className="inline-flex items-center text-text-accent"
-          >
-            <Pin size={14} strokeWidth={1.5} />
-          </span>
-        ) : null}
-
-        {context === 'hub' && scheduledHeader ? (
-          <Badge tone="general">Scheduled {scheduledHeader.dayMonth}</Badge>
-        ) : null}
-
-        {carousel && derived.isDueSoon ? <DueSoonDot /> : null}
-        {carousel ? <span className={dailyStyles.compactDeadline}>{deadline}</span> : deadline}
-        {!carousel && derived.isDueSoon ? <DueSoonDot /> : null}
-      </div>
-
-      {/* Expanded schedule action row in Tasks Hub (§9.1 & §9.4) */}
-      {context === 'hub' && expanded ? (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="pl-8 pt-2 mt-0.5 border-t border-ws-border flex flex-wrap items-center gap-1.5"
-        >
-          <Chip
-            active={task.scheduledDate === todayStr}
-            onClick={() => onScheduleDate(task, todayStr)}
-          >
-            Add to today
-          </Chip>
-          <Chip
-            active={task.scheduledDate === tomorrowStr}
-            onClick={() => onScheduleDate(task, tomorrowStr)}
-          >
-            Add to tomorrow
-          </Chip>
-          <Chip onClick={() => onOpenPickDate(task)}>Pick date…</Chip>
-          {task.scheduledDate !== null ? (
-            <Chip onClick={() => onScheduleDate(task, null)}>Remove from daily</Chip>
+              <Pin size={14} strokeWidth={1.5} />
+            </span>
           ) : null}
-        </div>
-      ) : null}
 
-      {/* Direct Transfer & Delete actions in Overdue lane (§9.3 & ui_readme.md §14.5) */}
-      {context === 'overdue' ? (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="pl-8 pt-2 mt-0.5 border-t border-tint-overdue-border flex flex-wrap items-center justify-end gap-2"
-        >
-          <Button
-            size="sm"
-            variant="secondary"
-            leftIcon={<ArrowRightLeft size={14} strokeWidth={1.5} />}
-            onClick={() => onOpenTransfer(task)}
-          >
-            Transfer
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            leftIcon={<Trash2 size={14} strokeWidth={1.5} />}
-            onClick={() => onRequestDelete(task)}
-          >
-            Delete
-          </Button>
+          {context === 'hub' && scheduledHeader ? (
+            <Badge tone="general">Scheduled {scheduledHeader.dayMonth}</Badge>
+          ) : null}
+
+          {carousel && derived.isDueSoon ? <DueSoonDot /> : null}
+          {carousel ? <span className={dailyStyles.compactDeadline}>{deadline}</span> : deadline}
+          {!carousel && derived.isDueSoon ? <DueSoonDot /> : null}
         </div>
-      ) : null}
-    </motion.article>
+
+        {/* Direct Transfer & Delete actions in Overdue lane (§9.3 & ui_readme.md §14.5) */}
+        {context === 'overdue' ? (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="pl-8 pt-2 mt-0.5 border-t border-tint-overdue-border flex flex-wrap items-center justify-end gap-2"
+          >
+            <Button
+              size="sm"
+              variant="secondary"
+              leftIcon={<ArrowRightLeft size={14} strokeWidth={1.5} />}
+              onClick={() => onOpenTransfer(task)}
+            >
+              Transfer
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              leftIcon={<Trash2 size={14} strokeWidth={1.5} />}
+              onClick={() => onRequestDelete(task)}
+            >
+              Delete
+            </Button>
+          </div>
+        ) : null}
+      </motion.article>
+      {context === 'hub' && dialogMounted && (
+        <Dialog
+          open={expanded}
+          onClose={() => setExpanded(false)}
+          title={task.title}
+          portal
+          className="max-w-[640px] max-h-[85dvh] overflow-y-auto"
+        >
+          <div className={noteStyles.details}>
+            <p className={noteStyles.description}>{task.description || 'No description.'}</p>
+            <div className={noteStyles.metadata}>
+              <PriorityBadge priority={task.priority} />
+              <span>
+                {isCompleted ? 'Completed' : 'Active'}
+                {task.pinned ? ' · Pinned' : ''}
+              </span>
+              {scheduledHeader && <span>Scheduled {scheduledHeader.dayMonth}</span>}
+              {deadline}
+            </div>
+            <div className={noteStyles.actions}>
+              <Chip
+                active={task.scheduledDate === todayStr}
+                onClick={() => onScheduleDate(task, todayStr)}
+              >
+                Add to today
+              </Chip>
+              <Chip
+                active={task.scheduledDate === tomorrowStr}
+                onClick={() => onScheduleDate(task, tomorrowStr)}
+              >
+                Add to tomorrow
+              </Chip>
+              <Chip
+                onClick={() => {
+                  setExpanded(false);
+                  onOpenPickDate(task);
+                }}
+              >
+                Pick date…
+              </Chip>
+              {task.scheduledDate !== null && (
+                <Chip onClick={() => onScheduleDate(task, null)}>Remove from daily</Chip>
+              )}
+            </div>
+            <div className={noteStyles.actions}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setExpanded(false);
+                  onEdit(task);
+                }}
+              >
+                Edit task
+              </Button>
+              {derived.isOverdue && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setExpanded(false);
+                    onOpenTransfer(task);
+                  }}
+                >
+                  Transfer…
+                </Button>
+              )}
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setExpanded(false);
+                  onRequestDelete(task);
+                }}
+              >
+                Delete task
+              </Button>
+              <Button variant="secondary" onClick={() => setExpanded(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+    </>
   );
 }

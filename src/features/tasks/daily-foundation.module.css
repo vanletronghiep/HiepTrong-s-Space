@@ -18,6 +18,7 @@
   inset: 0;
   z-index: var(--z-bg);
   overflow: hidden;
+  contain: layout style paint;
   pointer-events: none;
   color: var(--daily-violet);
   background: var(--daily-sky-gradient);
@@ -42,10 +43,20 @@
 .nebula {
   opacity: 0.67;
 }
-.clouds {
-  animation: daily-cloud-drift 94s ease-in-out infinite alternate;
-}
 .twinkle {
+  position: absolute;
+  display: block;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+.twinkle > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.sky[data-animated='true'] .twinkle {
+  will-change: opacity;
   animation: daily-twinkle 6s ease-in-out infinite alternate;
 }
 
@@ -109,18 +120,11 @@
   top: 40%;
   width: clamp(58px, 7.5vw, 105px);
 }
-.sky[data-paused='true'] :is(.clouds, .twinkle) {
+.sky[data-paused='true'] .twinkle {
   animation-play-state: paused;
+  will-change: auto;
 }
 
-@keyframes daily-cloud-drift {
-  from {
-    transform: translate(-4px, 0);
-  }
-  to {
-    transform: translate(17px, -10px);
-  }
-}
 @keyframes daily-twinkle {
   from {
     opacity: 0.38;
@@ -153,9 +157,8 @@
 }
 .modeStage {
   position: relative;
-  overflow: clip;
+  overflow-x: clip;
   margin-inline: calc(-1 * var(--daily-carousel-bleed));
-  transition: height var(--daily-duration) var(--daily-ease);
 }
 .modeContent {
   position: relative;
@@ -165,22 +168,9 @@
 .modePanel[data-present='true'] {
   position: relative;
   z-index: 1;
-  animation: daily-mode-in 210ms var(--daily-ease) both;
 }
 .modePanel[data-present='false'] {
-  position: absolute;
-  inset: 0 var(--daily-carousel-bleed) auto;
   pointer-events: none;
-}
-@keyframes daily-mode-in {
-  from {
-    opacity: 0.48;
-    transform: translateY(7px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 .datePill {
   display: inline-flex;
@@ -412,7 +402,12 @@
   overflow: visible;
 }
 .arcElapsed {
-  transition: clip-path 1s linear;
+  transition: none;
+}
+.arcMarkerTrack {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 .moon,
 .deadlineStar {
@@ -421,6 +416,8 @@
   pointer-events: none;
 }
 .moon {
+  left: 0;
+  top: 0;
   display: grid;
   place-items: center;
   width: 30px;
@@ -429,13 +426,6 @@
   background: radial-gradient(var(--ws-surface), var(--daily-pill));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--daily-arc-line) 24%, transparent);
   color: var(--daily-heading-accent);
-  transition:
-    left 1s linear,
-    top 1s linear;
-}
-.moon[data-midnight='true'],
-.arcElapsed[data-midnight='true'] {
-  transition: none;
 }
 .deadlineStar {
   left: 100%;
@@ -530,19 +520,10 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .modePanel[data-present='true'] {
-    opacity: 1;
+  .sky[data-animated='true'] .twinkle {
     animation: none;
+    will-change: auto;
   }
-  .modeStage {
-    transition: none;
-  }
-  .clouds,
-  .twinkle {
-    animation: none;
-  }
-  .moon,
-  .arcElapsed,
   .progressFill {
     transition: none;
   }

@@ -1,0 +1,112 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--ws-scrim);
+}
+
+.viewport {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+  background: var(--ws-surface);
+  color: var(--ws-text);
+  border: 0;
+  box-shadow: var(--shadow-popover);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--ws-border);
+  padding: 1rem 1.25rem;
+  background: color-mix(in srgb, var(--ws-bg) 42%, var(--ws-surface));
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.25rem;
+}
+
+.footer {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-top: 1px solid var(--ws-border);
+  background: color-mix(in srgb, var(--ws-bg) 56%, var(--ws-surface));
+  padding: 0.875rem 1.25rem;
+}
+
+.twoColumn {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.primaryColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.metaColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--ws-border);
+  background: color-mix(in srgb, var(--ws-bg) 68%, var(--ws-surface));
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .viewport {
+    padding: 1rem;
+  }
+
+  .panel {
+    width: min(92vw, 820px);
+    height: auto;
+    max-height: min(88dvh, 760px);
+    border-radius: var(--radius-card);
+    border: 1px solid var(--ws-border);
+  }
+}
+
+@media (min-width: 900px) {
+  .twoColumn {
+    grid-template-columns: minmax(0, 1.55fr) minmax(248px, 316px);
+    gap: 1.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .panel {
+    width: min(75vw, 1140px);
+  }
+}

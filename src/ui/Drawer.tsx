@@ -1,16 +1,60 @@
 'use client';
 
-import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { createPortal } from 'react-dom';
 import { MOTION_DURATION, MOTION_EASE } from '@/design/motion';
 import { IconButton } from './IconButton';
 import { cn } from './cn';
+import { useFeatureTheme } from './FeatureTheme';
 import { useFocusTrap } from './use-focus-trap';
 
 let openDrawers = 0;
 let savedOverflow = '';
+
+const DESKTOP_DRAWER_MEDIA_QUERY = '(min-width: 768px)';
+
+function subscribeDrawerMedia(callback: () => void): () => void {
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+  if (typeof window.matchMedia === 'function') {
+    const mql = window.matchMedia(DESKTOP_DRAWER_MEDIA_QUERY);
+    if (typeof mql?.addEventListener === 'function') {
+      mql.addEventListener('change', callback);
+      return () => mql.removeEventListener('change', callback);
+    }
+    if (typeof mql?.addListener === 'function') {
+      mql.addListener(callback);
+      return () => mql.removeListener(callback);
+    }
+    return () => {};
+  }
+  window.addEventListener('resize', callback);
+  return () => window.removeEventListener('resize', callback);
+}
+
+function getIsDesktopDrawer(): boolean {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+  if (typeof window.matchMedia === 'function') {
+    return window.matchMedia(DESKTOP_DRAWER_MEDIA_QUERY).matches;
+  }
+  return window.innerWidth >= 768;
+}
+
+function getServerDesktopDrawer(): boolean {
+  return true;
+}
 
 export interface DrawerProps {
   open: boolean;
@@ -33,9 +77,15 @@ export function Drawer({
   className,
   portal = false,
 }: DrawerProps) {
+  const featureTheme = useFeatureTheme();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
+  const isDesktop = useSyncExternalStore(
+    subscribeDrawerMedia,
+    getIsDesktopDrawer,
+    getServerDesktopDrawer,
+  );
 
   useFocusTrap({
     open,
@@ -82,13 +132,33 @@ export function Drawer({
             aria-modal="true"
             aria-labelledby={titleId}
             tabIndex={-1}
-            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 24, y: 16 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            exit={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 16, y: 12 }}
+            initial={
+              reducedMotion
+                ? { opacity: 0 }
+                : isDesktop
+                  ? { opacity: 0, x: 24 }
+                  : { opacity: 0, y: 24 }
+            }
+            animate={
+              reducedMotion
+                ? { opacity: 1 }
+                : isDesktop
+                  ? { opacity: 1, x: 0 }
+                  : { opacity: 1, y: 0 }
+            }
+            exit={
+              reducedMotion
+                ? { opacity: 0 }
+                : isDesktop
+                  ? { opacity: 0, x: 16 }
+                  : { opacity: 0, y: 16 }
+            }
             transition={{
               duration: reducedMotion ? 0 : MOTION_DURATION.base,
               ease: MOTION_EASE,
             }}
+            data-theme="workspace"
+            data-feature-theme={featureTheme}
             className={cn(
               'relative flex flex-col w-full max-h-[90dvh] rounded-t-[20px] bg-ws-surface text-ws-text border border-ws-border shadow-drawer',
               'md:max-h-none md:h-full md:w-[420px] lg:w-[440px] md:rounded-t-none md:rounded-l-[20px]',

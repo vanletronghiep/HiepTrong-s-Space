@@ -1,9 +1,10 @@
 'use client';
 
 import type { FeatureCollectionLayout } from '@/client/preferences';
+import { COLLECTION_SUBTITLE_COPY } from '@/features/home/home-journey';
 import { SegmentedControl, type SegmentedOption } from '@/ui/SegmentedControl';
 import { cn } from '@/ui/cn';
-import styles from '../home-journey.module.css';
+import styles from './feature-collection.module.css';
 
 const LAYOUT_OPTIONS: readonly SegmentedOption<FeatureCollectionLayout>[] = [
   { value: 'horizontal', label: 'Horizontal' },
@@ -24,13 +25,12 @@ export function CollectionHeader({ layout, onLayoutChange, className }: Collecti
         className,
       )}
     >
-      <h2
-        id="features-heading"
-        tabIndex={-1}
-        className={cn(styles.collectionHeading, 'text-cosmos-text')}
-      >
-        Explore my space
-      </h2>
+      <div>
+        <h2 id="features-heading" tabIndex={-1} className={styles.collectionHeading}>
+          My <span className={styles.collectionHeadingEmphasis}>collection</span>
+        </h2>
+        <p className={styles.collectionSubtitle}>{COLLECTION_SUBTITLE_COPY}</p>
+      </div>
 
       <SegmentedControl
         tone="cosmos"

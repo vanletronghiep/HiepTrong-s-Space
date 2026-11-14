@@ -80,26 +80,20 @@ export function OverdueList({
             </motion.div>
           )}
           {overdueTasks.map((task) => (
-            <motion.div
+            <TaskCard
               key={task.id}
-              layout={reducedMotion ? false : 'position'}
-              exit={{ opacity: 0, scale: reducedMotion ? 1 : 0.96 }}
-              transition={transition}
-            >
-              <TaskCard
-                task={task}
-                now={now}
-                timeZone={timeZone}
-                context="overdue"
-                isNew={recentlyCreatedId === task.id}
-                onToggleComplete={onToggleComplete}
-                onEdit={onEdit}
-                onScheduleDate={onScheduleDate}
-                onOpenPickDate={onOpenPickDate}
-                onOpenTransfer={onOpenTransfer}
-                onRequestDelete={onRequestDelete}
-              />
-            </motion.div>
+              task={task}
+              now={now}
+              timeZone={timeZone}
+              context="overdue"
+              isNew={recentlyCreatedId === task.id}
+              onToggleComplete={onToggleComplete}
+              onEdit={onEdit}
+              onScheduleDate={onScheduleDate}
+              onOpenPickDate={onOpenPickDate}
+              onOpenTransfer={onOpenTransfer}
+              onRequestDelete={onRequestDelete}
+            />
           ))}
         </AnimatePresence>
       </div>

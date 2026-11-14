@@ -1,10 +1,37 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { FeatureEntry } from '@/features/registry';
 import { TransitionLink } from '@/features/transitions/TransitionLink';
 import { cn } from '@/ui/cn';
 import { FeatureThumbnail } from './FeatureThumbnail';
+import styles from './feature-collection.module.css';
+
+const FEATURE_ACCENT_VARS: Record<string, string> = {
+  'daily-tasks': 'var(--cosmos-lavender)',
+  'tasks-hub': 'var(--cosmos-star-blue)',
+  events: 'color-mix(in srgb, var(--cosmos-star-blue) 68%, var(--daily-planet-optional-light))',
+  'ai-engineering':
+    'color-mix(in srgb, var(--daily-planet-optional-light) 72%, var(--cosmos-star-pale))',
+  blogs: 'color-mix(in srgb, var(--journey-flare-gold) 74%, var(--cosmos-star-white))',
+  apcs: 'var(--cosmos-star-pale)',
+  flashcards: 'color-mix(in srgb, var(--journey-flare-gold) 58%, var(--cosmos-lavender))',
+  entertainment: 'color-mix(in srgb, var(--cosmos-lavender) 64%, var(--daily-planet-urgent-light))',
+  tracking: 'var(--status-notif-completed)',
+  projects: 'color-mix(in srgb, var(--daily-planet-urgent-light) 55%, var(--journey-flare-gold))',
+  milestones: 'var(--journey-flare-gold)',
+  'learning-room':
+    'color-mix(in srgb, var(--daily-planet-optional-light) 60%, var(--cosmos-lavender))',
+  achievements: 'color-mix(in srgb, var(--journey-flare-gold) 65%, var(--cosmos-star-white))',
+};
+
+export function getFeatureAccentVar(feature: FeatureEntry): string {
+  return (
+    FEATURE_ACCENT_VARS[feature.id] ??
+    (feature.thumbnail.accent === 'lavender' ? 'var(--cosmos-lavender)' : 'var(--cosmos-star-blue)')
+  );
+}
 
 export interface FeatureCardProps {
   feature: FeatureEntry;
@@ -20,28 +47,18 @@ export function FeatureCard({ feature, className }: FeatureCardProps) {
     <TransitionLink
       href={feature.href}
       data-feature-id={feature.id}
-      className={cn(
-        'group block rounded-card text-left cursor-pointer',
-        'focus-visible:outline-2 focus-visible:outline-[var(--cosmos-focus)] focus-visible:outline-offset-4',
-        className,
-      )}
+      style={{ '--card-accent': getFeatureAccentVar(feature) } as CSSProperties}
+      className={cn(styles.featureCard, className)}
     >
       <FeatureThumbnail thumbnail={feature.thumbnail} />
 
-      <p className="mt-4 text-[length:var(--fs-small)] leading-none text-cosmos-text-muted">
-        {feature.label}
-      </p>
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <span className={styles.categoryPill}>{feature.label}</span>
+      </div>
 
-      <div className="mt-1 flex items-baseline justify-between gap-3">
-        <h3 className="font-display text-[length:var(--fs-card-title)] font-light leading-[1.1] text-cosmos-text transition-colors duration-[240ms] ease-[var(--ease)] [@media(hover:hover)]:group-hover:text-[color-mix(in_srgb,var(--cosmos-text)_88%,var(--cosmos-lavender))] group-focus-visible:text-[color-mix(in_srgb,var(--cosmos-text)_88%,var(--cosmos-lavender))]">
-          {feature.title}
-        </h3>
-        <ArrowUpRight
-          size={18}
-          strokeWidth={1.5}
-          aria-hidden="true"
-          className="shrink-0 translate-y-[1px] text-cosmos-text opacity-60 transition-[opacity,transform] duration-[240ms] ease-[var(--ease)] [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:translate-x-[2px] [@media(hover:hover)]:group-hover:-translate-y-[1px] group-focus-visible:opacity-100 group-focus-visible:translate-x-[2px] group-focus-visible:-translate-y-[1px]"
-        />
+      <div className="mt-2 flex items-baseline justify-between gap-3">
+        <h3 className={styles.cardTitle}>{feature.title}</h3>
+        <ArrowUpRight size={18} strokeWidth={1.6} aria-hidden="true" className={styles.cardArrow} />
       </div>
     </TransitionLink>
   );

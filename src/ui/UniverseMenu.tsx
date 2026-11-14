@@ -7,14 +7,35 @@ import { MOTION_DURATION, MOTION_EASE } from '@/design/motion';
 import { FEATURE_REGISTRY } from '@/features/registry';
 import { useTransitionRouter } from '@/features/transitions/TransitionProvider';
 import { cn } from './cn';
+import { useFeatureTheme, type FeatureThemeName } from './FeatureTheme';
 import { useFocusTrap } from './use-focus-trap';
 
 export interface UniverseMenuProps {
   open: boolean;
   onClose: () => void;
+  featureTheme?: FeatureThemeName;
 }
 
-export function UniverseMenu({ open, onClose }: UniverseMenuProps) {
+interface UniverseDestination {
+  id: string;
+  title: string;
+  label: string;
+  href: string;
+}
+
+const UNIVERSE_DESTINATIONS: readonly UniverseDestination[] = [
+  ...FEATURE_REGISTRY,
+  {
+    id: 'notifications',
+    title: 'Notifications',
+    label: 'Inbox',
+    href: '/notifications',
+  },
+];
+
+export function UniverseMenu({ open, onClose, featureTheme }: UniverseMenuProps) {
+  const inheritedTheme = useFeatureTheme();
+  const resolvedTheme = featureTheme ?? inheritedTheme;
   const titleId = useId();
   const listboxId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -42,9 +63,9 @@ export function UniverseMenu({ open, onClose }: UniverseMenuProps) {
   const filteredFeatures = useMemo(() => {
     const trimmed = query.trim().toLocaleLowerCase();
     if (!trimmed) {
-      return FEATURE_REGISTRY;
+      return UNIVERSE_DESTINATIONS;
     }
-    return FEATURE_REGISTRY.filter(
+    return UNIVERSE_DESTINATIONS.filter(
       (item) =>
         item.title.toLocaleLowerCase().includes(trimmed) ||
         item.label.toLocaleLowerCase().includes(trimmed) ||
@@ -85,7 +106,7 @@ export function UniverseMenu({ open, onClose }: UniverseMenuProps) {
     <AnimatePresence>
       {open ? (
         <div
-          style={{ zIndex: 'var(--z-drawer)' }}
+          style={{ zIndex: 'calc(var(--z-drawer) + 1)' }}
           className="fixed inset-0 flex items-start justify-center pt-[calc(var(--topbar-h)+12px)] px-4"
         >
           <motion.div
@@ -113,15 +134,21 @@ export function UniverseMenu({ open, onClose }: UniverseMenuProps) {
               duration: reducedMotion ? 0 : MOTION_DURATION.popoverOpen,
               ease: MOTION_EASE,
             }}
+            data-theme="workspace"
+            data-feature-theme={resolvedTheme}
             className="relative w-full max-w-[480px] rounded-card bg-ws-surface text-ws-text border border-ws-border shadow-popover overflow-hidden"
           >
             <h2 id={titleId} className="sr-only">
               Universe menu
             </h2>
-            <div className="flex items-center gap-2.5 px-4 h-12 border-b border-ws-border">
+            <div
+              data-frameless-search-row="true"
+              className="flex items-center gap-2.5 px-4 h-12 rounded-t-card border-b border-ws-border"
+            >
               <Search size={16} strokeWidth={1.5} className="text-ws-text-muted shrink-0" />
               <input
                 ref={inputRef}
+                data-frameless-search="true"
                 type="text"
                 role="combobox"
                 aria-expanded="true"
@@ -135,7 +162,7 @@ export function UniverseMenu({ open, onClose }: UniverseMenuProps) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleInputKeyDown}
-                className="w-full border-0 border-none bg-transparent text-[length:var(--fs-ui)] text-ws-text placeholder:text-ws-text-muted outline-none focus:outline-none focus:ring-0 shadow-none"
+                className="w-full border-0 bg-transparent text-[length:var(--fs-ui)] text-ws-text placeholder:text-ws-text-muted outline-none focus:outline-none focus:ring-0 shadow-none"
               />
             </div>
 

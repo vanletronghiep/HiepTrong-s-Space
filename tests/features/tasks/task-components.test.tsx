@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TaskDto } from '@/contracts';
+import { LayoutGroup } from 'motion/react';
+import { OverdueList } from '@/features/tasks/OverdueList';
 import { TaskCard } from '@/features/tasks/TaskCard';
 import { TaskForm } from '@/features/tasks/TaskForm';
 
@@ -105,7 +107,7 @@ describe('TaskCard component states', () => {
     expect(screen.getByRole('button', { name: /Transfer/i })).toBeInTheDocument();
   });
 
-  it('supports keyboard disclosure to expand and collapse Hub scheduling actions without triggering checkbox or menu (C11)', () => {
+  it('opens Hub details through the keyboard and restores focus after Escape without completing the task', async () => {
     const onToggle = vi.fn();
     const onScheduleDate = vi.fn();
     const now = new Date('2026-10-30T10:00:00.000Z');
@@ -142,11 +144,17 @@ describe('TaskCard component states', () => {
     expect(screen.getByRole('button', { name: /Add to today/i })).toBeInTheDocument();
     expect(onToggle).not.toHaveBeenCalled();
 
-    // Also support direct Enter/Space on the article element when focused directly
-    const article = disclosureBtn.closest('article')!;
-    fireEvent.keyDown(article, { key: ' ', code: 'Space' });
-    expect(disclosureBtn).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('button', { name: /Add to today/i })).not.toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: task.title });
+    expect(within(dialog).getByText(task.description)).toBeInTheDocument();
+    expect(dialog.closest('article')).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add to today' }));
+    expect(onScheduleDate).toHaveBeenCalledWith(task, '2026-10-30');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: task.title })).not.toBeInTheDocument(),
+    );
+    expect(disclosureBtn).toHaveFocus();
+    expect(onToggle).not.toHaveBeenCalled();
   });
 
   it('generates distinct DOM IDs when the same task is rendered in daily carousel and overdue lane (C12)', () => {
@@ -211,6 +219,14 @@ describe('TaskForm validation', () => {
       />,
     );
 
+    const title = screen.getByRole('textbox', { name: 'Title' });
+    const feedback = document.getElementById('task-title-feedback');
+    expect(feedback).toBeInTheDocument();
+    const reserve = feedback?.querySelector('[aria-hidden="true"]');
+    expect(reserve).toBeInTheDocument();
+    expect(reserve?.getAttribute('role')).toBeNull();
+    expect(screen.queryAllByRole('alert')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /^Today$|^Tomorrow$/ })).toBeNull();
     const timeInput = screen.getByLabelText(/Deadline time/i);
     fireEvent.change(timeInput, { target: { value: '99:99' } });
 
@@ -220,5 +236,69 @@ describe('TaskForm validation', () => {
     expect(await screen.findByText('Enter a task title.')).toBeInTheDocument();
     expect(await screen.findByText(/Enter a valid 24-hour time/i)).toBeInTheDocument();
     expect(onCreate).not.toHaveBeenCalled();
+    expect(title).toHaveFocus();
+    fireEvent.change(title, { target: { value: '  ' } });
+    expect(screen.getByText('Enter a task title.')).toBeInTheDocument();
+    fireEvent.change(title, { target: { value: 'Valid title' } });
+    await waitFor(() => expect(screen.queryByText('Enter a task title.')).toBeNull());
+    expect(document.getElementById('task-title-feedback')).toBe(feedback);
+  });
+});
+
+describe('OverdueList layout hygiene', () => {
+  it('renders TaskCard articles directly inside the overdue stack without duplicate layout wrappers', () => {
+    const noop = () => {};
+    const now = new Date('2026-10-30T18:00:00.000Z');
+    const overdueA = makeTaskDto({
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      title: 'Overdue A',
+      deadlineAt: '2026-10-30T15:00:00.000Z',
+      isOverdue: true,
+    });
+    const overdueB = makeTaskDto({
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      title: 'Overdue B',
+      deadlineAt: '2026-10-30T16:00:00.000Z',
+      isOverdue: true,
+    });
+
+    const { container, rerender } = render(
+      <LayoutGroup>
+        <OverdueList
+          tasks={[overdueA, overdueB]}
+          now={now}
+          recentlyCreatedId={null}
+          onToggleComplete={noop}
+          onEdit={noop}
+          onScheduleDate={noop}
+          onOpenPickDate={noop}
+          onOpenTransfer={noop}
+          onRequestDelete={noop}
+        />
+      </LayoutGroup>,
+    );
+
+    const articles = Array.from(container.querySelectorAll('article'));
+    expect(articles).toHaveLength(2);
+    expect(articles[0]?.parentElement).toBe(articles[1]?.parentElement);
+    expect(articles[0]?.parentElement?.children).toHaveLength(2);
+
+    rerender(
+      <LayoutGroup>
+        <OverdueList
+          tasks={[overdueB]}
+          now={now}
+          recentlyCreatedId={null}
+          onToggleComplete={noop}
+          onEdit={noop}
+          onScheduleDate={noop}
+          onOpenPickDate={noop}
+          onOpenTransfer={noop}
+          onRequestDelete={noop}
+        />
+      </LayoutGroup>,
+    );
+
+    expect(screen.getByText('Overdue B')).toBeInTheDocument();
   });
 });

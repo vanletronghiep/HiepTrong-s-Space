@@ -1,39 +1,112 @@
 'use client';
 
-import { Dialog } from '@/ui/Dialog';
-
-import React, { useRef, useState, useEffect, useCallback, useId } from 'react';
-import type { FlashcardDeck, FlashcardItem } from '@/contracts/flashcard';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, ArrowLeft, BookOpen, Plus, RotateCcw } from 'lucide-react';
+import Image from 'next/image';
+import {
+  clearEditorDraft,
+  loadEditorDraft,
+  saveEditorDraft,
+  type EditorDraftPayload,
+} from '@/client/editor-drafts';
 import {
   useCreateCard,
   useCreateDeck,
   useFlashcardsData,
   useReviewCard,
 } from '@/client/queries/flashcards';
+import type { FlashcardDeck, FlashcardItem } from '@/contracts/flashcard';
+import { DEFAULT_APP_TIMEZONE } from '@/domain/time';
+import { Button } from '@/ui/Button';
+import { Dialog } from '@/ui/Dialog';
+import {
+  LargeEditorDialog,
+  LargeEditorTwoColumn,
+  type DraftSaveOutcome,
+} from '@/ui/LargeEditorDialog';
+import { Skeleton } from '@/ui/Skeleton';
 import styles from './flashcards.module.css';
+
+interface FlashcardEditorValues {
+  deckId: string;
+  prompt: string;
+  answer: string;
+  notes: string;
+}
+
+const EMPTY_CARD_VALUES: FlashcardEditorValues = {
+  deckId: '',
+  prompt: '',
+  answer: '',
+  notes: '',
+};
+
+function isFlashcardDraftValues(raw: unknown): raw is FlashcardEditorValues {
+  if (typeof raw !== 'object' || raw === null) {
+    return false;
+  }
+  const value = raw as Record<string, unknown>;
+  return (
+    typeof value.deckId === 'string' &&
+    typeof value.prompt === 'string' &&
+    typeof value.answer === 'string' &&
+    typeof value.notes === 'string'
+  );
+}
+
+function sameCardValues(a: FlashcardEditorValues, b: FlashcardEditorValues): boolean {
+  return (
+    a.deckId === b.deckId && a.prompt === b.prompt && a.answer === b.answer && a.notes === b.notes
+  );
+}
+
+function formatDraftTimestamp(iso: string): string {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) {
+    return 'recently';
+  }
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: DEFAULT_APP_TIMEZONE,
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(ms));
+}
 
 export function FlashcardsView() {
   const writeLocks = useRef(new Set<string>());
+  const promptInputRef = useRef<HTMLInputElement>(null);
+  const answerInputRef = useRef<HTMLTextAreaElement>(null);
+  const deckNameInputRef = useRef<HTMLInputElement>(null);
+
   const [reviewComplete, setReviewComplete] = useState(false);
   const [activeDeck, setActiveDeck] = useState<FlashcardDeck | null>(null);
   const [studyCardIndex, setStudyCardIndex] = useState<number>(0);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState<boolean>(false);
+  const [reviewError, setReviewError] = useState<string>('');
 
-  // Modals state
+  // Add Card LargeEditorDialog state
   const [showAddCard, setShowAddCard] = useState<boolean>(false);
+  const [initialCardValues, setInitialCardValues] =
+    useState<FlashcardEditorValues>(EMPTY_CARD_VALUES);
+  const [cardFormValues, setCardFormValues] = useState<FlashcardEditorValues>(EMPTY_CARD_VALUES);
+  const [loadedCardDraft, setLoadedCardDraft] =
+    useState<EditorDraftPayload<FlashcardEditorValues> | null>(null);
+  const [cardEditorError, setCardEditorError] = useState<string>('');
+  const [isSubmittingCard, setIsSubmittingCard] = useState<boolean>(false);
+
+  // Compact New Deck Dialog state
   const [showAddDeck, setShowAddDeck] = useState<boolean>(false);
-
-  // Add Card inputs
-  const [newPrompt, setNewPrompt] = useState<string>('');
-  const [newAnswer, setNewAnswer] = useState<string>('');
-  const [newNotes, setNewNotes] = useState<string>('');
-  const [selectedDeckId, setSelectedDeckId] = useState<string>('');
-
-  // Add Deck inputs
   const [newDeckName, setNewDeckName] = useState<string>('');
   const [newDeckTopic, setNewDeckTopic] = useState<string>('English lexicon');
   const [newDeckDesc, setNewDeckDesc] = useState<string>('');
+  const [deckEditorError, setDeckEditorError] = useState<string>('');
+  const [isSubmittingDeck, setIsSubmittingDeck] = useState<boolean>(false);
 
+  const cardFormId = useId();
+  const deckFormId = useId();
   const deckSelectId = useId();
   const promptInputId = useId();
   const answerInputId = useId();
@@ -48,19 +121,64 @@ export function FlashcardsView() {
   const createDeck = useCreateDeck();
   const reviewCard = useReviewCard();
 
-  const decks = data?.decks ?? [];
-  const cards = data?.cards ?? [];
+  const decks = useMemo(() => data?.decks ?? [], [data?.decks]);
+  const cards = useMemo(() => data?.cards ?? [], [data?.cards]);
   const stats = data?.stats;
 
-  const activeDeckCards = activeDeck
-    ? cards.filter((c) => c.deckId === activeDeck.id)
-    : [];
+  const activeDeckCards = activeDeck ? cards.filter((c) => c.deckId === activeDeck.id) : [];
 
   const currentStudyCard: FlashcardItem | undefined = activeDeckCards[studyCardIndex];
+  const isCardDirty = showAddCard && !sameCardValues(cardFormValues, initialCardValues);
+
+  const resolveDefaultDeckId = useCallback(() => {
+    if (activeDeck && decks.some((d) => d.id === activeDeck.id)) {
+      return activeDeck.id;
+    }
+    return decks[0]?.id ?? '';
+  }, [activeDeck, decks]);
+
+  const handleOpenAddCard = () => {
+    const defaultDeckId = resolveDefaultDeckId();
+    const base: FlashcardEditorValues = {
+      deckId: defaultDeckId,
+      prompt: '',
+      answer: '',
+      notes: '',
+    };
+    const existing = loadEditorDraft<FlashcardEditorValues>(
+      'flashcard',
+      null,
+      isFlashcardDraftValues,
+    );
+    setInitialCardValues(base);
+    setCardFormValues(base);
+    setCardEditorError('');
+    setLoadedCardDraft(existing.ok ? existing.draft : null);
+    setShowAddCard(true);
+  };
+
+  const handleSaveCardDraft = useCallback((): DraftSaveOutcome => {
+    const result = saveEditorDraft({
+      formId: 'flashcard',
+      recordId: null,
+      recordUpdatedAt: null,
+      values: cardFormValues,
+    });
+    if (!result.ok) {
+      return { ok: false, error: result.error };
+    }
+    setLoadedCardDraft(null);
+    setInitialCardValues(cardFormValues);
+    return {
+      ok: true,
+      message: `Draft saved locally (${formatDraftTimestamp(result.draft.savedAt)}).`,
+    };
+  }, [cardFormValues]);
 
   const handleStartStudy = (deck: FlashcardDeck) => {
-    if (!cards.some(card => card.deckId === deck.id)) return;
+    if (!cards.some((card) => card.deckId === deck.id)) return;
     setReviewComplete(false);
+    setReviewError('');
     setActiveDeck(deck);
     setStudyCardIndex(0);
     setIsAnswerRevealed(false);
@@ -70,9 +188,13 @@ export function FlashcardsView() {
     if (!currentStudyCard) return;
     if (writeLocks.current.has('reviewCard')) return;
     writeLocks.current.add('reviewCard');
+    setReviewError('');
     try {
       await reviewCard.mutateAsync({ cardId: currentStudyCard.id, confidence });
-    } catch {
+    } catch (error) {
+      setReviewError(
+        error instanceof Error ? error.message : 'Could not save your rating. Please try again.',
+      );
       return;
     } finally {
       writeLocks.current.delete('reviewCard');
@@ -86,92 +208,182 @@ export function FlashcardsView() {
     }
   };
 
-  const handleSaveCard = useCallback(async () => {
-    if (!newPrompt.trim() || !newAnswer.trim()) return;
-    const targetDeckId = selectedDeckId || activeDeck?.id || (data?.decks[0]?.id ?? '');
-    if (!targetDeckId) return;
-
+  const submitCard = useCallback(async () => {
     if (writeLocks.current.has('createCard')) return;
+    const targetDeckId =
+      (cardFormValues.deckId && decks.some((d) => d.id === cardFormValues.deckId)
+        ? cardFormValues.deckId
+        : '') ||
+      decks[0]?.id ||
+      '';
+
+    if (!targetDeckId) {
+      setCardEditorError('Select a target deck before saving.');
+      return;
+    }
+    if (!cardFormValues.prompt.trim()) {
+      setCardEditorError('Enter a prompt or word before saving.');
+      promptInputRef.current?.focus();
+      return;
+    }
+    if (!cardFormValues.answer.trim()) {
+      setCardEditorError('Enter a definition or answer before saving.');
+      answerInputRef.current?.focus();
+      return;
+    }
+
     writeLocks.current.add('createCard');
+    setIsSubmittingCard(true);
+    setCardEditorError('');
     try {
       await createCard.mutateAsync({
         deckId: targetDeckId,
-        prompt: newPrompt.trim(),
-        answer: newAnswer.trim(),
-        notes: newNotes.trim(),
+        prompt: cardFormValues.prompt.trim(),
+        answer: cardFormValues.answer.trim(),
+        notes: cardFormValues.notes.trim(),
       });
-    } catch {
-      return;
+      clearEditorDraft('flashcard', null);
+      setLoadedCardDraft(null);
+      setInitialCardValues(EMPTY_CARD_VALUES);
+      setCardFormValues(EMPTY_CARD_VALUES);
+      setShowAddCard(false);
+    } catch (error) {
+      setCardEditorError(
+        error instanceof Error
+          ? error.message
+          : 'Could not save this flashcard. Your input is retained.',
+      );
     } finally {
       writeLocks.current.delete('createCard');
+      setIsSubmittingCard(false);
     }
+  }, [cardFormValues, createCard, decks]);
 
-    setNewPrompt('');
-    setNewAnswer('');
-    setNewNotes('');
-    setShowAddCard(false);
-  }, [newPrompt, newAnswer, newNotes, selectedDeckId, activeDeck, data?.decks, createCard]);
+  const handleCardFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitCard();
+  };
 
-  // Ctrl+S / Cmd+S shortcut inside Card Creation Modal
+  // Ctrl+S / Cmd+S shortcut scoped strictly to the open Add Card editor.
+  // Escape is delegated to LargeEditorDialog / Dialog focus traps for dirty-close handling.
   useEffect(() => {
+    if (!showAddCard) return undefined;
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-        if (showAddCard) {
-          e.preventDefault();
-          handleSaveCard();
-        }
-      } else if (e.key === 'Escape') {
-        setShowAddCard(false);
-        setShowAddDeck(false);
+        e.preventDefault();
+        void submitCard();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAddCard, handleSaveCard]);
+  }, [showAddCard, submitCard]);
+
+  const handleOpenAddDeck = () => {
+    setDeckEditorError('');
+    setShowAddDeck(true);
+  };
 
   const handleSaveDeck = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDeckName.trim()) return;
-
     if (writeLocks.current.has('createDeck')) return;
+    if (!newDeckName.trim()) {
+      setDeckEditorError('Enter a deck name before creating.');
+      deckNameInputRef.current?.focus();
+      return;
+    }
+
     writeLocks.current.add('createDeck');
+    setIsSubmittingDeck(true);
+    setDeckEditorError('');
     try {
       await createDeck.mutateAsync({
         name: newDeckName.trim(),
-        topic: newDeckTopic.trim(),
+        topic: newDeckTopic.trim() || 'English lexicon',
         description: newDeckDesc.trim(),
       });
-    } catch {
-      return;
+      setNewDeckName('');
+      setNewDeckDesc('');
+      setShowAddDeck(false);
+    } catch (error) {
+      setDeckEditorError(
+        error instanceof Error
+          ? error.message
+          : 'Could not create this deck. Your input is retained.',
+      );
     } finally {
       writeLocks.current.delete('createDeck');
+      setIsSubmittingDeck(false);
     }
-
-    setNewDeckName('');
-    setNewDeckDesc('');
-    setShowAddDeck(false);
   };
 
-
-
-  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+  if (loadFailed) {
+    return (
+      <div className={styles.pageStack}>
+        <div role="alert" className={styles.errorCard}>
+          <p className={styles.errorMessage}>
+            <AlertTriangle size={18} strokeWidth={1.7} aria-hidden="true" />
+            <span>Could not load your flashcards reading room right now.</span>
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<RotateCcw size={14} aria-hidden="true" />}
+            onClick={() => void refetch()}
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={styles.container}>
-      {reviewComplete && <p role="status">Review complete.</p>}
-      {[createCard, createDeck, reviewCard].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Retry the action.</p>}
-      {/* Ancient History / Norse Atmosphere Header */}
+    <div className={styles.pageStack}>
       {!activeDeck && (
-        <header className={styles.header}>
-          <div className={styles.eyebrow}>
-            <span>Runic memory & historical rhetoric</span>
-          </div>
+        <Image
+          src="/visuals/flashcards/bookmark-ribbon-edge.svg"
+          alt=""
+          aria-hidden="true"
+          width={200}
+          height={480}
+          unoptimized
+          className={styles.bookmarkEdgeDecor}
+        />
+      )}
 
-          <h1 className={styles.title}>Flashcards</h1>
-          <p className={styles.description}>
-            Review English vocabulary and classical discourse at your own pace.
-            Refine mastery with prompt-and-answer recall and active confidence rating.
-          </p>
+      {reviewComplete && (
+        <p role="status" className={styles.statusBanner}>
+          Review complete.
+        </p>
+      )}
+
+      {/* Vintage Reading Room Open Masthead (hidden during active study for focus) */}
+      {!activeDeck && (
+        <>
+          <header data-feature-heading className={styles.masthead}>
+            <div className={styles.mastheadCopy}>
+              <div className={styles.eyebrow}>
+                <BookOpen size={14} strokeWidth={1.7} aria-hidden="true" />
+                <span>Your personal study library</span>
+              </div>
+
+              <h1 className={styles.title}>Flashcards</h1>
+              <p className={styles.description}>
+                Review English vocabulary and classical discourse at your own pace. Refine mastery
+                with prompt-and-answer recall and active confidence rating.
+              </p>
+            </div>
+
+            <Image
+              src="/visuals/flashcards/library-arched-window.svg"
+              alt=""
+              aria-hidden="true"
+              width={480}
+              height={300}
+              unoptimized
+              className={styles.archedWindowArt}
+            />
+          </header>
 
           <div className={styles.statsRow}>
             <div className={styles.statCard}>
@@ -191,48 +403,91 @@ export function FlashcardsView() {
               <div className={styles.statLabel}>Needs practice</div>
             </div>
           </div>
-        </header>
+
+          <div className={styles.shelfDivider} aria-hidden="true">
+            <Image
+              src="/visuals/flashcards/shelf-of-stories.svg"
+              alt=""
+              aria-hidden="true"
+              width={720}
+              height={100}
+              unoptimized
+              className={styles.shelfDividerArt}
+            />
+          </div>
+        </>
       )}
 
       {/* Active Study Session Mode */}
       {activeDeck ? (
         <section aria-labelledby="study-heading" className={styles.studyContainer}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-            <button
-              type="button"
-              className={styles.actionBtn}
-              onClick={() => setActiveDeck(null)}
+          <div className={styles.studyTopBar}>
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<ArrowLeft size={14} aria-hidden="true" />}
+              className={styles.mobileTouchBtn}
+              onClick={() => {
+                setActiveDeck(null);
+                setReviewError('');
+              }}
             >
-              <span>← Back to decks</span>
-            </button>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--ws-text-muted)' }}>
+              Back to decks
+            </Button>
+            <span className={styles.studyProgress}>
               Card {studyCardIndex + 1} of {activeDeckCards.length}
             </span>
           </div>
 
-          <h2 id="study-heading" style={{ fontSize: 'var(--text-lg)', margin: 0, color: 'var(--ws-text)' }}>
+          <h2 id="study-heading" className={styles.studyHeading}>
             {activeDeck.name}
           </h2>
 
+          {reviewError ? (
+            <p role="alert" className={styles.inlineAlert}>
+              {reviewError}
+            </p>
+          ) : null}
+
           {activeDeckCards.length === 0 ? (
-            <div style={{ padding: '32px', color: 'var(--ws-text-muted)', fontSize: 'var(--text-sm)' }}>
-              This deck has no cards yet. Add your first card to begin.
+            <div className={styles.emptyLibrary} role="status">
+              <Image
+                src="/visuals/flashcards/reading-corner.svg"
+                alt=""
+                aria-hidden="true"
+                width={320}
+                height={280}
+                unoptimized
+                className={styles.emptyIllustration}
+              />
+              <h3 className={styles.emptyTitle}>This deck has no cards yet.</h3>
             </div>
           ) : currentStudyCard ? (
             <>
               <div className={styles.flashcardFrame}>
+                <Image
+                  src="/visuals/flashcards/quill-and-bookmark.svg"
+                  alt=""
+                  aria-hidden="true"
+                  width={240}
+                  height={240}
+                  unoptimized
+                  className={styles.quillCornerArt}
+                />
                 <h3 className={styles.cardPrompt}>{currentStudyCard.prompt}</h3>
 
                 {!isAnswerRevealed ? (
-                  <button
-                    type="button"
-                    className={styles.revealBtn}
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    pill
+                    className={styles.mobileTouchBtn}
                     onClick={() => setIsAnswerRevealed(true)}
                   >
-                    <span>Reveal definition & answer</span>
-                  </button>
+                    Reveal definition & answer
+                  </Button>
                 ) : (
-                  <div className={styles.cardAnswerBox}>
+                  <div className={styles.cardAnswerBox} role="status">
                     <p className={styles.cardAnswer}>{currentStudyCard.answer}</p>
                     {currentStudyCard.notes && (
                       <p className={styles.cardNotes}>{currentStudyCard.notes}</p>
@@ -253,7 +508,8 @@ export function FlashcardsView() {
                         key={lvl}
                         type="button"
                         className={styles.rateBtn}
-                        onClick={() => handleRateConfidence(lvl)}
+                        disabled={reviewCard.isPending}
+                        onClick={() => void handleRateConfidence(lvl)}
                         aria-label={`Confidence level ${lvl}`}
                       >
                         <span>{lvl}</span>
@@ -267,231 +523,340 @@ export function FlashcardsView() {
         </section>
       ) : (
         /* Decks Overview */
-        <section aria-labelledby="decks-heading">
+        <section aria-labelledby="decks-heading" className={styles.decksSection}>
           <div className={styles.sectionHeader}>
             <h2 id="decks-heading" className={styles.sectionTitle}>
               Vocabulary decks
             </h2>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className={styles.actionBtn}
-                onClick={() => setShowAddCard(true)}
+            <div className={styles.sectionActions}>
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Plus size={14} aria-hidden="true" />}
+                className={styles.mobileTouchBtn}
+                disabled={decks.length === 0}
+                title={decks.length === 0 ? 'Create a deck before adding cards.' : undefined}
+                onClick={handleOpenAddCard}
               >
-                <span>+ Add card</span>
-              </button>
-              <button
-                type="button"
-                className={styles.actionBtn}
-                onClick={() => setShowAddDeck(true)}
+                Add card
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={<Plus size={14} aria-hidden="true" />}
+                className={styles.mobileTouchBtn}
+                onClick={handleOpenAddDeck}
               >
-                <span>+ New deck</span>
-              </button>
+                New deck
+              </Button>
             </div>
           </div>
 
           {isLoading ? (
-            <div style={{ color: 'var(--ws-text-muted)', fontSize: 'var(--text-xs)' }}>
-              Loading flashcard decks...
-            </div>
-          ) : (
-            <div className={styles.decksGrid}>
-              {decks.map((deck) => (
-                <div key={deck.id} className={styles.deckCard}>
-                  <div>
-                    <span className={styles.deckTopic}>{deck.topic}</span>
-                    <h3 className={styles.deckName}>{deck.name}</h3>
-                    <p className={styles.deckDesc}>{deck.description}</p>
-                    <div className={styles.deckProgressTrack}>
-                      <div
-                        className={styles.deckProgressFill}
-                        style={{ width: `${deck.masteryPercentage}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className={styles.deckFooter}>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--ws-text-muted)' }}>
-                      {deck.cardCount} cards · {deck.masteryPercentage}% mastery
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.studyBtn}
-                      onClick={() => handleStartStudy(deck)}
-                    >
-                      Study deck
-                    </button>
+            <div className={styles.decksGrid} aria-busy="true" aria-label="Loading flashcard decks">
+              {[0, 1].map((idx) => (
+                <div key={idx} className={styles.skeletonCard}>
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-6 w-2/3" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-2 w-full rounded-pill" />
+                  <div className="flex items-center justify-between pt-2">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-9 w-24 rounded-pill" />
                   </div>
                 </div>
               ))}
+            </div>
+          ) : (
+            <div className={styles.decksGrid}>
+              {decks.length === 0 && (
+                <div className={styles.emptyLibrary} role="status">
+                  <Image
+                    src="/visuals/flashcards/reading-corner.svg"
+                    alt=""
+                    aria-hidden="true"
+                    width={320}
+                    height={280}
+                    unoptimized
+                    className={styles.emptyIllustration}
+                  />
+                  <h3 className={styles.emptyTitle}>Your study library is ready.</h3>
+                  <p className={styles.emptyDescription}>
+                    Create your first deck, then add cards to study.
+                  </p>
+                </div>
+              )}
+              {decks.map((deck) => {
+                const mastery = Math.max(0, Math.min(100, deck.masteryPercentage ?? 0));
+                const cardCount = deck.cardCount ?? 0;
+                const hasCards = cards.some((card) => card.deckId === deck.id);
+                return (
+                  <article key={deck.id} className={styles.deckCard}>
+                    <div>
+                      <span className={styles.deckTopic}>{deck.topic}</span>
+                      <h3 className={styles.deckName}>{deck.name}</h3>
+                      {deck.description ? (
+                        <p className={styles.deckDesc}>{deck.description}</p>
+                      ) : null}
+                      <div className={styles.deckProgressTrack} aria-hidden="true">
+                        <div className={styles.deckProgressFill} style={{ width: `${mastery}%` }} />
+                      </div>
+                    </div>
+
+                    <div className={styles.deckFooter}>
+                      <span className={styles.deckMeta}>
+                        {cardCount} {cardCount === 1 ? 'card' : 'cards'} · {mastery}% mastery
+                      </span>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        pill
+                        className={styles.mobileTouchBtn}
+                        disabled={!hasCards}
+                        title={!hasCards ? 'Add a card to study this deck.' : undefined}
+                        onClick={() => handleStartStudy(deck)}
+                      >
+                        Study deck
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
       )}
 
-      {/* Add Card Modal with Ctrl+S shortcut */}
-      {showAddCard && (
-        <Dialog open portal title="Add new flashcard" className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setShowAddCard(false)}>
-{[createCard, createDeck, reviewCard].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
-          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Add Card Large Two-Column Editor + Local Drafts */}
+      <LargeEditorDialog
+        open={showAddCard}
+        onClose={() => {
+          setShowAddCard(false);
+          setCardEditorError('');
+          setLoadedCardDraft(null);
+        }}
+        title="Add new flashcard"
+        eyebrow="Vocabulary index"
+        description="Compose a prompt, definition, and context note for active recall. Press Ctrl+S to save."
+        formId={cardFormId}
+        isDirty={isCardDirty}
+        isSubmitting={createCard.isPending || isSubmittingCard}
+        submitLabel="Save card"
+        submittingLabel="Saving…"
+        closeAriaLabel="Close card editor"
+        initialFocusRef={promptInputRef}
+        errorMessage={cardEditorError || null}
+        draftRecovery={
+          loadedCardDraft
+            ? {
+                savedAtLabel: formatDraftTimestamp(loadedCardDraft.savedAt),
+                onResume: () => {
+                  const restoredDeckId = decks.some((d) => d.id === loadedCardDraft.values.deckId)
+                    ? loadedCardDraft.values.deckId
+                    : resolveDefaultDeckId();
+                  setCardFormValues({
+                    ...loadedCardDraft.values,
+                    deckId: restoredDeckId,
+                  });
+                  setLoadedCardDraft(null);
+                  setCardEditorError('');
+                },
+                onDiscard: () => {
+                  clearEditorDraft('flashcard', null);
+                  setLoadedCardDraft(null);
+                },
+              }
+            : null
+        }
+        onSaveDraft={handleSaveCardDraft}
+        onDiscardChanges={() => {
+          setCardFormValues(initialCardValues);
+          setCardEditorError('');
+        }}
+      >
+        <form id={cardFormId} onSubmit={handleCardFormSubmit} noValidate>
+          <LargeEditorTwoColumn
+            primary={
+              <>
+                <div className={styles.fieldGroup}>
+                  <label htmlFor={promptInputId} className={styles.fieldLabel}>
+                    Prompt / Word
+                  </label>
+                  <input
+                    ref={promptInputRef}
+                    id={promptInputId}
+                    type="text"
+                    required
+                    className={styles.inputField}
+                    placeholder="e.g., Epistemic (adjective)"
+                    value={cardFormValues.prompt}
+                    onChange={(e) => {
+                      setCardFormValues((prev) => ({ ...prev, prompt: e.target.value }));
+                      if (cardEditorError) setCardEditorError('');
+                    }}
+                  />
+                </div>
 
-              <span className={styles.shortcutHint}>Press Ctrl+S to save</span>
-            </div>
+                <div className={styles.fieldGroup}>
+                  <label htmlFor={answerInputId} className={styles.fieldLabel}>
+                    Answer / Definition
+                  </label>
+                  <textarea
+                    ref={answerInputRef}
+                    id={answerInputId}
+                    rows={6}
+                    required
+                    className={styles.textareaField}
+                    placeholder="Precise definition, explanation, or translation..."
+                    value={cardFormValues.answer}
+                    onChange={(e) => {
+                      setCardFormValues((prev) => ({ ...prev, answer: e.target.value }));
+                      if (cardEditorError) setCardEditorError('');
+                    }}
+                  />
+                </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label htmlFor={deckSelectId} style={{ display: 'block', fontSize: 'var(--text-xs)', marginBottom: '4px' }}>
-                  Target deck
-                </label>
-                <select
-                  id={deckSelectId}
-                  className={styles.inputField}
-                  value={selectedDeckId || decks[0]?.id || ''}
-                  onChange={(e) => setSelectedDeckId(e.target.value)}
-                >
-                  {decks.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div className={styles.fieldGroup}>
+                  <label htmlFor={notesInputId} className={styles.fieldLabel}>
+                    Context &amp; example sentence
+                  </label>
+                  <textarea
+                    id={notesInputId}
+                    rows={3}
+                    className={styles.textareaField}
+                    placeholder="e.g., Demonstrating epistemic humility in research."
+                    value={cardFormValues.notes}
+                    onChange={(e) =>
+                      setCardFormValues((prev) => ({ ...prev, notes: e.target.value }))
+                    }
+                  />
+                </div>
+              </>
+            }
+            metadata={
+              <>
+                <div className={styles.fieldGroup}>
+                  <label htmlFor={deckSelectId} className={styles.fieldLabel}>
+                    Target deck
+                  </label>
+                  <select
+                    id={deckSelectId}
+                    className={styles.selectField}
+                    value={cardFormValues.deckId}
+                    onChange={(e) =>
+                      setCardFormValues((prev) => ({ ...prev, deckId: e.target.value }))
+                    }
+                  >
+                    {decks.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label htmlFor={promptInputId} style={{ display: 'block', fontSize: 'var(--text-xs)', marginBottom: '4px' }}>
-                  Prompt / Word
-                </label>
-                <input
-                  id={promptInputId}
-                  type="text"
-                  required
-                  className={styles.inputField}
-                  placeholder="e.g., Epistemic (adjective)"
-                  value={newPrompt}
-                  onChange={(e) => setNewPrompt(e.target.value)}
-                />
-              </div>
+                <p className={styles.metaHintCard}>
+                  Cards begin at confidence level 1 and reach mastery at level 4 or 5 during study
+                  sessions.
+                </p>
+              </>
+            }
+          />
+        </form>
+      </LargeEditorDialog>
 
-              <div>
-                <label htmlFor={answerInputId} style={{ display: 'block', fontSize: 'var(--text-xs)', marginBottom: '4px' }}>
-                  Answer / Definition
-                </label>
-                <textarea
-                  id={answerInputId}
-                  required
-                  className={styles.textareaField}
-                  placeholder="Precise definition or translation..."
-                  value={newAnswer}
-                  onChange={(e) => setNewAnswer(e.target.value)}
-                />
-              </div>
+      {/* Compact New Deck Dialog */}
+      <Dialog
+        open={showAddDeck}
+        portal
+        title="Create vocabulary deck"
+        description="Group related terms into a focused reading-room deck."
+        initialFocusRef={deckNameInputRef}
+        className="max-w-[440px] max-h-[90svh] overflow-y-auto"
+        onClose={() => {
+          setShowAddDeck(false);
+          setDeckEditorError('');
+        }}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setShowAddDeck(false);
+                setDeckEditorError('');
+              }}
+              disabled={createDeck.isPending || isSubmittingDeck}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form={deckFormId}
+              variant="primary"
+              size="sm"
+              disabled={createDeck.isPending || isSubmittingDeck}
+            >
+              {createDeck.isPending || isSubmittingDeck ? 'Creating…' : 'Create deck'}
+            </Button>
+          </>
+        }
+      >
+        <form id={deckFormId} onSubmit={handleSaveDeck} className="flex flex-col gap-3" noValidate>
+          {deckEditorError ? (
+            <p role="alert" className={styles.inlineAlert}>
+              {deckEditorError}
+            </p>
+          ) : null}
 
-              <div>
-                <label htmlFor={notesInputId} style={{ display: 'block', fontSize: 'var(--text-xs)', marginBottom: '4px' }}>
-                  Context & example sentence
-                </label>
-                <input
-                  id={notesInputId}
-                  type="text"
-                  className={styles.inputField}
-                  placeholder="e.g., Demonstrating epistemic humility in research."
-                  value={newNotes}
-                  onChange={(e) => setNewNotes(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className={styles.modalFooter}>
-              <button
-                type="button"
-                className={styles.cancelBtn}
-                onClick={() => setShowAddCard(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={styles.submitBtn}
-                onClick={handleSaveCard}
-                disabled={createCard.isPending}
-              >
-                Save card (Ctrl+S)
-              </button>
-            </div>
+          <div className={styles.fieldGroup}>
+            <label htmlFor={deckNameId} className={styles.fieldLabel}>
+              Deck name
+            </label>
+            <input
+              ref={deckNameInputRef}
+              id={deckNameId}
+              type="text"
+              required
+              className={styles.inputField}
+              placeholder="e.g., Literary Rhetoric & Classical Terms"
+              value={newDeckName}
+              onChange={(e) => {
+                setNewDeckName(e.target.value);
+                if (deckEditorError) setDeckEditorError('');
+              }}
+            />
           </div>
-        </Dialog>
-      )}
 
-      {/* Add Deck Modal */}
-      {showAddDeck && (
-        <Dialog open portal title="Create vocabulary deck" className="max-w-2xl max-h-[90svh] overflow-y-auto" onClose={() => setShowAddDeck(false)}>
-{[createCard, createDeck, reviewCard].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
-          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
-
-            <form onSubmit={handleSaveDeck} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label htmlFor={deckNameId} style={{ display: 'block', fontSize: 'var(--text-xs)', marginBottom: '4px' }}>
-                  Deck name
-                </label>
-                <input
-                  id={deckNameId}
-                  type="text"
-                  required
-                  className={styles.inputField}
-                  placeholder="e.g., Old English & Viking Etymology"
-                  value={newDeckName}
-                  onChange={(e) => setNewDeckName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label htmlFor={deckTopicId} style={{ display: 'block', fontSize: 'var(--text-xs)', marginBottom: '4px' }}>
-                  Topic
-                </label>
-                <input
-                  id={deckTopicId}
-                  type="text"
-                  className={styles.inputField}
-                  placeholder="e.g., Etymology & History"
-                  value={newDeckTopic}
-                  onChange={(e) => setNewDeckTopic(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label htmlFor={deckDescId} style={{ display: 'block', fontSize: 'var(--text-xs)', marginBottom: '4px' }}>
-                  Description
-                </label>
-                <textarea
-                  id={deckDescId}
-                  className={styles.textareaField}
-                  placeholder="Purpose of this vocabulary set..."
-                  value={newDeckDesc}
-                  onChange={(e) => setNewDeckDesc(e.target.value)}
-                />
-              </div>
-
-              <div className={styles.modalFooter}>
-                <button
-                  type="button"
-                  className={styles.cancelBtn}
-                  onClick={() => setShowAddDeck(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className={styles.submitBtn}
-                  disabled={createDeck.isPending}
-                >
-                  Create deck
-                </button>
-              </div>
-            </form>
+          <div className={styles.fieldGroup}>
+            <label htmlFor={deckTopicId} className={styles.fieldLabel}>
+              Topic
+            </label>
+            <input
+              id={deckTopicId}
+              type="text"
+              className={styles.inputField}
+              placeholder="e.g., Etymology & Rhetoric"
+              value={newDeckTopic}
+              onChange={(e) => setNewDeckTopic(e.target.value)}
+            />
           </div>
-        </Dialog>
-      )}
+
+          <div className={styles.fieldGroup}>
+            <label htmlFor={deckDescId} className={styles.fieldLabel}>
+              Description
+            </label>
+            <textarea
+              id={deckDescId}
+              rows={3}
+              className={styles.textareaField}
+              placeholder="Purpose of this vocabulary set..."
+              value={newDeckDesc}
+              onChange={(e) => setNewDeckDesc(e.target.value)}
+            />
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 }

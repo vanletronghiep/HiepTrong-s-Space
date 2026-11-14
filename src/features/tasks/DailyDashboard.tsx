@@ -13,6 +13,14 @@ import styles from './daily-foundation.module.css';
 const FORECAST =
   'Focus tends to peak between 8 and 10 PM. One urgent task is still due before midnight.';
 const ARC = 'M0 78 Q500 -18 1000 78';
+const MINUTE_MS = 60_000;
+
+function getMinuteProgress(time: string): number {
+  const [hour = '0', minute = '0'] = time.split(':');
+  const totalMinutes = Number(hour) * 60 + Number(minute);
+  if (!Number.isFinite(totalMinutes)) return 0;
+  return Math.min(1, Math.max(0, totalMinutes / 1440));
+}
 
 export function DailyHeaderDate({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string } = {}) {
   const now = useMinuteTicker();
@@ -58,7 +66,7 @@ function DayArc({ timeZone }: { timeZone: string }) {
       if (document.hidden) return;
       const now = new Date();
       setInstant(now);
-      timer = window.setTimeout(tick, 1000 - (now.getTime() % 1000));
+      timer = window.setTimeout(tick, MINUTE_MS - (now.getTime() % MINUTE_MS) + 50);
     };
     tick();
     document.addEventListener('visibilitychange', tick);
@@ -69,19 +77,14 @@ function DayArc({ timeZone }: { timeZone: string }) {
   }, []);
 
   const clock = instant ? getDailyClock(instant, formatter) : null;
-  const progress = clock?.progress ?? 0;
+  const progress = clock ? getMinuteProgress(clock.time) : 0;
   const positionY = 78 - 192 * progress * (1 - progress);
   return (
     <section className={styles.arc} aria-label="Day arc">
       <div className={styles.arcHeader}>
         <h2 className={styles.eyebrow}>Day arc</h2>
         <div className={styles.clock}>
-          <time>{clock?.timeSeconds ?? '––:––:––'}</time>
-          {clock?.countdown && (
-            <span className={styles.countdown} aria-label={`Remaining today: ${clock.countdown}`}>
-              {clock.countdown}
-            </span>
-          )}
+          <time>{clock?.time ?? '––:––'}</time>
         </div>
       </div>
       <div className={styles.timeline} aria-hidden="true">
@@ -111,18 +114,19 @@ function DayArc({ timeZone }: { timeZone: string }) {
           )}
         </svg>
         {clock && (
-          <span
-            className={styles.moon}
-            style={{ left: `${progress * 100}%`, top: `${positionY}%` }}
-            data-midnight={progress === 0}
+          <div
+            className={styles.arcMarkerTrack}
+            style={{ transform: `translate3d(${progress * 100}%, ${positionY}%, 0)` }}
           >
-            <svg width="16" height="16" viewBox="0 0 20 20">
-              <path
-                d="M15.7 13.7A7.1 7.1 0 0 1 6.3 4.3a7.15 7.15 0 1 0 9.4 9.4Z"
-                fill="currentColor"
-              />
-            </svg>
-          </span>
+            <span className={styles.moon} data-midnight={progress === 0}>
+              <svg width="16" height="16" viewBox="0 0 20 20">
+                <path
+                  d="M15.7 13.7A7.1 7.1 0 0 1 6.3 4.3a7.15 7.15 0 1 0 9.4 9.4Z"
+                  fill="currentColor"
+                />
+              </svg>
+            </span>
+          </div>
         )}
         <StarIcon size={19} className={styles.deadlineStar} />
         <div className={styles.times}>

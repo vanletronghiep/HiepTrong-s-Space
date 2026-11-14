@@ -163,14 +163,14 @@ export function WeekView({
 
           return (
             <motion.article
-              key={date}
+              key={index}
               className={styles.card}
               data-today={isToday}
               initial={reduced ? false : { opacity: 0, y: 7 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{
-                duration: reduced ? 0 : MOTION_DURATION.base,
-                delay: reduced ? 0 : index * 0.035,
+                duration: reduced ? 0 : MOTION_DURATION.fast,
+                delay: reduced ? 0 : index * 0.018,
                 ease: MOTION_EASE,
               }}
             >

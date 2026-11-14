@@ -1,29 +1,49 @@
 import * as THREE from 'three';
 import { INITIAL_EARTH_YAW } from './home-journey';
 
+export interface EarthScene {
+  render: (
+    width: number,
+    height: number,
+    diameter: number,
+    centerY: number,
+    yaw: number,
+    centerX?: number,
+  ) => void;
+  dispose: () => void;
+}
+
+/**
+ * WebGL Earth renderer using 2K WebP textures, tuned sphere tessellation,
+ * and anisotropy=1 to keep GPU/software rasterization smooth while preserving
+ * day/night shading, city lights, clouds, and atmospheric rim glow.
+ */
 export async function createEarthScene(
   canvas: HTMLCanvasElement,
   phone: boolean,
   signal: AbortSignal,
-) {
+): Promise<EarthScene> {
   const renderer = new THREE.WebGLRenderer({
     canvas,
     alpha: true,
     antialias: true,
+    powerPreference: 'high-performance',
   });
   renderer.setPixelRatio(1);
   renderer.setClearColor(0, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100_000);
   camera.position.z = 20_000;
+
   const loader = new THREE.TextureLoader();
-  const profile = phone || renderer.capabilities.maxTextureSize < 4096 ? '2k' : '4k';
   const results = await Promise.allSettled([
-    loader.loadAsync(`/earth/earth-day-${profile}.webp`),
-    loader.loadAsync(`/earth/earth-night-${profile}.webp`),
-    loader.loadAsync(`/earth/earth-clouds-${profile}.webp`),
+    loader.loadAsync('/earth/earth-day-2k.webp'),
+    loader.loadAsync('/earth/earth-night-2k.webp'),
+    loader.loadAsync('/earth/earth-clouds-2k.webp'),
   ] as const);
+
   const [surfaceMap, lightMap, cloudMap] = results;
   if (
     signal.aborted ||
@@ -31,20 +51,27 @@ export async function createEarthScene(
     lightMap.status !== 'fulfilled' ||
     cloudMap.status !== 'fulfilled'
   ) {
-    for (const result of results) if (result.status === 'fulfilled') result.value.dispose();
+    for (const result of results) {
+      if (result.status === 'fulfilled') result.value.dispose();
+    }
     renderer.dispose();
     throw new Error('Earth textures unavailable');
   }
+
   const { value: day } = surfaceMap;
   const { value: night } = lightMap;
   const { value: clouds } = cloudMap;
+
   day.colorSpace = night.colorSpace = THREE.SRGBColorSpace;
   clouds.colorSpace = THREE.NoColorSpace;
   for (const map of [day, night, clouds]) {
-    map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    map.anisotropy = 1;
     map.wrapS = THREE.RepeatWrapping;
   }
-  const geometry = new THREE.SphereGeometry(1, phone ? 96 : 192, phone ? 64 : 128);
+
+  const surfaceGeometry = new THREE.SphereGeometry(1, phone ? 64 : 96, phone ? 44 : 64);
+  const auraGeometry = new THREE.SphereGeometry(1, phone ? 48 : 72, phone ? 32 : 48);
+
   const vertexShader = `
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -54,6 +81,7 @@ export async function createEarthScene(
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }
   `;
+
   const surfaceMaterial = new THREE.ShaderMaterial({
     uniforms: { uDay: { value: day }, uNight: { value: night } },
     vertexShader,
@@ -73,12 +101,13 @@ export async function createEarthScene(
         float lights = max(dot(night, vec3(0.2126, 0.7152, 0.0722)) - 0.004, 0.0);
         vec3 cities = vec3(1.0, 0.59, 0.19) * pow(lights, 0.86) * 2.7;
         float rim = pow(1.0 - facing, 5.2);
-        vec3 color = base + cities + rim * vec3(0.016, 0.07, 0.14) * 0.65;
+        vec3 color = base + cities + rim * vec3(0.024, 0.075, 0.165) * 0.72;
         gl_FragColor = vec4(color, 1.0);
         #include <colorspace_fragment>
       }
     `,
   });
+
   const cloudMaterial = new THREE.ShaderMaterial({
     uniforms: { uClouds: { value: clouds } },
     transparent: true,
@@ -98,6 +127,7 @@ export async function createEarthScene(
       }
     `,
   });
+
   const atmosphereMaterial = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -108,18 +138,22 @@ export async function createEarthScene(
       varying vec3 vNormal;
       void main() {
         float facing = abs(normalize(vNormal).z);
-        float edge = pow(1.0 - facing, 3.0) * smoothstep(0.0, 0.2, facing);
-        gl_FragColor = vec4(vec3(0.12, 0.43, 0.8), edge * 0.45);
+        float edge = pow(1.0 - facing, 2.8) * smoothstep(0.0, 0.22, facing);
+        vec3 blueRim = vec3(0.14, 0.44, 0.85);
+        vec3 lavenderRim = vec3(0.45, 0.40, 0.92);
+        vec3 glowColor = mix(blueRim, lavenderRim, pow(1.0 - facing, 1.8) * 0.48);
+        gl_FragColor = vec4(glowColor, edge * 0.52);
         #include <colorspace_fragment>
       }
     `,
   });
+
   const globe = new THREE.Group();
-  const surface = new THREE.Mesh(geometry, surfaceMaterial);
-  const cloudLayer = new THREE.Mesh(geometry, cloudMaterial);
+  const surface = new THREE.Mesh(surfaceGeometry, surfaceMaterial);
+  const cloudLayer = new THREE.Mesh(auraGeometry, cloudMaterial);
   cloudLayer.scale.setScalar(1.003);
-  const atmosphere = new THREE.Mesh(geometry, atmosphereMaterial);
-  atmosphere.scale.setScalar(1.006);
+  const atmosphere = new THREE.Mesh(auraGeometry, atmosphereMaterial);
+  atmosphere.scale.setScalar(1.012);
   globe.add(surface, cloudLayer, atmosphere);
   globe.rotation.y = INITIAL_EARTH_YAW;
   scene.add(globe);
@@ -132,28 +166,33 @@ export async function createEarthScene(
     yaw: number,
     centerX?: number,
   ) {
-    if (canvas.width !== width || canvas.height !== height || camera.right !== width / 2) {
-      renderer.setSize(width, height, false);
-      camera.left = -width / 2;
-      camera.right = width / 2;
-      camera.top = height / 2;
-      camera.bottom = -height / 2;
+    const safeW = Math.max(1, Math.round(width));
+    const safeH = Math.max(1, Math.round(height));
+    if (canvas.width !== safeW || canvas.height !== safeH || camera.right !== safeW / 2) {
+      renderer.setSize(safeW, safeH, false);
+      camera.left = -safeW / 2;
+      camera.right = safeW / 2;
+      camera.top = safeH / 2;
+      camera.bottom = -safeH / 2;
       camera.updateProjectionMatrix();
     }
     globe.rotation.y = yaw;
-    globe.position.set(centerX !== undefined ? centerX - width / 2 : 0, height / 2 - centerY, 0);
-    globe.scale.setScalar(diameter / 2);
+    globe.position.set(centerX !== undefined ? centerX - safeW / 2 : 0, safeH / 2 - centerY, 0);
+    globe.scale.setScalar(Math.max(0.5, diameter / 2));
     renderer.render(scene, camera);
   }
+
   function dispose() {
     for (const texture of [day, night, clouds]) texture.dispose();
     for (const material of [surfaceMaterial, cloudMaterial, atmosphereMaterial]) material.dispose();
-    geometry.dispose();
+    surfaceGeometry.dispose();
+    auraGeometry.dispose();
     renderer.dispose();
     // During Strict Mode's effect replay the same canvas remains attached.
     queueMicrotask(() => {
       if (!canvas.isConnected) renderer.forceContextLoss();
     });
   }
+
   return { render, dispose };
 }

@@ -52,27 +52,39 @@ export function DayTaskList({
     const pane = viewport.current;
     if (!pane || !list.current || !scrollable) return;
     const container = list.current;
-    const cards = Array.from(pane.querySelectorAll('article'));
-    const fourth = cards[3];
-    if (!fourth) return;
     const measure = () => {
+      const fourth = pane.querySelectorAll('article')[3];
+      if (!fourth) return;
       const visibleHeight = fourth.offsetTop + fourth.offsetHeight / 2;
-      const last = pane.querySelector<HTMLElement>('article:last-of-type');
-      const gap = parseFloat(getComputedStyle(pane).rowGap) || 0;
       container.style.setProperty('--day-list-height', `${visibleHeight}px`);
-      container.style.setProperty(
-        '--day-list-tail',
-        `${Math.max(0, visibleHeight - (last?.offsetHeight ?? 0) - gap)}px`,
-      );
       container.style.setProperty('--day-list-fade', `${fourth.offsetHeight / 2}px`);
       syncThumb();
     };
+    let resizeObserver: ResizeObserver | null = null;
+    const observeCards = () => {
+      if (!resizeObserver) return;
+      resizeObserver.disconnect();
+      resizeObserver.observe(pane);
+      pane.querySelectorAll('article').forEach((card) => resizeObserver?.observe(card));
+    };
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(measure);
+      observeCards();
+    }
     measure();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    observer?.observe(pane);
-    cards.forEach((card) => observer?.observe(card));
-    return () => observer?.disconnect();
-  }, [children, scrollable, syncThumb]);
+    const mutationObserver =
+      typeof MutationObserver === 'undefined'
+        ? null
+        : new MutationObserver(() => {
+            observeCards();
+            measure();
+          });
+    mutationObserver?.observe(pane, { childList: true });
+    return () => {
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+    };
+  }, [count, scrollable, syncThumb]);
 
   const scrollByItems = (event: KeyboardEvent<HTMLDivElement>) => {
     const pane = viewport.current;
@@ -132,8 +144,12 @@ export function DayTaskList({
     const pane = viewport.current;
     if (!pane) return;
     const cards = Array.from(pane.querySelectorAll('article'));
+    const max = Math.max(0, pane.scrollHeight - pane.clientHeight);
     pane.scrollTo({
-      top: cards[nearestCardIndex(cards, pane.scrollTop)]?.offsetTop ?? 0,
+      top:
+        max - pane.scrollTop <= 1
+          ? max
+          : limit(cards[nearestCardIndex(cards, pane.scrollTop)]?.offsetTop ?? 0, max),
       behavior: reducedMotion ? 'auto' : 'smooth',
     });
     syncThumb();
@@ -155,7 +171,6 @@ export function DayTaskList({
         onScroll={scrollable ? syncThumb : undefined}
       >
         {children}
-        {scrollable && <div className={styles.endSpacer} aria-hidden="true" />}
       </motion.div>
       {scrollable && (
         <>

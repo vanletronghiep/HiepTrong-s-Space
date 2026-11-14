@@ -1,6 +1,7 @@
 'use client';
 
 import type { MouseEvent } from 'react';
+import { useReducedMotion } from 'motion/react';
 import { cn } from './cn';
 
 export interface CheckboxProps {
@@ -22,6 +23,8 @@ export function Checkbox({
   stopPropagation = true,
   className,
 }: CheckboxProps) {
+  const reducedMotion = useReducedMotion();
+
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (stopPropagation) {
       event.stopPropagation();
@@ -48,7 +51,8 @@ export function Checkbox({
     >
       <span
         className={cn(
-          'inline-flex items-center justify-center rounded-[6px] border-[1.5px] transition-[background-color,border-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease)]',
+          'inline-flex items-center justify-center rounded-[6px] border-[1.5px] transition-[background-color,border-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease)] motion-reduce:transition-none motion-reduce:duration-0',
+          reducedMotion && 'transition-none duration-0',
           size === 'md' ? 'h-5 w-5' : 'h-4 w-4',
           checked
             ? 'bg-fill-checkbox-checked border-fill-checkbox-checked text-ws-surface'
@@ -69,10 +73,11 @@ export function Checkbox({
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="motion-reduce:transition-none"
             style={{
               strokeDasharray: 16,
               strokeDashoffset: checked ? 0 : 16,
-              transition: 'stroke-dashoffset 200ms var(--ease)',
+              transition: reducedMotion ? 'none' : 'stroke-dashoffset 200ms var(--ease)',
             }}
           />
         </svg>

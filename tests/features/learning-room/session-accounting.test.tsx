@@ -47,7 +47,7 @@ describe('focus session accounting', () => {
     render(<LearningRoomView />);
     fireEvent.click(screen.getByRole('button', { name: 'Begin focus' }));
     act(() => vi.advanceTimersByTime(25 * 60000));
-    expect(screen.getByText('Rest & Recharge')).toBeTruthy();
+    expect(screen.getByText('Rest & recharge')).toBeTruthy();
     act(() => vi.advanceTimersByTime(5 * 60000));
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Skip notes' })); });
     expect(mocks.save.mock.calls[0]?.[0]).toMatchObject({ focusMinutes: 25, breakMinutes: 5, pausedMinutes: 0, durationMinutes: 30 });

@@ -86,4 +86,48 @@ describe('Daily Month view', () => {
     fireEvent.click(within(drawer).getByRole('checkbox', { name: 'Complete Scheduled task' }));
     expect(onToggleComplete).toHaveBeenCalledWith(scheduled);
   });
+
+  it('reuses fixed 42 calendar slot buttons in place across month changes', () => {
+    const noop = () => {};
+    const { rerender } = render(
+      <MonthView
+        anchorDate="2027-02-01"
+        tasks={[task({})]}
+        now={now}
+        recentlyCreatedId={null}
+        onToggleComplete={noop}
+        onEdit={noop}
+        onScheduleDate={noop}
+        onOpenPickDate={noop}
+        onOpenTransfer={noop}
+        onRequestDelete={noop}
+      />,
+    );
+
+    const calendar = screen.getByRole('region', { name: 'February 2027 calendar' });
+    const initialButtons = within(calendar).getAllByRole('button');
+
+    rerender(
+      <MonthView
+        anchorDate="2027-03-01"
+        tasks={[task({ scheduledDate: '2027-03-01' })]}
+        now={now}
+        recentlyCreatedId={null}
+        onToggleComplete={noop}
+        onEdit={noop}
+        onScheduleDate={noop}
+        onOpenPickDate={noop}
+        onOpenTransfer={noop}
+        onRequestDelete={noop}
+      />,
+    );
+
+    const updatedCalendar = screen.getByRole('region', { name: 'March 2027 calendar' });
+    expect(updatedCalendar).toBe(calendar);
+    const updatedButtons = within(updatedCalendar).getAllByRole('button');
+    expect(updatedButtons).toHaveLength(42);
+    updatedButtons.forEach((button, index) => {
+      expect(button).toBe(initialButtons[index]);
+    });
+  });
 });

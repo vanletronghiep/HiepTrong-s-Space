@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { MOTION_DURATION, MOTION_EASE } from '@/design/motion';
 import { Button } from './Button';
 import { cn } from './cn';
+import { useFeatureTheme } from './FeatureTheme';
 import { useFocusTrap } from './use-focus-trap';
 
 export interface DialogProps {
@@ -31,6 +32,7 @@ export function Dialog({
   className,
   portal = false,
 }: DialogProps) {
+  const featureTheme = useFeatureTheme();
   const titleId = useId();
   const descId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -76,8 +78,11 @@ export function Dialog({
               duration: reducedMotion ? 0 : MOTION_DURATION.base,
               ease: MOTION_EASE,
             }}
+            data-theme="workspace"
+            data-feature-theme={featureTheme}
             className={cn(
               'relative w-full max-w-[400px] rounded-card bg-ws-surface border border-ws-border shadow-popover p-6 text-ws-text',
+              featureTheme && '[overflow-wrap:anywhere]',
               className,
             )}
           >

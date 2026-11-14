@@ -21,7 +21,7 @@
   block-size: var(--day-list-height, calc(3.5 * var(--day-card-height) + 3 * var(--day-card-gap)));
   overflow-y: auto;
   overflow-x: hidden;
-  scroll-snap-type: y mandatory;
+  scroll-snap-type: y proximity;
 }
 
 .list[data-scrollable='true']:not([data-list-end='true']) .viewport:not(:focus-within) {
@@ -39,11 +39,6 @@
 
 .list[data-thumb-dragging='true'] .viewport {
   scroll-snap-type: none;
-}
-
-.endSpacer {
-  flex: 0 0 var(--day-list-tail, calc(2.5 * var(--day-card-height) + 2 * var(--day-card-gap)));
-  pointer-events: none;
 }
 
 .fade {
@@ -94,7 +89,18 @@
 .thumb {
   position: absolute;
   inset-inline: 0;
-  top: calc(var(--day-scroll-progress, 0) * (100% - var(--day-thumb-size)));
+  top: 0;
+  transform: translateY(
+    calc(
+      var(--day-scroll-progress, 0) *
+        max(
+          0px,
+          var(--day-list-height, calc(3.5 * var(--day-card-height) + 3 * var(--day-card-gap))) -
+            var(--day-thumb-size)
+        )
+    )
+  );
+  will-change: transform;
   display: grid;
   place-items: center;
   height: var(--day-thumb-size);

@@ -1,6 +1,3 @@
-commit lan dau tien - baseline
-moi lan hoan thien mot page - commit
-
 # OVERALL
 Hello Codex, I want you to colab with you to make a comprehensive plan. Then we will give this plan to Antigravity, let it handle the coding phase. After our discussion for clarification, you should give a detailed plan.md file for agy, the plan will be split into few phase, each phase is an epic. Then agy will read it, do the i task, until reach the goal, after finish coding,agy should follow up information in the review.md, I will check for the website UI, review then do some adjustment. After finish the adjustments, I will tell agent to proceed the next step if possible.
 Scope: Entire website
@@ -111,3 +108,5 @@ This is the detailed description, also the enhancement for each page.
 ## OTHER FEATURES
 - Applying the ui-ux-pro-max skills I gave you to enhanced UI/UX interfaces. I had no idea right now.
 
+## REQUIREMENTS
+- Applying all the assets in the `sources\assets` with respect to feature page, put it in suitable position.

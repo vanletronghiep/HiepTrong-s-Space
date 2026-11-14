@@ -24,8 +24,12 @@ export interface ToastItem {
 }
 
 export interface ToastContextValue {
-  pushToast: (message: string, tone?: ToastTone) => void;
+  pushToast: (message: string, tone?: ToastTone, options?: ToastOptions) => void;
   dismissToast: (id: string) => void;
+}
+
+export interface ToastOptions {
+  durationMs?: number;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -45,15 +49,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const pushToast = useCallback(
-    (message: string, tone: ToastTone = 'info') => {
+    (message: string, tone: ToastTone = 'info', options?: ToastOptions) => {
       const id = crypto.randomUUID();
-      setToasts((prev) => [...prev.slice(-2), { id, message, tone }]);
+      setToasts((prev) => {
+        const next = [...prev, { id, message, tone }];
+        const recentTransientIds = new Set(
+          next
+            .filter((item) => item.tone !== 'error')
+            .slice(-3)
+            .map((item) => item.id),
+        );
+        return next.filter((item) => item.tone === 'error' || recentTransientIds.has(item.id));
+      });
 
-      // Errors persist until dismissed per ui_readme.md §9.9; others dismiss after 4s.
+      // Errors persist until dismissed; other messages default to four seconds.
       if (tone !== 'error') {
         const timer = window.setTimeout(() => {
           dismissToast(id);
-        }, 4000);
+        }, options?.durationMs ?? 4000);
         timersRef.current.set(id, timer);
       }
     },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
 import { AnimatePresence, LayoutGroup, motion, useIsPresent, useReducedMotion } from 'motion/react';
 import {
@@ -56,6 +56,31 @@ const VIEW_OPTIONS: readonly SegmentedOption<DailyViewMode>[] = [
   { value: 'month', label: 'Month' },
 ];
 
+const viewPreferenceListeners = new Set<() => void>();
+
+function subscribeDailyViewPreference(listener: () => void) {
+  viewPreferenceListeners.add(listener);
+  if (typeof window === 'undefined') {
+    return () => {
+      viewPreferenceListeners.delete(listener);
+    };
+  }
+  const onStorage = () => listener();
+  window.addEventListener('storage', onStorage);
+  return () => {
+    viewPreferenceListeners.delete(listener);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
+function notifyDailyViewPreferenceChange() {
+  for (const listener of viewPreferenceListeners) {
+    listener();
+  }
+}
+
+const getServerDailyViewPreference = (): DailyViewMode => 'day';
+
 function DailyModePanel({ children }: { children: ReactNode }) {
   const present = useIsPresent();
   const reduced = useReducedMotion();
@@ -65,10 +90,16 @@ function DailyModePanel({ children }: { children: ReactNode }) {
       data-present={present}
       inert={!present}
       aria-hidden={!present}
-      initial={false}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: reduced ? 0 : 0.16, ease: [0.2, 0.7, 0.17, 1] }}
+      initial={reduced ? false : { opacity: 0.48, y: 7 }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        transition: { duration: reduced ? 0 : 0.17, ease: [0.2, 0.7, 0.17, 1] },
+      }}
+      exit={{
+        opacity: 0,
+        transition: { duration: reduced ? 0 : 0.09, ease: [0.2, 0.7, 0.17, 1] },
+      }}
     >
       {children}
     </motion.div>
@@ -76,26 +107,10 @@ function DailyModePanel({ children }: { children: ReactNode }) {
 }
 
 function DailyModeStage({ mode, children }: { mode: DailyViewMode; children: ReactNode }) {
-  const stage = useRef<HTMLDivElement>(null);
-  const content = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    const viewport = stage.current;
-    const inner = content.current;
-    if (!viewport || !inner || typeof ResizeObserver === 'undefined') return;
-    const measure = () => {
-      viewport.style.height = `${inner.offsetHeight}px`;
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(inner);
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <div ref={stage} className={foundation.modeStage}>
-      <div ref={content} className={foundation.modeContent}>
-        <AnimatePresence initial={false}>
+    <div className={foundation.modeStage}>
+      <div className={foundation.modeContent}>
+        <AnimatePresence mode="wait" initial={false}>
           <DailyModePanel key={mode}>{children}</DailyModePanel>
         </AnimatePresence>
       </div>
@@ -111,7 +126,13 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
   const yesterdayStr = shiftScheduledDate(todayStr, -1, timeZone);
   const tomorrowStr = shiftScheduledDate(todayStr, 1, timeZone);
 
-  const [viewMode, setViewMode] = useState<DailyViewMode>('day');
+  const storedViewMode = useSyncExternalStore(
+    subscribeDailyViewPreference,
+    getDailyViewPreference,
+    getServerDailyViewPreference,
+  );
+  const [localViewOverride, setLocalViewOverride] = useState<DailyViewMode | null>(null);
+  const viewMode = localViewOverride ?? storedViewMode;
   const [weekAnchorDate, setWeekAnchorDate] = useState<string>(todayStr);
   const [monthAnchorDate, setMonthAnchorDate] = useState<string>(todayStr);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -134,13 +155,10 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
   const [deleteTarget, setDeleteTarget] = useState<TaskDto | null>(null);
   const [recentlyCreatedId, setRecentlyCreatedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    setViewMode(getDailyViewPreference());
-  }, []);
-
   const handleViewChange = (nextMode: DailyViewMode) => {
-    setViewMode(nextMode);
     setDailyViewPreference(nextMode);
+    notifyDailyViewPreferenceChange();
+    setLocalViewOverride(getDailyViewPreference() === nextMode ? null : nextMode);
   };
 
   const tasksQuery = useTasks();
@@ -186,6 +204,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
               ? 'Removed from daily view.'
               : `Scheduled for ${formatDayColumnHeader(scheduledDate, timeZone).dayMonth}.`,
             'success',
+            { durationMs: 1000 },
           );
         },
         onError: (err) => pushToast(err.message, 'error'),
@@ -196,13 +215,13 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
   const handleCreateTask = async (input: CreateTaskInput): Promise<TaskDto> => {
     const created = await createTask.mutateAsync(input);
     markRecentlyCreated(created.id);
-    pushToast('Task added.', 'success');
+    pushToast('Task added.', 'success', { durationMs: 1000 });
     return created;
   };
 
   const handleUpdateTask = async (id: string, input: UpdateTaskInput): Promise<TaskDto> => {
     const updated = await updateTask.mutateAsync({ id, input });
-    pushToast('Task updated.', 'success');
+    pushToast('Task updated.', 'success', { durationMs: 1000 });
     return updated;
   };
 
@@ -211,7 +230,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
     payload: { scheduledDate: string; deadlineAt: string },
   ) => {
     await transferTask.mutateAsync({ id: taskId, input: payload });
-    pushToast('Overdue task transferred.', 'success');
+    pushToast('Overdue task transferred.', 'success', { durationMs: 1000 });
   };
 
   const handleConfirmDelete = () => {
@@ -220,7 +239,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
     deleteTask.mutate(id, {
       onSuccess: () => {
         setDeleteTarget(null);
-        pushToast('Task deleted.', 'info');
+        pushToast('Task deleted.', 'info', { durationMs: 1000 });
       },
       onError: (err) => {
         pushToast(err.message, 'error');
@@ -597,6 +616,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
           pushToast(
             `Scheduled for ${formatDayColumnHeader(scheduledDate, timeZone).dayMonth}.`,
             'success',
+            { durationMs: 1000 },
           );
         }}
         now={now}

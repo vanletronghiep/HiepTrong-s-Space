@@ -1,20 +1,35 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   getFeatureCollectionLayoutPreference,
   setFeatureCollectionLayoutPreference,
   type FeatureCollectionLayout,
 } from '@/client/preferences';
+import type { CollectionRevealState } from '@/features/home/home-journey';
 import { FEATURE_REGISTRY } from '@/features/registry';
 import { HorizontalGallery } from './HorizontalGallery';
 import { VerticalGrid } from './VerticalGrid';
+import styles from './feature-collection.module.css';
 
-export function FeatureCollection() {
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+export interface FeatureCollectionProps {
+  revealState?: CollectionRevealState;
+  revealComplete?: boolean;
+  scrollStartOffset?: number;
+}
+
+export function FeatureCollection({
+  revealState = 'revealed',
+  revealComplete = true,
+  scrollStartOffset,
+}: FeatureCollectionProps = {}) {
   const sectionRef = useRef<HTMLElement>(null);
   const [layout, setLayout] = useState<FeatureCollectionLayout>('horizontal');
+  const isRevealComplete = revealComplete && revealState === 'revealed';
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     setLayout(getFeatureCollectionLayoutPreference());
   }, []);
 
@@ -25,11 +40,15 @@ export function FeatureCollection() {
     setLayout(next);
     setFeatureCollectionLayoutPreference(next);
 
-    // Keep user anchored at the start of the collection so switching out of pinned horizontal
-    // never strands the scroll position below the shortened section (§9.9 & ui_readme.md §11.7).
+    // Keep user anchored at the start of the revealed collection so switching out of pinned horizontal
+    // never strands the scroll position or returns into the reveal wipe (§9.9 & ui_readme.md §11.7).
     if (typeof window !== 'undefined') {
       window.requestAnimationFrame(() => {
-        sectionRef.current?.scrollIntoView?.({ behavior: 'auto', block: 'start' });
+        if (typeof scrollStartOffset === 'number' && scrollStartOffset > 0) {
+          window.scrollTo({ top: scrollStartOffset, behavior: 'auto' });
+        } else {
+          sectionRef.current?.scrollIntoView?.({ behavior: 'auto', block: 'start' });
+        }
       });
     }
   };
@@ -39,38 +58,27 @@ export function FeatureCollection() {
       ref={sectionRef}
       id="features"
       aria-labelledby="features-heading"
-      className="relative w-full scroll-mt-4"
+      className="relative w-full scroll-mt-0"
     >
-      <div
-        className="pointer-events-none absolute inset-0 -top-32 overflow-hidden -z-10"
-        aria-hidden="true"
-      >
-        <div
-          className="absolute left-[12%] top-[5%] w-[60vw] max-w-[850px] aspect-square rounded-full blur-[90px]"
-          style={{
-            background:
-              'radial-gradient(circle, color-mix(in srgb, var(--cosmos-accent) 12%, transparent) 0%, color-mix(in srgb, var(--cosmos-accent) 3%, transparent) 50%, transparent 70%)',
-          }}
-        />
-        <div
-          className="absolute right-[8%] top-[30%] w-[55vw] max-w-[750px] aspect-square rounded-full blur-[100px]"
-          style={{
-            background:
-              'radial-gradient(circle, color-mix(in srgb, var(--daily-planet) 10%, transparent) 0%, color-mix(in srgb, var(--daily-planet) 2%, transparent) 55%, transparent 72%)',
-          }}
-        />
+      {/* Pre-blended radial gradients replacing runtime blur filters */}
+      <div className={styles.collectionAmbient} aria-hidden="true">
+        <div className={styles.collectionGlowLeft} />
+        <div className={styles.collectionGlowRight} />
       </div>
       {layout === 'horizontal' ? (
         <HorizontalGallery
           features={FEATURE_REGISTRY}
           layout={layout}
           onLayoutChange={handleLayoutChange}
+          revealComplete={isRevealComplete}
+          scrollStartOffset={scrollStartOffset}
         />
       ) : (
         <VerticalGrid
           features={FEATURE_REGISTRY}
           layout={layout}
           onLayoutChange={handleLayoutChange}
+          revealComplete={isRevealComplete}
         />
       )}
     </section>

@@ -34,8 +34,10 @@ const QUICK_FADE_TOTAL_MS = 280;
 
 export interface TransitionContextValue {
   isTransitioning: boolean;
+  isOverlayActive: boolean;
   navigate: (href: string, options?: { replace?: boolean }) => void;
   signalPageReady: (pathname: string) => void;
+  registerNavigationGuard: (guard: ((proceed: () => void) => boolean) | null) => void;
 }
 
 const TransitionContext = createContext<TransitionContextValue | null>(null);
@@ -105,8 +107,16 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
   const arrivalStartedRef = useRef(false);
   const currentPathnameRef = useRef(currentPathname);
   const timersRef = useRef<number[]>([]);
+  const navigationGuardRef = useRef<((proceed: () => void) => boolean) | null>(null);
 
   currentPathnameRef.current = currentPathname;
+
+  const registerNavigationGuard = useCallback(
+    (guard: ((proceed: () => void) => boolean) | null) => {
+      navigationGuardRef.current = guard;
+    },
+    [],
+  );
 
   const clearAllTimers = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -236,7 +246,7 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
     [router],
   );
 
-  const navigate = useCallback(
+  const executeNavigate = useCallback(
     (href: string, options?: { replace?: boolean }) => {
       const parsed = parseInternalHref(href);
 
@@ -358,17 +368,37 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
     ],
   );
 
+  const navigate = useCallback(
+    (href: string, options?: { replace?: boolean }) => {
+      if (isTransitioningRef.current) {
+        return;
+      }
+
+      const guard = navigationGuardRef.current;
+      if (guard && guard(() => executeNavigate(href, options))) {
+        return;
+      }
+
+      executeNavigate(href, options);
+    },
+    [executeNavigate],
+  );
+
   const handleOverlayRuntimeError = useCallback(() => {
     finishTransition(false);
   }, [finishTransition]);
 
+  const isOverlayActive = overlayState !== null;
+
   const value = useMemo<TransitionContextValue>(
     () => ({
       isTransitioning,
+      isOverlayActive,
       navigate,
       signalPageReady,
+      registerNavigationGuard,
     }),
-    [isTransitioning, navigate, signalPageReady],
+    [isOverlayActive, isTransitioning, navigate, registerNavigationGuard, signalPageReady],
   );
 
   return (
@@ -384,6 +414,11 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
       ) : null}
     </TransitionContext.Provider>
   );
+}
+
+export function useIsTransitioning(): boolean {
+  const ctx = useContext(TransitionContext);
+  return Boolean(ctx?.isTransitioning || ctx?.isOverlayActive);
 }
 
 export function useTransitionRouter(): {
@@ -437,4 +472,30 @@ export function usePageReady(ready: boolean = true): void {
 export function PageReady({ ready = true }: { ready?: boolean }) {
   usePageReady(ready);
   return null;
+}
+
+export function useNavigationGuard(
+  enabled: boolean,
+  onAttemptNavigate: (proceed: () => void) => void,
+): void {
+  const ctx = useContext(TransitionContext);
+  const callbackRef = useRef(onAttemptNavigate);
+
+  useEffect(() => {
+    callbackRef.current = onAttemptNavigate;
+  }, [onAttemptNavigate]);
+
+  useEffect(() => {
+    if (!ctx || !enabled) {
+      return undefined;
+    }
+    const guard = (proceed: () => void) => {
+      callbackRef.current(proceed);
+      return true;
+    };
+    ctx.registerNavigationGuard(guard);
+    return () => {
+      ctx.registerNavigationGuard(null);
+    };
+  }, [ctx, enabled]);
 }

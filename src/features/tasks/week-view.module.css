@@ -20,8 +20,7 @@
   transition:
     border-color var(--dur-fast) var(--daily-ease),
     background-color var(--dur-fast) var(--daily-ease),
-    box-shadow var(--dur-fast) var(--daily-ease),
-    translate var(--dur-fast) var(--daily-ease);
+    box-shadow var(--dur-fast) var(--daily-ease);
 }
 
 .card[data-today='true'] {
@@ -31,7 +30,6 @@
 }
 
 .card:has(.trigger:hover) {
-  translate: 0 -2px;
   border-color: var(--ws-accent);
   box-shadow: var(--shadow-task-hover);
 }
@@ -212,9 +210,5 @@
 @media (prefers-reduced-motion: reduce) {
   .card {
     transition: none;
-  }
-
-  .card:has(.trigger:hover) {
-    translate: none;
   }
 }

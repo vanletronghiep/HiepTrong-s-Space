@@ -38,7 +38,7 @@ export function useFocusTrap(options: {
     const focusTimer = window.setTimeout(() => {
       if (!isTopmost()) return;
       if (initialFocusRef?.current) {
-        initialFocusRef.current.focus();
+        initialFocusRef.current.focus({ preventScroll: true });
         return;
       }
       const container = containerRef.current;
@@ -47,9 +47,9 @@ export function useFocusTrap(options: {
       }
       const firstFocusable = container.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
       if (firstFocusable) {
-        firstFocusable.focus();
+        firstFocusable.focus({ preventScroll: true });
       } else {
-        container.focus();
+        container.focus({ preventScroll: true });
       }
     }, 10);
 
@@ -105,9 +105,11 @@ export function useFocusTrap(options: {
       if (!restore) return;
       const parent = focusStack.at(-1)?.current;
       if (previouslyFocused?.isConnected && (!parent || parent.contains(previouslyFocused))) {
-        previouslyFocused.focus();
+        previouslyFocused.focus({ preventScroll: true });
       } else if (parent) {
-        (parent.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? parent).focus();
+        (parent.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? parent).focus({
+          preventScroll: true,
+        });
       }
     };
   }, [open, containerRef, initialFocusRef]);

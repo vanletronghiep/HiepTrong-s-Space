@@ -117,3 +117,45 @@ it('counts scheduled tasks and zoned deadlines separately and keeps task actions
   fireEvent.keyDown(document, { key: 'Escape' });
   await waitFor(() => expect(monday).toHaveFocus());
 });
+
+it('reuses the 7 fixed week card elements across week navigation', () => {
+  const noop = () => {};
+  const { rerender } = render(
+    <WeekView
+      anchorDate="2026-11-02"
+      tasks={[]}
+      now={new Date('2026-11-04T18:10:00.000Z')}
+      recentlyCreatedId={null}
+      onToggleComplete={noop}
+      onEdit={noop}
+      onScheduleDate={noop}
+      onOpenPickDate={noop}
+      onOpenTransfer={noop}
+      onRequestDelete={noop}
+    />,
+  );
+
+  const summaries = within(screen.getByRole('group', { name: 'Week task summaries' }));
+  const initialCards = summaries.getAllByRole('button').map((btn) => btn.closest('article'));
+
+  rerender(
+    <WeekView
+      anchorDate="2026-11-09"
+      tasks={[]}
+      now={new Date('2026-11-04T18:10:00.000Z')}
+      recentlyCreatedId={null}
+      onToggleComplete={noop}
+      onEdit={noop}
+      onScheduleDate={noop}
+      onOpenPickDate={noop}
+      onOpenTransfer={noop}
+      onRequestDelete={noop}
+    />,
+  );
+
+  const updatedCards = summaries.getAllByRole('button').map((btn) => btn.closest('article'));
+  expect(updatedCards).toHaveLength(7);
+  updatedCards.forEach((card, index) => {
+    expect(card).toBe(initialCards[index]);
+  });
+});

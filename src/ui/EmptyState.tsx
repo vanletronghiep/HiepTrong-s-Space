@@ -1,6 +1,10 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import { StarIcon } from './StarIcon';
 import { cn } from './cn';
+import { FEATURE_ART, useFeatureTheme } from './FeatureTheme';
+import Image from 'next/image';
 
 export interface EmptyStateProps {
   title: string;
@@ -17,6 +21,7 @@ export function EmptyState({
   compact = false,
   className,
 }: EmptyStateProps) {
+  const featureTheme = useFeatureTheme();
   const orbitSize = compact ? 56 : 72;
   return (
     <div
@@ -26,7 +31,7 @@ export function EmptyState({
         className,
       )}
     >
-      <div
+      {featureTheme ? <Image src={`/visuals/${featureTheme}/${FEATURE_ART[featureTheme][1]}.svg`} alt="" aria-hidden="true" width={160} height={140} unoptimized /> : <div
         aria-hidden="true"
         style={{ width: orbitSize, height: orbitSize }}
         className="relative flex items-center justify-center"
@@ -36,7 +41,7 @@ export function EmptyState({
         <span className="absolute -top-1 right-2 text-ws-accent">
           <StarIcon size={10} />
         </span>
-      </div>
+      </div>}
       <div className="space-y-1 max-w-[var(--max-narrow)]">
         <p
           className={cn(

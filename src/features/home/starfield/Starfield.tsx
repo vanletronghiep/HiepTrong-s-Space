@@ -10,6 +10,7 @@ export interface StarfieldProps {
   initialQuality?: StarfieldQuality;
   speedMultiplier?: number;
   trailStrength?: number;
+  paused?: boolean;
   onEngineReady?: (engine: StarfieldEngine | null) => void;
   className?: string;
 }
@@ -20,6 +21,7 @@ export function Starfield({
   initialQuality = 'high',
   speedMultiplier = 1,
   trailStrength = 1,
+  paused,
   onEngineReady,
   className,
 }: StarfieldProps) {
@@ -42,6 +44,7 @@ export function Starfield({
       reducedMotion: mediaQuery?.matches ?? false,
       enableParallax,
       initialQuality,
+      paused: paused ?? false,
     });
     engineRef.current = engine;
     onEngineReady?.(engine);
@@ -50,14 +53,16 @@ export function Starfield({
       engine.setReducedMotion(event.matches);
     };
 
-    mediaQuery?.addEventListener('change', handleMotionChange);
+    mediaQuery?.addEventListener?.('change', handleMotionChange);
 
     return () => {
-      mediaQuery?.removeEventListener('change', handleMotionChange);
+      mediaQuery?.removeEventListener?.('change', handleMotionChange);
       onEngineReady?.(null);
       engine.destroy();
       engineRef.current = null;
     };
+    // `paused` updates via `setPaused` below without recreating the engine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enableParallax, initialQuality, onEngineReady]);
 
   useEffect(() => {
@@ -67,6 +72,12 @@ export function Starfield({
   useEffect(() => {
     engineRef.current?.setTrailStrength(trailStrength);
   }, [trailStrength]);
+
+  useEffect(() => {
+    if (paused !== undefined) {
+      engineRef.current?.setPaused(paused);
+    }
+  }, [paused]);
 
   useEffect(() => {
     engineRef.current?.start();

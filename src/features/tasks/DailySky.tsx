@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useId, useRef, type SVGProps } from 'react';
+import { useEffect, useId, useRef, useState, type SVGProps } from 'react';
+import { useReducedMotion } from 'motion/react';
+import { useIsTransitioning } from '@/features/transitions/TransitionProvider';
 import styles from './daily-foundation.module.css';
 
 const sparkle = 'M0 -8Q1 -1 8 0Q1 1 0 8Q-1 1 -8 0Q-1 -1 0 -8Z';
@@ -278,8 +280,35 @@ export function OrbitPlanetIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+const SPARKLE_STARS = [
+  [90, 141],
+  [25, 310],
+  [85, 518],
+  [42, 722],
+  [68, 930],
+  [1070, 96],
+  [1368, 22],
+  [1370, 110],
+  [1376, 356],
+  [1322, 650],
+  [1345, 756],
+  [788, 96],
+] as const;
+
+const STATIC_SPARKLES = SPARKLE_STARS.map(
+  ([x, y], index) => [x, y, index % 3 === 0 ? 1 : 0.58, index] as const,
+).filter(([, , , index]) => index % 3 === 1);
+
+const TWINKLE_SPARKLES = SPARKLE_STARS.map(
+  ([x, y], index) => [x, y, index % 3 === 0 ? 1 : 0.58, index] as const,
+).filter(([, , , index]) => index % 3 !== 1);
+
 export function DailySky() {
   const layer = useRef<HTMLDivElement>(null);
+  const isTransitioning = useIsTransitioning();
+  const reducedMotion = useReducedMotion();
+  const [animated, setAnimated] = useState(false);
+
   useEffect(() => {
     const element = layer.current;
     const update = () => {
@@ -290,8 +319,24 @@ export function DailySky() {
     return () => document.removeEventListener('visibilitychange', update);
   }, []);
 
+  useEffect(() => {
+    if (isTransitioning || reducedMotion) {
+      setAnimated(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      setAnimated(true);
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [isTransitioning, reducedMotion]);
+
   return (
-    <div ref={layer} className={styles.sky} aria-hidden="true">
+    <div
+      ref={layer}
+      className={styles.sky}
+      data-animated={animated ? 'true' : 'false'}
+      aria-hidden="true"
+    >
       <svg className={styles.nebula} viewBox="0 0 1400 1100" preserveAspectRatio="none">
         <defs>
           <radialGradient id="daily-nebula-pale">
@@ -365,38 +410,37 @@ export function DailySky() {
         {Array.from({ length: 114 }, (_, index) => (
           <circle
             key={index}
-            className={styles.twinkle}
             cx={(index * 367 + 25) % 1396}
             cy={(index * 193 + 17) % 935}
             r={index % 7 === 0 ? 1.15 : 0.7}
-            style={{ animationDelay: `${-(index % 13)}s` }}
             fill="currentColor"
           />
         ))}
-        {[
-          [90, 141],
-          [25, 310],
-          [85, 518],
-          [42, 722],
-          [68, 930],
-          [1070, 96],
-          [1368, 22],
-          [1370, 110],
-          [1376, 356],
-          [1322, 650],
-          [1345, 756],
-          [788, 96],
-        ].map(([x, y], index) => (
+        {STATIC_SPARKLES.map(([x, y, scale]) => (
           <path
             key={`${x}-${y}`}
             d={sparkle}
-            transform={`translate(${x} ${y}) scale(${index % 3 === 0 ? 1 : 0.58})`}
-            className={styles.twinkle}
-            style={{ animationDelay: `${-index}s` }}
+            transform={`translate(${x} ${y}) scale(${scale})`}
             fill="currentColor"
           />
         ))}
       </svg>
+      {TWINKLE_SPARKLES.map(([x, y, scale, index]) => (
+        <span
+          key={`${x}-${y}`}
+          className={styles.twinkle}
+          style={{
+            left: `${(x / 1400) * 100}%`,
+            top: `${(y / 1120) * 100}%`,
+            transform: `translate3d(-50%, -50%, 0) scale(${scale})`,
+            animationDelay: `${-index}s`,
+          }}
+        >
+          <svg width="16" height="16" viewBox="-8 -8 16 16" aria-hidden="true">
+            <path d={sparkle} fill="currentColor" fillOpacity="0.63" />
+          </svg>
+        </span>
+      ))}
     </div>
   );
 }

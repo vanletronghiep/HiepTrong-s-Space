@@ -1,10 +1,16 @@
 'use client';
 
-import { Dialog } from '@/ui/Dialog';
-
-import React, { useState, useEffect, useRef, useId } from 'react';
-import type { FocusMode } from '@/contracts/learning-room';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { AlertTriangle, Check, Eye, EyeOff, Pause, Play, RotateCcw, Sprout } from 'lucide-react';
+import Image from 'next/image';
 import { useCreateLearningSession, useLearningRoomData } from '@/client/queries/learning-room';
+import type { FocusMode } from '@/contracts/learning-room';
+import { DEFAULT_APP_TIMEZONE } from '@/domain/time';
+import { Button } from '@/ui/Button';
+import { cn } from '@/ui/cn';
+import { Dialog } from '@/ui/Dialog';
+import { EmptyState } from '@/ui/EmptyState';
+import { Skeleton } from '@/ui/Skeleton';
 import styles from './learning-room.module.css';
 
 const PRESETS: Record<FocusMode, { label: string; minutes: number }> = {
@@ -13,14 +19,42 @@ const PRESETS: Record<FocusMode, { label: string; minutes: number }> = {
   quick_review: { label: 'Quick review (15m)', minutes: 15 },
 };
 
-const SUBJECTS = [
-  'Calculus I',
-  'CS160',
-  'CM102',
-  'Physics I',
-  'AI Engineering',
-  'General',
-];
+const SUBJECTS = ['Calculus I', 'CS160', 'CM102', 'Physics I', 'AI Engineering', 'General'];
+
+function parseDateOnlyInAppTimezone(dateStr: string): Date | null {
+  const isoCandidate = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? `${dateStr}T12:00:00+07:00` : dateStr;
+  const parsed = new Date(isoCandidate);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatChartWeekday(dateStr: string): string {
+  const parsed = parseDateOnlyInAppTimezone(dateStr);
+  if (!parsed) return dateStr;
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    timeZone: DEFAULT_APP_TIMEZONE,
+  }).format(parsed);
+}
+
+function formatChartDate(dateStr: string): string {
+  const parsed = parseDateOnlyInAppTimezone(dateStr);
+  if (!parsed) return dateStr;
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: DEFAULT_APP_TIMEZONE,
+  }).format(parsed);
+}
+
+function formatSessionDate(startedAt: string): string {
+  const parsed = new Date(startedAt);
+  if (Number.isNaN(parsed.getTime())) return startedAt;
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: DEFAULT_APP_TIMEZONE,
+  }).format(parsed);
+}
 
 export function LearningRoomView() {
   const writeLocks = useRef(new Set<string>());
@@ -41,8 +75,11 @@ export function LearningRoomView() {
   const [reflectionNotes, setReflectionNotes] = useState<string>('');
   const [rating, setRating] = useState<number>(5);
 
+  const subjectGroupLabelId = useId();
   const intentionInputId = useId();
+  const reflectionRatingLabelId = useId();
   const reflectionTextareaId = useId();
+  const firstStarRef = useRef<HTMLButtonElement>(null);
 
   // Queries & Mutations
   const { data, isLoading, isError: loadFailed, refetch } = useLearningRoomData();
@@ -102,6 +139,7 @@ export function LearningRoomView() {
   }, [isActive, isPaused, isBreak, selectedMode]);
 
   const handleStart = () => {
+    createSession.reset?.();
     startedAt.current = Date.now();
     finishedAt.current = null;
     pausedMs.current = 0;
@@ -137,6 +175,7 @@ export function LearningRoomView() {
   };
 
   const handleFinishEarly = () => {
+    createSession.reset?.();
     finishedAt.current = Date.now();
     if (pausedAt.current !== null) {
       const pause = Date.now() - pausedAt.current;
@@ -199,85 +238,109 @@ export function LearningRoomView() {
 
   const stats = data?.stats;
   const sessions = data?.sessions ?? [];
-
-
-
-  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
+  const maxDailyMinutes = Math.max(60, ...(stats?.dailyHistory.map((h) => h.focusMinutes) ?? []));
 
   return (
-    <div className={styles.container}>
-      {[createSession].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Retry the action.</p>}
-      {/* Header (hidden in zen mode for deep calm) */}
-      {!isZenMode && (
-        <header className={styles.header}>
-          <div className={styles.eyebrow}>
-            <svg
-              className={styles.eyebrowIcon}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            <span>Focused study sanctuary</span>
-          </div>
+    <div className={styles.pageStack}>
+      <Image
+        src="/visuals/learning-room/bamboo-screen-edge.svg"
+        alt=""
+        aria-hidden="true"
+        width={200}
+        height={480}
+        loading="eager"
+        unoptimized
+        className={styles.bambooEdgeDecor}
+      />
 
-          <h1 className={styles.title}>Learning Room</h1>
-          <p className={styles.description}>
-            A distraction-free space for deliberate study. Choose an intention, set your cadence, and
-            immerse yourself in deep work.
-          </p>
+      {/* Editorial Bonsai Timer Sanctuary Masthead (hidden in quiet view) */}
+      {!isZenMode && (
+        <header className={styles.masthead} aria-labelledby="learning-page-heading">
+          <Image
+            src="/visuals/learning-room/bonsai-on-a-stone.svg"
+            alt=""
+            aria-hidden="true"
+            width={480}
+            height={300}
+            loading="eager"
+            unoptimized
+            className={styles.bonsaiMastheadArt}
+          />
+
+          <div className={styles.mastheadText}>
+            <div className={styles.eyebrow}>
+              <Sprout size={14} strokeWidth={1.6} aria-hidden="true" />
+              <span>Bonsai timer sanctuary · Deep work</span>
+            </div>
+
+            <h1 id="learning-page-heading" className={styles.displayTitle}>
+              Learning <span className={styles.displayTitleEmphasis}>Room</span>
+            </h1>
+            <p className={styles.mastheadSubtitle}>
+              A distraction-free space for deliberate study. Choose an intention, set your cadence,
+              and immerse yourself in deep work.
+            </p>
+          </div>
         </header>
       )}
 
-      {/* Main Focus Timer Card */}
+      {/* Non-blocking load failure banner: timer remains fully usable offline */}
+      {loadFailed ? (
+        <div role="alert" className={styles.alertBanner}>
+          <span className={styles.alertMessageGroup}>
+            <AlertTriangle size={16} strokeWidth={1.6} aria-hidden="true" />
+            <span>
+              Could not load past study history. The focus timer remains ready for offline study.
+            </span>
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<RotateCcw size={14} strokeWidth={1.6} aria-hidden="true" />}
+            onClick={() => void refetch()}
+          >
+            Retry
+          </Button>
+        </div>
+      ) : null}
+
+      {/* Main Focus Timer Sanctuary Card */}
       <section
         aria-labelledby="timer-heading"
-        className={`${styles.timerCard} ${isZenMode ? styles.timerCardZen : ''}`}
+        className={cn(styles.timerCard, isZenMode && styles.timerCardZen)}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-          <h2 id="timer-heading" className={styles.cardTitle} style={{ margin: 0 }}>
+        <div className={styles.timerCardHeader}>
+          <h2 id="timer-heading" className={styles.cardTitle}>
             {isBreak ? 'Short break' : 'Active focus session'}
           </h2>
 
-          <button
-            type="button"
-            className={styles.zenToggle}
-            onClick={() => setIsZenMode(!isZenMode)}
+          <Button
+            variant="secondary"
+            size="sm"
+            pill
+            className={styles.zenToggleBtn}
             aria-pressed={isZenMode}
+            leftIcon={
+              isZenMode ? (
+                <Eye size={14} strokeWidth={1.6} aria-hidden="true" />
+              ) : (
+                <EyeOff size={14} strokeWidth={1.6} aria-hidden="true" />
+              )
+            }
+            onClick={() => setIsZenMode(!isZenMode)}
           >
-            <span>{isZenMode ? 'Exit quiet view' : 'Quiet focus view'}</span>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
+            {isZenMode ? 'Exit quiet view' : 'Quiet focus view'}
+          </Button>
         </div>
 
         {/* Mode Selector (disabled during active timer) */}
-        <div className={styles.modeTabs} role="tablist" aria-label="Session duration mode">
+        <div className={styles.modeTabs} role="group" aria-label="Session duration mode">
           {(Object.keys(PRESETS) as FocusMode[]).map((mode) => (
             <button
               key={mode}
               type="button"
-              role="tab"
-              aria-selected={selectedMode === mode}
-              className={`${styles.modeTabBtn} ${selectedMode === mode ? styles.modeTabBtnActive : ''}`}
+              aria-pressed={selectedMode === mode}
+              className={cn(styles.modeTabBtn, selectedMode === mode && styles.modeTabBtnActive)}
               onClick={() => handleSelectMode(mode)}
               disabled={isActive}
             >
@@ -286,40 +349,19 @@ export function LearningRoomView() {
           ))}
         </div>
 
-        {/* Intention & Subject picker */}
-        {!isZenMode && (
-          <div className={styles.intentionRow}>
-            <span className={styles.intentionLabel}>Study subject & intention:</span>
-            <div className={styles.subjectPills}>
-              {SUBJECTS.map((sub) => (
-                <button
-                  key={sub}
-                  type="button"
-                  className={`${styles.subjectPill} ${selectedSubject === sub ? styles.subjectPillActive : ''}`}
-                  onClick={() => setSelectedSubject(sub)}
-                  disabled={isActive}
-                >
-                  {sub}
-                </button>
-              ))}
-            </div>
-
-            <input
-              id={intentionInputId}
-              type="text"
-              className={styles.intentionInput}
-              placeholder="What are you focusing on during this session?"
-              value={intentionTitle}
-              onChange={(e) => setIntentionTitle(e.target.value)}
-              disabled={isActive}
-              aria-label="Study session title"
-            />
-          </div>
-        )}
-
-        {/* Clock Ring */}
+        {/* Clock Ring + Enso Halo */}
         <div className={styles.clockWrapper}>
-          <svg className={styles.timerSvgRing} viewBox="0 0 220 220">
+          <Image
+            src="/visuals/learning-room/enso-and-pebble.svg"
+            alt=""
+            aria-hidden="true"
+            width={360}
+            height={360}
+            unoptimized
+            className={cn(styles.ensoHalo, isActive && !isPaused && styles.ensoHaloActive)}
+          />
+
+          <svg className={styles.timerSvgRing} viewBox="0 0 220 220" aria-hidden="true">
             <circle
               className={styles.timerTrack}
               cx="110"
@@ -342,9 +384,22 @@ export function LearningRoomView() {
           </svg>
 
           <div className={styles.clockCenter}>
-            <div className={styles.clockDigits}>{timeFormatted}</div>
-            <div className={styles.clockPhaseLabel}>
-              {isBreak ? 'Rest & Recharge' : `${selectedSubject} · Focus`}
+            <div
+              className={styles.clockDigits}
+              role="timer"
+              aria-label="Time remaining"
+              aria-live="off"
+            >
+              {timeFormatted}
+            </div>
+            <div className={styles.clockPhaseLabel} role="status">
+              {showReflectionModal
+                ? 'Session finished'
+                : isPaused
+                  ? 'Paused'
+                  : isBreak
+                    ? 'Rest & recharge'
+                    : `${selectedSubject} · Focus`}
             </div>
           </div>
         </div>
@@ -352,96 +407,169 @@ export function LearningRoomView() {
         {/* Control Buttons */}
         <div className={styles.timerControls}>
           {!isActive ? (
-            <button type="button" className={styles.primaryBtn} onClick={handleStart}>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polygon points="5 3 19 12 5 21 5 3" />
-              </svg>
-              <span>Begin focus</span>
-            </button>
+            <Button
+              variant="primary"
+              pill
+              leftIcon={<Play size={16} strokeWidth={2} aria-hidden="true" />}
+              onClick={handleStart}
+            >
+              Begin focus
+            </Button>
           ) : isPaused ? (
             <>
-              <button type="button" className={styles.primaryBtn} onClick={handleResume}>
-                <span>Resume</span>
-              </button>
-              <button type="button" className={styles.secondaryBtn} onClick={handleReset}>
-                <span>Reset</span>
-              </button>
-              <button type="button" className={styles.secondaryBtn} onClick={handleFinishEarly}>
-                <span>Log & finish</span>
-              </button>
+              <Button
+                variant="primary"
+                pill
+                leftIcon={<Play size={16} strokeWidth={2} aria-hidden="true" />}
+                onClick={handleResume}
+              >
+                Resume
+              </Button>
+              <Button
+                variant="secondary"
+                pill
+                leftIcon={<RotateCcw size={15} strokeWidth={1.8} aria-hidden="true" />}
+                onClick={handleReset}
+              >
+                Reset
+              </Button>
+              <Button
+                variant="secondary"
+                pill
+                leftIcon={<Check size={15} strokeWidth={1.8} aria-hidden="true" />}
+                onClick={handleFinishEarly}
+              >
+                Log &amp; finish
+              </Button>
             </>
           ) : (
             <>
-              <button type="button" className={styles.primaryBtn} onClick={handlePause}>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="6" y="4" width="4" height="16" />
-                  <rect x="14" y="4" width="4" height="16" />
-                </svg>
-                <span>Pause</span>
-              </button>
-              <button type="button" className={styles.secondaryBtn} onClick={handleFinishEarly}>
-                <span>Log & finish</span>
-              </button>
+              <Button
+                variant="primary"
+                pill
+                leftIcon={<Pause size={16} strokeWidth={2} aria-hidden="true" />}
+                onClick={handlePause}
+              >
+                Pause
+              </Button>
+              <Button
+                variant="secondary"
+                pill
+                leftIcon={<Check size={15} strokeWidth={1.8} aria-hidden="true" />}
+                onClick={handleFinishEarly}
+              >
+                Log &amp; finish
+              </Button>
             </>
           )}
         </div>
+
+        {/* Intention & Subject picker */}
+        {!isZenMode && (
+          <div className={styles.intentionRow}>
+            <div className={styles.subjectField}>
+              <span id={subjectGroupLabelId} className={styles.intentionLabel}>
+                Study subject
+              </span>
+              <div
+                className={styles.subjectPills}
+                role="group"
+                aria-labelledby={subjectGroupLabelId}
+              >
+                {SUBJECTS.map((sub) => (
+                  <button
+                    key={sub}
+                    type="button"
+                    className={cn(
+                      styles.subjectPill,
+                      selectedSubject === sub && styles.subjectPillActive,
+                    )}
+                    aria-pressed={selectedSubject === sub}
+                    onClick={() => setSelectedSubject(sub)}
+                    disabled={isActive}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className={styles.intentionField}>
+              <label htmlFor={intentionInputId} className={styles.intentionLabel}>
+                Session intention
+              </label>
+              <input
+                id={intentionInputId}
+                type="text"
+                className={styles.intentionInput}
+                placeholder="What are you focusing on during this session?"
+                value={intentionTitle}
+                onChange={(e) => setIntentionTitle(e.target.value)}
+                disabled={isActive}
+              />
+            </div>
+          </div>
+        )}
       </section>
 
-      {/* Analytics & Stats (only shown outside zen mode) */}
+      {/* Analytics & Logbook (hidden in quiet view) */}
       {!isZenMode && (
         <>
+          <div className={styles.bambooDividerWrap} aria-hidden="true">
+            <Image
+              src="/visuals/learning-room/bamboo-interval.svg"
+              alt=""
+              aria-hidden="true"
+              width={720}
+              height={100}
+              unoptimized
+              className={styles.bambooDivider}
+            />
+          </div>
+
           {/* Stats Summary Cards */}
           <section aria-labelledby="stats-heading">
             <h2 id="stats-heading" className="sr-only">
               Focus statistics
             </h2>
-            <div className={styles.statsGrid}>
-              <div className={styles.statCard}>
-                <div className={styles.statValue}>
-                  {Math.round(((stats?.totalFocusMinutes ?? 0) / 60) * 10) / 10} hrs
+            {isLoading ? (
+              <div className={styles.statsGrid} aria-label="Loading focus statistics">
+                <Skeleton className="h-[84px] w-full rounded-item" />
+                <Skeleton className="h-[84px] w-full rounded-item" />
+                <Skeleton className="h-[84px] w-full rounded-item" />
+                <Skeleton className="h-[84px] w-full rounded-item" />
+              </div>
+            ) : (
+              <div className={styles.statsGrid}>
+                <div className={styles.statCard}>
+                  <div className={styles.statValue}>
+                    {Math.round(((stats?.totalFocusMinutes ?? 0) / 60) * 10) / 10} hrs
+                  </div>
+                  <div className={styles.statLabel}>Total focus time</div>
                 </div>
-                <div className={styles.statLabel}>Total focus time</div>
-              </div>
 
-              <div className={styles.statCard}>
-                <div className={styles.statValue}>{stats?.completedSessions ?? 0}</div>
-                <div className={styles.statLabel}>Completed sessions</div>
-              </div>
-
-              <div className={styles.statCard}>
-                <div className={styles.statValue}>{stats?.streakDays ?? 0} days</div>
-                <div className={styles.statLabel}>Study streak</div>
-              </div>
-
-              <div className={styles.statCard}>
-                <div className={styles.statValue}>
-                  {stats?.totalStudyMinutes
-                    ? `${Math.round(((stats.totalFocusMinutes) / stats.totalStudyMinutes) * 100)}%`
-                    : '100%'}
+                <div className={styles.statCard}>
+                  <div className={styles.statValue}>{stats?.completedSessions ?? 0}</div>
+                  <div className={styles.statLabel}>Completed sessions</div>
                 </div>
-                <div className={styles.statLabel}>Focus efficiency</div>
+
+                <div className={styles.statCard}>
+                  <div className={styles.statValue}>
+                    {stats?.streakDays ?? 0} {stats?.streakDays === 1 ? 'day' : 'days'}
+                  </div>
+                  <div className={styles.statLabel}>Study streak</div>
+                </div>
+
+                <div className={styles.statCard}>
+                  <div className={styles.statValue}>
+                    {stats?.totalStudyMinutes
+                      ? `${Math.round((stats.totalFocusMinutes / stats.totalStudyMinutes) * 100)}%`
+                      : '100%'}
+                  </div>
+                  <div className={styles.statLabel}>Focus efficiency</div>
+                </div>
               </div>
-            </div>
+            )}
           </section>
 
           {/* Charts Row */}
@@ -452,50 +580,83 @@ export function LearningRoomView() {
                 7-day study pattern
               </h3>
 
-              <div className={styles.barChart}>
-                {stats?.dailyHistory.map((d) => {
-                  const maxMinutes = Math.max(
-                    60,
-                    ...(stats.dailyHistory.map((h) => h.focusMinutes)),
-                  );
-                  const heightPercent = Math.min(100, Math.round((d.focusMinutes / maxMinutes) * 100));
-                  const dayName = new Date(d.date).toLocaleDateString(undefined, { weekday: 'short' });
+              {isLoading ? (
+                <div className="space-y-2.5" aria-label="Loading 7-day study pattern">
+                  <Skeleton className="h-32 w-full rounded-item" />
+                  <Skeleton className="h-4 w-3/4 rounded-item" />
+                </div>
+              ) : !stats?.dailyHistory.length ? (
+                <p className={styles.quietEmptyCue}>
+                  Complete a session to trace your 7-day study cadence.
+                </p>
+              ) : (
+                <ul className={styles.barChart} aria-label="7-day study pattern">
+                  {stats.dailyHistory.map((d) => {
+                    const heightPercent = Math.min(
+                      100,
+                      Math.round((d.focusMinutes / maxDailyMinutes) * 100),
+                    );
+                    const dayName = formatChartWeekday(d.date);
+                    const fullDate = formatChartDate(d.date);
+                    const roundedMinutes = Math.round(d.focusMinutes);
 
-                  return (
-                    <div key={d.date} className={styles.barCol}>
-                      <div
-                        className={styles.barPillar}
-                        style={{ height: `${heightPercent}%` }}
-                        title={`${d.date}: ${d.focusMinutes} focus mins`}
-                      />
-                      <span className={styles.barLabel}>{dayName}</span>
-                    </div>
-                  );
-                })}
-              </div>
+                    return (
+                      <li
+                        key={d.date}
+                        className={styles.barCol}
+                        title={`${fullDate} (${dayName}): ${roundedMinutes} focus mins`}
+                      >
+                        <span className={styles.barMinutes}>{roundedMinutes}m</span>
+                        <div className={styles.barTrack} aria-hidden="true">
+                          <div
+                            className={styles.barPillar}
+                            style={{ height: `${heightPercent}%` }}
+                          />
+                        </div>
+                        <span className={styles.barLabel}>
+                          {dayName}
+                          <span className="sr-only"> ({fullDate})</span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
 
             {/* Subject Distribution */}
             <div className={styles.chartCard}>
               <h3 className={styles.cardTitle}>Subject distribution</h3>
-              <div className={styles.subjectList}>
-                {stats?.subjectBreakdown.map((item) => (
-                  <div key={item.subject} className={styles.subjectRow}>
-                    <div className={styles.subjectMeta}>
-                      <span>{item.subject}</span>
-                      <span>
-                        {item.minutes}m ({item.percentage}%)
-                      </span>
+              {isLoading ? (
+                <div className="space-y-3" aria-label="Loading subject distribution">
+                  <Skeleton className="h-6 w-full rounded-item" />
+                  <Skeleton className="h-6 w-full rounded-item" />
+                  <Skeleton className="h-6 w-4/5 rounded-item" />
+                </div>
+              ) : !stats?.subjectBreakdown.length ? (
+                <p className={styles.quietEmptyCue}>
+                  Subject distribution will appear after your first logged session.
+                </p>
+              ) : (
+                <div className={styles.subjectList}>
+                  {stats.subjectBreakdown.map((item) => (
+                    <div key={item.subject} className={styles.subjectRow}>
+                      <div className={styles.subjectMeta}>
+                        <span>{item.subject}</span>
+                        <span>
+                          {Math.round(item.minutes)}m ({item.percentage}%)
+                        </span>
+                      </div>
+                      <div className={styles.subjectBarTrack}>
+                        <div
+                          className={styles.subjectBarFill}
+                          style={{ width: `${item.percentage}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className={styles.subjectBarTrack}>
-                      <div
-                        className={styles.subjectBarFill}
-                        style={{ width: `${item.percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 
@@ -506,12 +667,18 @@ export function LearningRoomView() {
             </h3>
 
             {isLoading ? (
-              <div style={{ color: 'var(--ws-text-muted)', fontSize: 'var(--text-sm)' }}>
-                Loading sessions...
+              <div className="space-y-3" aria-label="Loading recent study sessions">
+                <Skeleton className="h-16 w-full rounded-item" />
+                <Skeleton className="h-16 w-full rounded-item" />
+                <Skeleton className="h-16 w-full rounded-item" />
               </div>
             ) : sessions.length === 0 ? (
-              <div style={{ color: 'var(--ws-text-muted)', fontSize: 'var(--text-sm)' }}>
-                No recorded sessions yet. Begin your first focus block above.
+              <div role="status" className={styles.emptyStateWrap}>
+                <EmptyState
+                  compact
+                  title="No recorded sessions yet."
+                  description="Begin a focus timer above to log your first reflection."
+                />
               </div>
             ) : (
               <div className={styles.historyList}>
@@ -519,24 +686,22 @@ export function LearningRoomView() {
                   <div key={s.id} className={styles.historyItem}>
                     <div>
                       <h4 className={styles.historyTitle}>{s.title}</h4>
-                      {s.reflectionNotes && (
+                      {s.reflectionNotes ? (
                         <p className={styles.historyNotes}>{s.reflectionNotes}</p>
-                      )}
+                      ) : null}
                       <div className={styles.historyMeta}>
                         <span>{s.targetSubject}</span>
-                        <span>·</span>
-                        <span>{s.focusMinutes} mins</span>
-                        <span>·</span>
-                        <span>
-                          {new Date(s.startedAt).toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>{Math.round(s.focusMinutes * 10) / 10} mins</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{formatSessionDate(s.startedAt)}</span>
                       </div>
                     </div>
 
-                    <div className={styles.starRating} aria-label={`Rating: ${s.rating} stars`}>
+                    <div
+                      className={cn(styles.starRating, 'text-text-due-soon')}
+                      aria-label={`Rating: ${s.rating} out of 5 stars`}
+                    >
                       {'★'.repeat(s.rating)}
                       {'☆'.repeat(5 - s.rating)}
                     </div>
@@ -548,28 +713,61 @@ export function LearningRoomView() {
         </>
       )}
 
-      {/* Reflection & Logging Modal */}
+      {/* Compact Session Reflection Dialog (NEVER expanded to LargeEditorDialog) */}
       {showReflectionModal && (
-        <Dialog open portal className="max-h-[90svh] overflow-y-auto" title="Session reflection" onClose={() => void handleSaveReflection()}>
-          <div className="flex flex-col gap-4">
-            <div className={styles.modalHeader}>
-
-            </div>
-
+        <Dialog
+          open
+          portal
+          initialFocusRef={firstStarRef}
+          className="max-w-[440px] max-h-[90svh] overflow-y-auto"
+          title="Session reflection"
+          description="Capture your focus rating and key takeaways before saving to your logbook."
+          onClose={() => void handleSaveReflection()}
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  void handleSaveReflection();
+                }}
+              >
+                Skip notes
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  void handleSaveReflection();
+                }}
+                disabled={createSession.isPending}
+              >
+                {createSession.isPending ? 'Saving...' : 'Save to logbook'}
+              </Button>
+            </>
+          }
+        >
+          <div className={styles.reflectionForm}>
             <div>
-              <p style={{ margin: '0 0 8px 0', fontSize: 'var(--text-xs)', color: 'var(--ws-text-muted)' }}>
+              <p id={reflectionRatingLabelId} className={styles.fieldLabel}>
                 How focused was your study time?
               </p>
-              <div className={styles.ratingPicker} role="radiogroup" aria-label="Rate your focus">
+              <div
+                className={styles.ratingPicker}
+                role="radiogroup"
+                aria-labelledby={reflectionRatingLabelId}
+              >
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
+                    ref={star === 1 ? firstStarRef : undefined}
                     type="button"
-                    className={`${styles.starBtn} ${rating >= star ? styles.starBtnActive : ''}`}
+                    className={cn(
+                      styles.starBtn,
+                      rating >= star && cn(styles.starBtnActive, 'text-text-due-soon'),
+                    )}
                     onClick={() => setRating(star)}
                     role="radio"
                     aria-checked={rating === star}
-                    aria-label={`${star} star`}
+                    aria-label={`${star} ${star === 1 ? 'star' : 'stars'}`}
                   >
                     ★
                   </button>
@@ -578,15 +776,7 @@ export function LearningRoomView() {
             </div>
 
             <div>
-              <label
-                htmlFor={reflectionTextareaId}
-                style={{
-                  display: 'block',
-                  marginBottom: '6px',
-                  fontSize: 'var(--text-xs)',
-                  color: 'var(--ws-text-muted)',
-                }}
-              >
+              <label htmlFor={reflectionTextareaId} className={styles.fieldLabel}>
                 Key insights or notes from this session:
               </label>
               <textarea
@@ -598,30 +788,14 @@ export function LearningRoomView() {
               />
             </div>
 
-            {createSession.isError && <p role="alert">Could not save this session. Your notes are retained; retry saving.</p>}
-            <div className={styles.modalFooter}>
-              <button
-                type="button"
-                className={styles.secondaryBtn}
-                onClick={() => {
-                  void handleSaveReflection();
-                }}
-              >
-                Skip notes
-              </button>
-              <button
-                type="button"
-                className={styles.primaryBtn}
-                onClick={handleSaveReflection}
-                disabled={createSession.isPending}
-              >
-                {createSession.isPending ? 'Saving...' : 'Save to logbook'}
-              </button>
-            </div>
+            {createSession.isError ? (
+              <p role="alert" className={styles.inlineAlert}>
+                Could not save this session. Your notes are retained; retry saving.
+              </p>
+            ) : null}
           </div>
         </Dialog>
       )}
     </div>
   );
 }
-

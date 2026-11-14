@@ -1,202 +1,289 @@
-.container {
+.pageStack {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  padding: var(--space-6) var(--space-4);
-  max-width: 1100px;
-  margin: 0 auto;
-  width: 100%;
+  gap: 1.75rem;
+  padding-bottom: 2.5rem;
 }
 
-@media (min-width: 768px) {
-  .container {
-    padding: var(--space-8) var(--space-6);
+@media (min-width: 1024px) {
+  .pageStack {
+    gap: 2rem;
+    padding-bottom: 3.5rem;
   }
 }
 
-/* Restrained Japanese Mindful Header */
-.header {
+.thymeEdgeDecor {
+  display: none;
+  pointer-events: none;
+  user-select: none;
+  position: fixed;
+  left: -24px;
+  top: 24%;
+  width: 156px;
+  height: auto;
+  opacity: 0.42;
+  z-index: 0;
+}
+
+@media (min-width: 1280px) {
+  .thymeEdgeDecor {
+    display: block;
+  }
+}
+
+/* Editorial Herbal Tea Sanctuary Masthead */
+.masthead {
   position: relative;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--daily-priority-optional) 10%, var(--ws-surface)) 0%,
-    color-mix(in srgb, var(--status-notif-completed) 8%, var(--ws-surface)) 100%
-  );
-  border: 1px solid color-mix(in srgb, var(--daily-priority-optional) 22%, var(--ws-border));
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ws-border) 82%, transparent);
   overflow: hidden;
-  box-shadow: 0 4px 20px color-mix(in srgb, var(--daily-priority-optional) 4%, transparent);
+}
+
+@media (min-width: 768px) {
+  .masthead {
+    padding-bottom: 1.85rem;
+  }
+}
+
+.teaMastheadArt {
+  display: none;
+  position: absolute;
+  top: -18px;
+  right: 0;
+  width: 320px;
+  height: auto;
+  opacity: 0.76;
+  pointer-events: none;
+  user-select: none;
+  mask-image: linear-gradient(270deg, black 42%, transparent 100%);
+  -webkit-mask-image: linear-gradient(270deg, black 42%, transparent 100%);
+}
+
+@media (min-width: 768px) {
+  .teaMastheadArt {
+    display: block;
+  }
+}
+
+@media (min-width: 1024px) {
+  .teaMastheadArt {
+    width: 360px;
+    opacity: 0.82;
+  }
+}
+
+.mastheadText {
+  position: relative;
+  z-index: 1;
+  max-width: 40rem;
 }
 
 .eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--daily-priority-optional);
-  background: color-mix(in srgb, var(--daily-priority-optional) 12%, transparent);
-  padding: var(--space-1) var(--space-3);
+  gap: 0.45rem;
+  padding: 0.25rem 0.75rem;
   border-radius: var(--radius-pill);
-  width: fit-content;
+  border: 1px solid color-mix(in srgb, var(--ws-accent) 26%, var(--ws-border));
+  background: color-mix(in srgb, var(--feature-soft) 55%, var(--ws-surface));
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--ws-accent);
 }
 
-.eyebrowIcon {
-  width: 14px;
-  height: 14px;
-}
-
-.title {
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  color: var(--ws-text);
-  margin: var(--space-2) 0 0;
+.displayTitle {
+  margin-top: 0.65rem;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(2.15rem, 4.4vw, 3.4rem);
+  line-height: 1.04;
   letter-spacing: -0.02em;
+  color: var(--ws-text);
 }
 
-.description {
-  font-size: var(--text-sm);
+.displayTitleEmphasis {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ws-accent);
+}
+
+.mastheadSubtitle {
+  margin-top: 0.75rem;
+  max-width: 37rem;
+  font-size: var(--fs-ui);
+  line-height: var(--lh-body);
   color: var(--ws-text-muted);
-  max-width: 640px;
-  line-height: 1.6;
-  margin: var(--space-2) 0 0;
 }
 
-/* Stats Row */
-.statsRow {
+/* 7-day & today rhythm strip (stationary cards) */
+.rhythmStrip {
+  position: relative;
+  z-index: 1;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
 }
 
-@media (min-width: 640px) {
-  .statsRow {
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-4);
+@media (min-width: 768px) {
+  .rhythmStrip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
   }
 }
 
-.statCard {
-  background: var(--ws-surface);
+.rhythmCard {
+  background: color-mix(in srgb, var(--ws-surface) 94%, var(--feature-canvas));
   border: 1px solid var(--ws-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
+  border-radius: var(--radius-item);
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
-.statValue {
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: var(--daily-priority-optional);
+.rhythmValue {
+  font-size: var(--fs-h2);
+  font-weight: 600;
   line-height: 1.2;
+  color: var(--ws-accent);
+  font-variant-numeric: tabular-nums;
 }
 
-.statLabel {
-  font-size: var(--text-xs);
+.rhythmLabel {
+  font-size: var(--fs-micro);
   color: var(--ws-text-muted);
-  margin-top: 2px;
+  line-height: 1.35;
 }
 
-/* Section Header */
+/* Asymmetric Sanctuary Workspace */
+.sanctuaryGrid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .sanctuaryGrid {
+    grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr);
+    gap: 1.75rem;
+  }
+}
+
+.folioSurface,
+.supportSurface {
+  background: color-mix(in srgb, var(--ws-surface) 93%, var(--feature-canvas));
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-card);
+  padding: 1.125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 12px 32px -24px color-mix(in srgb, var(--feature-accent) 36%, transparent);
+}
+
+@media (min-width: 768px) {
+  .folioSurface,
+  .supportSurface {
+    padding: 1.5rem;
+  }
+}
+
+.supportColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .sectionHeader {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: center;
-  margin-bottom: var(--space-3);
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sectionTitleGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.55rem;
+  min-width: 0;
 }
 
 .sectionTitle {
-  font-size: var(--text-base);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: clamp(1.375rem, 2.2vw, 1.625rem);
+  font-weight: 500;
+  line-height: 1.15;
   color: var(--ws-text);
   margin: 0;
 }
 
-.addBtn {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--daily-priority-optional);
-  background: color-mix(in srgb, var(--daily-priority-optional) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--daily-priority-optional) 30%, transparent);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  transition: background var(--dur-fast) var(--ease);
+.todayTally {
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  color: var(--ws-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.addBtn:hover {
-  background: color-mix(in srgb, var(--daily-priority-optional) 20%, transparent);
-}
-
-/* Habits Card */
-.habitsCard {
-  background: var(--ws-surface);
-  border: 1px solid var(--ws-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
+/* Daily Habits Checklist */
 .habitList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0.6rem;
 }
 
 .habitRow {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: center;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  border: 1px solid color-mix(in srgb, var(--ws-border) 80%, transparent);
-  background: color-mix(in srgb, var(--ws-bg) 40%, var(--ws-surface));
-  transition: background var(--dur-fast) var(--ease),
+  justify-content: space-between;
+  gap: 0.65rem 0.9rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: var(--radius-item);
+  border: 1px solid color-mix(in srgb, var(--ws-border) 84%, transparent);
+  background: color-mix(in srgb, var(--ws-bg) 42%, var(--ws-surface));
+  transition:
+    background-color var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease);
 }
 
 .habitRowDone {
-  background: color-mix(in srgb, var(--daily-priority-optional) 6%, var(--ws-surface));
-  border-color: color-mix(in srgb, var(--daily-priority-optional) 25%, var(--ws-border));
+  background: color-mix(in srgb, var(--feature-soft) 45%, var(--ws-surface));
+  border-color: color-mix(in srgb, var(--ws-accent) 34%, var(--ws-border));
 }
 
 .habitLeft {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1 1 12rem;
 }
 
-.checkCircle {
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-pill);
-  border: 2px solid var(--ws-border);
-  background: var(--ws-surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  transition: border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease);
+.habitCheckbox {
+  min-width: 44px;
+  min-height: 44px;
+  margin: -10px;
 }
 
-.checkCircleDone {
-  border-color: var(--daily-priority-optional);
-  background: var(--daily-priority-optional);
-  color: var(--cosmos-star-white);
+.habitCheckbox[aria-checked='true'] > span {
+  background-color: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: var(--ws-surface);
 }
 
 .habitTitle {
-  font-size: var(--text-sm);
-  color: var(--ws-text);
+  font-size: var(--fs-ui);
   font-weight: 500;
-  margin: 0;
+  line-height: 1.4;
+  color: var(--ws-text);
+  overflow-wrap: anywhere;
 }
 
 .habitTitleDone {
@@ -206,220 +293,378 @@
 
 .habitRight {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.categoryBadge {
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  color: var(--ws-text-muted);
+  background: color-mix(in srgb, var(--ws-bg) 70%, var(--ws-surface));
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-pill);
+  padding: 0.15rem 0.6rem;
 }
 
 .streakPill {
-  font-size: 11px;
-  color: var(--daily-priority-optional);
-  background: color-mix(in srgb, var(--daily-priority-optional) 12%, transparent);
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  font-size: var(--fs-micro);
   font-weight: 600;
+  color: var(--ws-accent);
+  background: color-mix(in srgb, var(--feature-soft) 72%, var(--ws-surface));
+  border: 1px solid color-mix(in srgb, var(--ws-accent) 20%, var(--ws-border));
+  border-radius: var(--radius-pill);
+  padding: 0.15rem 0.6rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.categoryTag {
-  font-size: 11px;
-  color: var(--ws-text-muted);
-  text-transform: capitalize;
+/* Empty States */
+.emptySpot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.55rem;
+  padding: 1.75rem 1rem;
+  border-radius: var(--radius-item);
+  border: 1px dashed color-mix(in srgb, var(--ws-accent) 28%, var(--ws-border));
+  background: color-mix(in srgb, var(--feature-canvas) 45%, var(--ws-surface));
 }
 
-/* Two Column Layout (Sleep & Screen Time) */
-.twoColRow {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-4);
+.emptyWateringCan {
+  width: 156px;
+  height: auto;
+  opacity: 0.88;
+  pointer-events: none;
+  user-select: none;
 }
 
 @media (min-width: 768px) {
-  .twoColRow {
-    grid-template-columns: 1fr 1fr;
+  .emptyWateringCan {
+    width: 200px;
   }
 }
 
-.panelCard {
-  background: var(--ws-surface);
-  border: 1px solid var(--ws-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+.emptyTitle {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 500;
+  color: var(--ws-text);
+  margin: 0;
 }
 
-/* Sleep Calculator Box */
-.calcBox {
-  background: color-mix(in srgb, var(--daily-priority-optional) 8%, var(--ws-bg));
-  border: 1px dashed color-mix(in srgb, var(--daily-priority-optional) 30%, var(--ws-border));
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--text-xs);
-  color: var(--ws-text);
+.emptyCopy {
+  font-size: var(--fs-small);
+  color: var(--ws-text-muted);
+  max-width: 24rem;
+  margin: 0;
+}
+
+.quietEmptyCue {
+  font-size: var(--fs-small);
+  color: var(--ws-text-muted);
+  line-height: 1.5;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-item);
+  background: color-mix(in srgb, var(--ws-bg) 52%, var(--ws-surface));
+  border: 1px dashed var(--ws-border);
+  margin: 0;
+}
+
+/* 90-Minute Sleep Cycle Callout */
+.cycleBox {
+  background: color-mix(in srgb, var(--feature-soft) 38%, var(--ws-surface));
+  border: 1px dashed color-mix(in srgb, var(--ws-accent) 32%, var(--ws-border));
+  border-radius: var(--radius-item);
+  padding: 0.85rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 0.35rem;
+}
+
+.cycleHeading {
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--ws-text);
+}
+
+.cycleNote {
+  font-size: var(--fs-micro);
+  line-height: 1.45;
+  color: var(--ws-text-muted);
 }
 
 .cycleChips {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
+  gap: 0.45rem;
+  margin-top: 0.2rem;
 }
 
 .cycleChip {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 0.2rem 0.6rem;
   border-radius: var(--radius-sm);
   background: var(--ws-surface);
   border: 1px solid var(--ws-border);
-  color: var(--daily-priority-optional);
+  color: var(--ws-accent);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Logs List */
+/* Sleep & Screen Time Log Rows */
 .logList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0.5rem;
 }
 
 .logItem {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--ws-bg) 50%, var(--ws-surface));
-  font-size: var(--text-xs);
+  gap: 0.5rem 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-item);
+  border: 1px solid color-mix(in srgb, var(--ws-border) 75%, transparent);
+  background: color-mix(in srgb, var(--ws-bg) 46%, var(--ws-surface));
+  font-size: var(--fs-small);
 }
 
 .logMain {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1 1 10rem;
 }
 
 .logDate {
   font-weight: 600;
   color: var(--ws-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.logTimeRange {
+  color: var(--ws-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .logNotes {
   color: var(--ws-text-muted);
+  font-size: var(--fs-micro);
+  overflow-wrap: anywhere;
+}
+
+.logMeta {
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .logValue {
-  font-weight: 700;
-  color: var(--daily-priority-optional);
-  text-align: right;
+  font-weight: 600;
+  color: var(--ws-accent);
+}
+
+.starRating {
+  color: var(--text-due-soon);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.04em;
+}
+
+.logSubtleMeta {
+  color: var(--ws-text-muted);
+  font-size: var(--fs-micro);
 }
 
 /* Screen Time Ratio Bar */
+.ratioSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.ratioLabels {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: var(--fs-micro);
+  color: var(--ws-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ratioLabels strong {
+  color: var(--ws-text);
+  font-weight: 600;
+}
+
 .ratioBarTrack {
-  height: 12px;
-  background: color-mix(in srgb, var(--ws-border) 80%, transparent);
+  height: 10px;
+  background: color-mix(in srgb, var(--ws-border) 82%, transparent);
   border-radius: var(--radius-pill);
   display: flex;
   overflow: hidden;
-  margin-top: var(--space-1);
 }
 
 .ratioBarProd {
-  background: var(--daily-priority-optional);
+  background: var(--ws-accent);
   height: 100%;
+  transition: width var(--dur-fast) var(--ease);
 }
 
 .ratioBarLeisure {
-  background: var(--status-due-soon);
+  background: color-mix(in srgb, var(--status-due-soon) 72%, var(--ws-text-muted));
   height: 100%;
+  transition: width var(--dur-fast) var(--ease);
 }
 
-/* Modal */
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  background: var(--ws-scrim);
-  backdrop-filter: blur(4px);
+/* Tea-Steam Rule Divider */
+.teaDividerWrap {
   display: flex;
-  align-items: center;
   justify-content: center;
-  padding: var(--space-4);
-  z-index: 100;
+  padding-block: 0.15rem;
+  pointer-events: none;
+  user-select: none;
 }
 
-.modalContent {
-  background: var(--ws-surface);
-  border: 1px solid var(--ws-border);
-  border-radius: var(--radius-lg);
-  max-width: 480px;
+.teaDivider {
   width: 100%;
-  box-shadow: 0 16px 40px color-mix(in srgb, var(--ws-text) 15%, transparent);
-  padding: var(--space-6);
+  max-width: 260px;
+  height: auto;
+  opacity: 0.72;
+}
+
+@media (min-width: 768px) {
+  .teaDivider {
+    max-width: 340px;
+  }
+}
+
+/* Sanctuary Footer + Mint Herbarium Accent */
+.sanctuaryFooter {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--ws-border) 68%, transparent);
+}
+
+.footerNote {
+  font-size: var(--fs-micro);
+  color: var(--ws-text-muted);
+  max-width: 30rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.mintCornerAccent {
+  width: 100px;
+  height: auto;
+  margin-left: auto;
+  opacity: 0.65;
+  pointer-events: none;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .mintCornerAccent {
+    width: 140px;
+  }
+}
+
+/* Alerts & Forms */
+.alertBanner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--tint-overdue-border);
+  background: var(--tint-overdue-bg);
+  color: var(--text-overdue);
+  font-size: var(--fs-ui);
+}
+
+.inlineAlert {
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-item);
+  border: 1px solid var(--tint-overdue-border);
+  background: var(--tint-overdue-bg);
+  color: var(--text-overdue);
+  font-size: var(--fs-small);
+  margin: 0;
+}
+
+.formStack {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 0.85rem;
 }
 
-.modalTitle {
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--ws-text);
-  margin: 0;
+.formGridTwo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+@media (min-width: 420px) {
+  .formGridTwo {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.fieldLabel {
+  display: block;
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  color: var(--ws-text-muted);
+  margin-bottom: 0.3rem;
 }
 
 .inputField,
 .selectField {
   width: 100%;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
+  padding: 0.5rem 0.75rem;
+  font-size: var(--fs-ui);
   color: var(--ws-text);
-  background: color-mix(in srgb, var(--ws-bg) 60%, var(--ws-surface));
+  background: color-mix(in srgb, var(--ws-bg) 55%, var(--ws-surface));
   border: 1px solid var(--ws-border);
-  border-radius: var(--radius-md);
-  outline: none;
+  border-radius: var(--radius-sm);
   transition: border-color var(--dur-fast) var(--ease);
 }
 
 .inputField:focus,
 .selectField:focus {
-  border-color: var(--daily-priority-optional);
+  border-color: var(--ws-accent);
 }
 
 .modalFooter {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-}
-
-.cancelBtn {
-  background: var(--ws-surface);
-  border: 1px solid var(--ws-border);
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
-  color: var(--ws-text);
-  cursor: pointer;
-}
-
-.submitBtn {
-  background: var(--daily-priority-optional);
-  color: var(--cosmos-star-white);
-  border: none;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  cursor: pointer;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .habitRow,
-  .checkCircle,
-  .addBtn {
+  .ratioBarProd,
+  .ratioBarLeisure,
+  .inputField,
+  .selectField {
     transition: none;
   }
 }
-

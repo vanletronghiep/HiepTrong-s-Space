@@ -1,87 +1,168 @@
-.container {
+.pageStack {
+  --project-control-border: color-mix(in srgb, var(--ws-accent) 52%, var(--ws-border));
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-5);
+  padding-bottom: var(--space-6);
   width: 100%;
 }
 
-.techGlow {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 1200px;
-  height: 280px;
+@media (min-width: 1024px) {
+  .pageStack {
+    gap: var(--space-6);
+    padding-bottom: var(--space-7);
+  }
+}
+
+.cloudPillarDecor {
+  display: none;
   pointer-events: none;
-  background: radial-gradient(
-    ellipse 70% 60% at 50% 0%,
-    color-mix(in srgb, var(--daily-priority-normal) 10%, transparent) 0%,
-    transparent 75%
-  );
+  user-select: none;
+  position: fixed;
+  left: -24px;
+  top: 22%;
+  width: 156px;
+  height: auto;
+  opacity: 0.42;
   z-index: 0;
 }
 
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  position: relative;
-  z-index: 1;
+@media (min-width: 1280px) {
+  .cloudPillarDecor {
+    display: block;
+  }
 }
 
-.titleArea {
+/* Eastern Strategy Masthead */
+.masthead {
+  position: relative;
+  z-index: 1;
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid color-mix(in srgb, var(--ws-border) 82%, transparent);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
+  align-items: flex-start;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .masthead {
+    flex-direction: row;
+    align-items: flex-end;
+    padding-bottom: var(--space-6);
+  }
+}
+
+.dragonMastheadArt {
+  display: none;
+  position: absolute;
+  top: -14px;
+  right: 0;
+  width: 320px;
+  height: auto;
+  opacity: 0.72;
+  pointer-events: none;
+  user-select: none;
+  mask-image: linear-gradient(270deg, black 42%, transparent 100%);
+  -webkit-mask-image: linear-gradient(270deg, black 42%, transparent 100%);
+}
+
+@media (min-width: 768px) {
+  .dragonMastheadArt {
+    display: block;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dragonMastheadArt {
+    width: 376px;
+    opacity: 0.8;
+  }
+}
+
+.mastheadText {
+  position: relative;
+  z-index: 1;
+  max-width: 40rem;
 }
 
 .eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: var(--fs-small);
-  color: var(--daily-priority-normal);
-  font-weight: 600;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--project-control-border);
+  background: color-mix(in srgb, var(--feature-soft) 55%, var(--ws-surface));
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  color: var(--ws-accent);
 }
 
-.title {
+.displayTitle {
+  margin: var(--space-3) 0 0;
   font-family: var(--font-display);
-  font-size: clamp(2rem, 3.2vw, 2.75rem);
-  font-weight: 600;
+  font-weight: 500;
+  font-size: clamp(2.15rem, 4.4vw, 3.35rem);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.02em;
   color: var(--ws-text);
-  line-height: 1.1;
-  margin: 0;
 }
 
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+.displayTitleEmphasis {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ws-accent);
+}
+
+.mastheadSubtitle {
+  margin: var(--space-2) 0 0;
+  max-width: 36rem;
+  font-size: var(--fs-ui);
+  line-height: var(--lh-body);
+  color: var(--ws-text-muted);
+}
+
+.mastheadActions {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* KPI Rhythm Strip */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  position: relative;
+  z-index: 1;
+}
+
+@media (min-width: 768px) {
+  .statsGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .statCard {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 16px 20px;
-  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-item);
   background: var(--ws-surface);
   border: 1px solid var(--ws-border);
-  box-shadow: var(--shadow-sm);
-  transition: border-color var(--dur-fast) ease-out;
-}
-
-.statCard:hover {
-  border-color: color-mix(in srgb, var(--daily-priority-normal) 40%, var(--ws-border));
+  box-shadow: var(--shadow-task);
 }
 
 .statValue {
-  font-family: var(--font-sans);
+  font-family: var(--font-ui);
   font-size: 2rem;
   font-weight: 700;
   color: var(--ws-text);
@@ -89,147 +170,196 @@
   font-variant-numeric: tabular-nums;
 }
 
+.statValueAccent {
+  color: var(--ws-accent);
+}
+
+.statValueCompleted {
+  color: var(--text-notif-completed);
+}
+
 .statLabel {
   font-size: var(--fs-small);
   color: var(--ws-text-muted);
 }
 
+/* Filter Bar */
 .controlsBar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
+  position: relative;
+  z-index: 1;
 }
 
-.filterTabs {
+.filterGroup {
+  display: flex;
   flex-wrap: wrap;
-  max-width: 100%;
-  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border-radius: var(--radius-pill);
-  background: var(--ws-accent-soft);
-  border: 1px solid var(--ws-border);
+  gap: var(--space-2);
 }
 
-.filterTab {
-  padding: 5px 14px;
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-small);
-  font-weight: 500;
-  color: var(--ws-text-muted);
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  transition: color var(--dur-fast) ease-out, background var(--dur-fast) ease-out;
+.filterChip {
+  min-height: 44px;
 }
 
-.filterTabActive {
-  background: var(--ws-surface);
-  color: var(--ws-text);
-  box-shadow: var(--shadow-sm);
+.filterChip:not([aria-pressed='true']) {
+  border-color: var(--project-control-border);
 }
 
+@media (min-width: 768px) {
+  .filterChip {
+    min-height: 32px;
+  }
+}
+
+.cloudScrollDividerWrap {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-1);
+  pointer-events: none;
+  user-select: none;
+}
+
+.cloudScrollDivider {
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  opacity: 0.72;
+}
+
+@media (min-width: 768px) {
+  .cloudScrollDivider {
+    max-width: 520px;
+  }
+}
+
+/* Responsive Projects Grid */
 .projectsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: var(--space-5);
+  position: relative;
+  z-index: 1;
 }
 
 .projectCard {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 18px;
-  padding: 22px 24px;
-  border-radius: var(--radius-lg);
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
   background: var(--ws-surface);
   border: 1px solid var(--ws-border);
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--dur-fast) ease-out, border-color var(--dur-fast) ease-out,
-    box-shadow var(--dur-fast) ease-out;
-}
-
-.projectCard:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--daily-priority-normal) 40%, var(--ws-border));
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-task);
 }
 
 .projectCardTop {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .cardHeaderRow {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .cardTitle {
-  font-family: var(--font-sans);
+  font-family: var(--font-ui);
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: 1.125rem;
   color: var(--ws-text);
-  line-height: 1.25;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
-.statusBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-micro, 11px);
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.statusBadge_active {
-  background: color-mix(in srgb, var(--daily-priority-normal) 14%, var(--ws-surface));
-  color: var(--daily-priority-normal);
-}
-
-.statusBadge_in_progress {
-  background: color-mix(in srgb, var(--text-due-soon) 14%, var(--ws-surface));
-  color: var(--text-due-soon);
-}
-
-.statusBadge_completed {
-  background: color-mix(in srgb, var(--text-completed) 14%, var(--ws-surface));
-  color: var(--text-completed);
-}
-
-.statusBadge_on_hold {
-  background: var(--ws-accent-soft);
-  color: var(--ws-text-muted);
+.statusBadgeOnHold {
+  border-color: var(--project-control-border);
 }
 
 .cardOverview {
   font-size: var(--fs-small);
   color: var(--ws-text-muted);
-  line-height: 1.55;
+  line-height: var(--lh-body);
+  overflow-wrap: anywhere;
+}
+
+.deadlineLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-micro);
+  color: var(--ws-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .progressSection {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .progressHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
   font-size: var(--fs-small);
 }
 
+.progressControls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.progressStepButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--project-control-border);
+  background: var(--ws-accent-soft);
+  color: var(--ws-text);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.progressStepButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ws-accent) 20%, var(--ws-accent-soft));
+  border-color: var(--ws-accent);
+}
+
+.progressStepButton:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+@media (min-width: 768px) {
+  .progressStepButton {
+    min-width: 38px;
+    min-height: 30px;
+    padding: 0 8px;
+  }
+}
+
 .progressPercent {
+  min-width: 3ch;
+  text-align: center;
   font-weight: 700;
   color: var(--ws-text);
   font-variant-numeric: tabular-nums;
@@ -244,10 +374,18 @@
 }
 
 .progressFill {
+  width: 100%;
   height: 100%;
   border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--daily-priority-normal), var(--cosmos-accent));
-  transition: width 0.4s ease-out;
+  background: var(--ws-accent);
+  transform-origin: left center;
+  transition: transform var(--dur-base) var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    transition: none;
+  }
 }
 
 .nextStepBox {
@@ -256,15 +394,15 @@
   gap: 4px;
   padding: 10px 14px;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--daily-priority-normal) 6%, var(--ws-surface));
-  border: 1px solid color-mix(in srgb, var(--daily-priority-normal) 18%, var(--ws-border));
+  background: color-mix(in srgb, var(--ws-accent) 6%, var(--ws-surface));
+  border: 1px solid color-mix(in srgb, var(--ws-accent) 22%, var(--ws-border));
   font-size: var(--fs-small);
 }
 
 .nextStepLabel {
-  font-size: var(--fs-micro, 11px);
+  font-size: var(--fs-micro);
   font-weight: 700;
-  color: var(--daily-priority-normal);
+  color: var(--ws-accent);
 }
 
 .blockerBox {
@@ -273,13 +411,13 @@
   gap: 4px;
   padding: 10px 14px;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--text-overdue) 6%, var(--ws-surface));
-  border: 1px solid color-mix(in srgb, var(--text-overdue) 20%, var(--ws-border));
+  background: var(--tint-overdue-bg);
+  border: 1px solid var(--tint-overdue-border);
   font-size: var(--fs-small);
 }
 
 .blockerLabel {
-  font-size: var(--fs-micro, 11px);
+  font-size: var(--fs-micro);
   font-weight: 700;
   color: var(--text-overdue);
 }
@@ -291,56 +429,65 @@
 }
 
 .techTag {
-  padding: 2px 8px;
+  padding: 2px 10px;
   border-radius: var(--radius-pill);
   background: var(--ws-accent-soft);
   border: 1px solid var(--ws-border);
-  font-size: var(--fs-micro, 11px);
-  color: var(--ws-text-muted);
+  font-size: var(--fs-micro);
+  color: var(--ws-text);
 }
 
-.modalBackdrop {
-  position: fixed;
-  inset: 0;
-  background: color-mix(in srgb, var(--cosmos-bg) 50%, transparent);
-  backdrop-filter: blur(4px);
-  z-index: var(--z-drawer);
+.cardFooter {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  padding: 20px;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--ws-border);
 }
 
-.modalWindow {
-  position: relative;
-  width: 100%;
-  max-width: 540px;
-  max-height: 90vh;
-  overflow-y: auto;
-  border-radius: var(--radius-lg);
+.emptyContainer {
+  border-radius: var(--radius-card);
   background: var(--ws-surface);
   border: 1px solid var(--ws-border);
-  box-shadow: var(--shadow-lg);
-  padding: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  box-shadow: var(--shadow-task);
 }
 
-.modalCloseButton {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: transparent;
-  border: none;
-  color: var(--ws-text-muted);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: var(--radius-pill);
-}
-
-.modalCloseButton:hover {
+/* Editor Form Controls (WCAG 1.4.11 >= 3:1 Border Contrast) */
+.editorControl {
+  --project-control-border: color-mix(in srgb, var(--ws-accent) 52%, var(--ws-border));
+  width: 100%;
+  border-radius: var(--radius-item);
+  border: 1px solid var(--project-control-border);
+  background: var(--ws-surface);
   color: var(--ws-text);
-  background: var(--ws-accent-soft);
+  font-size: var(--fs-ui);
 }
 
+.editorControlInput {
+  height: 44px;
+  padding: 0 14px;
+}
+
+.editorControlTextarea {
+  padding: 12px 14px;
+  line-height: var(--lh-body);
+}
+
+.jadeEditorOrnament {
+  display: none;
+  width: 112px;
+  height: auto;
+  margin-left: auto;
+  padding-top: var(--space-2);
+  opacity: 0.72;
+  pointer-events: none;
+  user-select: none;
+}
+
+@media (min-width: 900px) {
+  .jadeEditorOrnament {
+    display: block;
+  }
+}

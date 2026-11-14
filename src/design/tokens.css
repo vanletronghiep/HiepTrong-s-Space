@@ -9,6 +9,11 @@
   --journey-flare-light: #fff3d1;
   --journey-space-black: #000000;
   --journey-flare-gold: #ffd08a;
+  /* APCS logo hues, lightened at the introduction for dark-background contrast. */
+  --intro-apcs-advanced: #7d8735;
+  --intro-apcs-program: #403472;
+  --intro-apcs-computer: #f58b24;
+  --intro-apcs-science: #323230;
   --cosmos-text-muted: #a5a5b8;
   --cosmos-lavender: #a78bfa;
   --cosmos-star-white: #ffffff;
@@ -164,3 +169,113 @@
     --y-enter: 0px;
   }
 }
+
+/* Feature palettes: content and explicitly scoped owned overlays only. */
+[data-feature-theme='tasks-hub'] {
+  --feature-canvas: #f5f0fc;
+  --feature-accent: #6c51ac;
+  --feature-soft: #e7ddf7;
+  --feature-ink: #332847;
+  --feature-muted: #635572;
+}
+[data-feature-theme='notification'] {
+  --feature-canvas: #fcf0f4;
+  --feature-accent: #995068;
+  --feature-soft: #f2d8e1;
+  --feature-ink: #482e3a;
+  --feature-muted: #735363;
+}
+[data-feature-theme='events'] {
+  --feature-canvas: #eff8fa;
+  --feature-accent: #367080;
+  --feature-soft: #d5eaf0;
+  --feature-ink: #223d48;
+  --feature-muted: #526a74;
+}
+[data-feature-theme='ai-engineering'] {
+  --feature-canvas: #f2f5f1;
+  --feature-accent: #4f7062;
+  --feature-soft: #dce5df;
+  --feature-ink: #293e35;
+  --feature-muted: #56685f;
+}
+[data-feature-theme='blogs-hub'] {
+  --feature-canvas: #f8f2e7;
+  --feature-accent: #855c3c;
+  --feature-soft: #e9dcc8;
+  --feature-ink: #443326;
+  --feature-muted: #75614d;
+}
+[data-feature-theme='apcs-hub'] {
+  --feature-canvas: #f1f8fc;
+  --feature-accent: #456f99;
+  --feature-soft: #daedf5;
+  --feature-ink: #283c54;
+  --feature-muted: #536b82;
+}
+[data-feature-theme='flashcards'] {
+  --feature-canvas: #f8f5eb;
+  --feature-accent: #78613d;
+  --feature-soft: #e8dfcb;
+  --feature-ink: #3d3527;
+  --feature-muted: #6e6351;
+}
+[data-feature-theme='entertainment-hub'] {
+  --feature-canvas: #f5f2fc;
+  --feature-accent: #79609f;
+  --feature-soft: #e2dcf4;
+  --feature-ink: #373047;
+  --feature-muted: #665771;
+}
+[data-feature-theme='tracking'] {
+  --feature-canvas: #f0f7f1;
+  --feature-accent: #3c735a;
+  --feature-soft: #d9ebdf;
+  --feature-ink: #293f34;
+  --feature-muted: #536e5d;
+}
+[data-feature-theme='project'] {
+  --feature-canvas: #f8f3e9;
+  --feature-accent: #856047;
+  --feature-soft: #e9decd;
+  --feature-ink: #443326;
+  --feature-muted: #75614d;
+}
+[data-feature-theme='learning-room'] {
+  --feature-canvas: #f5f6ed;
+  --feature-accent: #5f754d;
+  --feature-soft: #e2e8d7;
+  --feature-ink: #333e2b;
+  --feature-muted: #616d54;
+}
+[data-feature-theme='personal-achievements'] {
+  --feature-canvas: #faf7ef;
+  --feature-accent: #7a6640;
+  --feature-soft: #e9e1cf;
+  --feature-ink: #403829;
+  --feature-muted: #71644f;
+}
+[data-feature-theme='annual-milestones'] {
+  --feature-canvas: #fcf8e9;
+  --feature-accent: #84651e;
+  --feature-soft: #efe3c0;
+  --feature-ink: #44391e;
+  --feature-muted: #75643c;
+}
+[data-feature-theme] {
+  --ws-bg: var(--feature-canvas);
+  --ws-surface: color-mix(in srgb, var(--feature-canvas) 24%, white);
+  --ws-text: var(--feature-ink);
+  --ws-text-muted: color-mix(in srgb, var(--feature-muted) 85%, var(--feature-ink));
+  --ws-accent: color-mix(in srgb, var(--feature-accent) 55%, var(--feature-ink));
+  --ws-accent-soft: var(--feature-soft);
+  --ws-border: color-mix(in srgb, var(--feature-soft) 85%, var(--feature-muted));
+  --ws-focus: var(--ws-accent);
+  --text-accent: var(--ws-accent);
+}
+[data-note-tone='lavender'] { --note-header: #d2c4ee; --note-body: #f3edfc; --note-ink: #3e315d; }
+[data-note-tone='blush'] { --note-header: #edc6d3; --note-body: #fcf0f4; --note-ink: #65394b; }
+[data-note-tone='blue'] { --note-header: #bdd7ed; --note-body: #edf5fc; --note-ink: #2d4967; }
+[data-note-tone='mint'] { --note-header: #bcdccd; --note-body: #edf7f0; --note-ink: #315742; }
+[data-note-tone='peach'] { --note-header: #efcdb8; --note-body: #fcf2e9; --note-ink: #704631; }
+[data-note-tone='cream'] { --note-header: #e8d9a9; --note-body: #faf6e6; --note-ink: #605124; }

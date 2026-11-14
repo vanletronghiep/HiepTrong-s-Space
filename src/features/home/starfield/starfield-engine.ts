@@ -5,6 +5,7 @@ export interface StarfieldEngineOptions {
   reducedMotion?: boolean;
   enableParallax?: boolean;
   initialQuality?: StarfieldQuality;
+  paused?: boolean;
   seed?: number;
   maxDpr?: number;
 }
@@ -120,12 +121,15 @@ export class StarfieldEngine {
 
   private rafId: number | null = null;
   private running = false;
+  private paused: boolean;
+  private inViewport = true;
   private destroyed = false;
   private lastTimestamp = 0;
   private elapsedSeconds = 0;
   private slowFrameStreak = 0;
 
   private resizeObserver: ResizeObserver | null = null;
+  private intersectionObserver: IntersectionObserver | null = null;
   private readonly handleVisibilityChange: () => void;
   private readonly handlePointerMove: (event: MouseEvent) => void;
 
@@ -138,22 +142,31 @@ export class StarfieldEngine {
     this.quality = options.initialQuality ?? 'high';
     this.reducedMotion = options.reducedMotion ?? false;
     this.enableParallax = options.enableParallax ?? true;
+    this.paused = options.paused ?? false;
     this.palette = readStarPaletteFromTokens();
 
     this.handleVisibilityChange = () => {
       if (this.destroyed) {
         return;
       }
-      if (document.hidden) {
+      if (this.isDocumentHidden()) {
         this.pauseLoop();
-      } else if (this.running && !this.reducedMotion) {
+      } else if (this.canAnimate()) {
         this.lastTimestamp = 0;
         this.scheduleNextFrame();
       }
     };
 
     this.handlePointerMove = (event: MouseEvent) => {
-      if (!this.enableParallax || this.reducedMotion || this.width <= 0 || this.height <= 0) {
+      if (
+        !this.enableParallax ||
+        this.reducedMotion ||
+        this.paused ||
+        !this.inViewport ||
+        this.isDocumentHidden() ||
+        this.width <= 0 ||
+        this.height <= 0
+      ) {
         return;
       }
       const normX = (event.clientX / this.width) * 2 - 1;
@@ -167,6 +180,21 @@ export class StarfieldEngine {
     this.attachObservers();
   }
 
+  private isDocumentHidden(): boolean {
+    return typeof document !== 'undefined' && Boolean(document.hidden);
+  }
+
+  private canAnimate(): boolean {
+    return (
+      !this.destroyed &&
+      this.running &&
+      !this.reducedMotion &&
+      !this.paused &&
+      this.inViewport &&
+      !this.isDocumentHidden()
+    );
+  }
+
   public start(): void {
     if (this.destroyed) {
       return;
@@ -178,7 +206,7 @@ export class StarfieldEngine {
       return;
     }
     this.renderFrame(0);
-    if (typeof document === 'undefined' || !document.hidden) {
+    if (this.canAnimate()) {
       this.lastTimestamp = 0;
       this.scheduleNextFrame();
     }
@@ -187,6 +215,23 @@ export class StarfieldEngine {
   public stop(): void {
     this.running = false;
     this.pauseLoop();
+  }
+
+  public setPaused(paused: boolean): void {
+    if (this.destroyed || this.paused === paused) {
+      return;
+    }
+    this.paused = paused;
+    if (paused) {
+      this.pauseLoop();
+    } else if (this.canAnimate()) {
+      this.lastTimestamp = 0;
+      this.scheduleNextFrame();
+    }
+  }
+
+  public isAnimating(): boolean {
+    return this.rafId !== null;
   }
 
   public setReducedMotion(reduced: boolean): void {
@@ -201,7 +246,7 @@ export class StarfieldEngine {
       this.parallaxY = 0;
       this.pauseLoop();
       this.renderFrame(0);
-    } else if (this.running && (typeof document === 'undefined' || !document.hidden)) {
+    } else if (this.canAnimate()) {
       this.lastTimestamp = 0;
       this.scheduleNextFrame();
     }
@@ -266,6 +311,10 @@ export class StarfieldEngine {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
     }
+    if (this.intersectionObserver) {
+      this.intersectionObserver.disconnect();
+      this.intersectionObserver = null;
+    }
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     }
@@ -289,6 +338,33 @@ export class StarfieldEngine {
         }
       });
       this.resizeObserver.observe(this.canvas);
+    }
+
+    if (typeof IntersectionObserver !== 'undefined') {
+      this.intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          if (this.destroyed) {
+            return;
+          }
+          const entry = entries[entries.length - 1];
+          if (!entry) {
+            return;
+          }
+          const nextVisible = entry.isIntersecting;
+          if (this.inViewport === nextVisible) {
+            return;
+          }
+          this.inViewport = nextVisible;
+          if (!nextVisible) {
+            this.pauseLoop();
+          } else if (this.canAnimate()) {
+            this.lastTimestamp = 0;
+            this.scheduleNextFrame();
+          }
+        },
+        { threshold: 0 },
+      );
+      this.intersectionObserver.observe(this.canvas);
     }
 
     if (typeof document !== 'undefined') {
@@ -428,7 +504,7 @@ export class StarfieldEngine {
   }
 
   private scheduleNextFrame(): void {
-    if (this.rafId !== null || this.destroyed || !this.running || this.reducedMotion) {
+    if (this.rafId !== null || !this.canAnimate()) {
       return;
     }
     this.rafId = window.requestAnimationFrame((timestamp) => {
@@ -445,7 +521,7 @@ export class StarfieldEngine {
   }
 
   private onAnimationFrame(timestamp: number): void {
-    if (this.destroyed || !this.running || this.reducedMotion) {
+    if (!this.canAnimate()) {
       return;
     }
 

@@ -11,6 +11,22 @@ import { TransitionLink } from '@/features/transitions/TransitionLink';
 import { StarIcon } from './StarIcon';
 import { UniverseMenu } from './UniverseMenu';
 import { cn } from './cn';
+import { FeatureTheme, FeatureThemeProvider, type FeatureThemeName } from './FeatureTheme';
+
+const FULL_PAGE_FEATURE_THEMES = new Set<FeatureThemeName>([
+  'events',
+  'notification',
+  'tracking',
+  'project',
+  'annual-milestones',
+  'personal-achievements',
+  'ai-engineering',
+  'blogs-hub',
+  'apcs-hub',
+  'flashcards',
+  'learning-room',
+  'entertainment-hub',
+]);
 
 export interface WorkspaceShellProps {
   children: ReactNode;
@@ -18,7 +34,26 @@ export interface WorkspaceShellProps {
 }
 
 export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
-  const daily = usePathname() === '/tasks/daily';
+  const pathname = usePathname();
+  const daily = pathname === '/tasks/daily';
+  const themes: Record<string, FeatureThemeName> = {
+    '/tasks/hub': 'tasks-hub',
+    '/notifications': 'notification',
+    '/events': 'events',
+    '/ai-engineering': 'ai-engineering',
+    '/blogs': 'blogs-hub',
+    '/apcs': 'apcs-hub',
+    '/flashcards': 'flashcards',
+    '/entertainment': 'entertainment-hub',
+    '/tracking': 'tracking',
+    '/projects': 'project',
+    '/milestones': 'annual-milestones',
+    '/learning-room': 'learning-room',
+    '/achievements': 'personal-achievements',
+  };
+  const featureTheme = themes[pathname];
+  const fullPageTheme =
+    featureTheme && FULL_PAGE_FEATURE_THEMES.has(featureTheme) ? featureTheme : undefined;
   const topbar = useRef<HTMLElement>(null);
   const [scrolled, setScrolled] = useState(false);
   const [universeOpen, setUniverseOpen] = useState(false);
@@ -63,16 +98,23 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
   return (
     <div
       data-theme="workspace"
+      data-feature-theme={fullPageTheme}
+      data-fullpage-theme={fullPageTheme ? 'true' : undefined}
       className={cn(
         'relative min-h-[100svh] bg-ws-bg text-ws-text flex flex-col',
         daily && dailyStyles.workspace,
       )}
     >
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:bg-ws-surface focus:text-ws-text focus:p-3">Skip to content</a>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:bg-ws-surface focus:text-ws-text focus:p-3"
+      >
+        Skip to content
+      </a>
       {/* Faint top lavender ambient wash (≤ 8%, fading by ~40vh) per ui_readme.md §13.1 */}
       {daily ? (
         <DailySky />
-      ) : (
+      ) : !fullPageTheme ? (
         <div
           aria-hidden="true"
           className="pointer-events-none fixed inset-x-0 top-0 h-[40vh]"
@@ -82,17 +124,21 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
               'radial-gradient(ellipse 80% 100% at 50% 0%, color-mix(in srgb, var(--ws-accent) 8%, transparent), transparent 75%)',
           }}
         />
-      )}
+      ) : null}
 
       <header
         ref={topbar}
+        data-fullpage-topbar={fullPageTheme ? 'true' : undefined}
         style={{ zIndex: 'var(--z-nav)', height: daily ? undefined : 'var(--topbar-h)' }}
         className={cn(
           'sticky top-0 w-full border-b',
           daily
             ? cn('border-transparent', dailyStyles.topbar)
             : cn(
-                'bg-[color-mix(in_srgb,var(--ws-bg)_92%,transparent)] backdrop-blur-sm transition-[border-color] duration-[var(--dur-fast)]',
+                'transition-[border-color] duration-[var(--dur-fast)]',
+                fullPageTheme
+                  ? 'backdrop-blur-md'
+                  : 'bg-[color-mix(in_srgb,var(--ws-bg)_92%,transparent)] backdrop-blur-sm',
                 scrolled ? 'border-ws-border' : 'border-transparent',
               ),
         )}
@@ -142,7 +188,9 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
         </div>
       </header>
 
-      <main id="main-content" tabIndex={-1}
+      <main
+        id="main-content"
+        tabIndex={-1}
         style={{ zIndex: 'var(--z-content)' }}
         className={cn(
           'relative flex-1 mx-auto flex flex-col w-full max-w-[var(--max-content)] px-[var(--gutter)] lg:px-[var(--gutter-lg)] py-8',
@@ -150,10 +198,20 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
           daily && dailyStyles.main,
         )}
       >
-        {children}
+        {fullPageTheme ? (
+          <FeatureThemeProvider name={fullPageTheme}>{children}</FeatureThemeProvider>
+        ) : featureTheme ? (
+          <FeatureTheme name={featureTheme}>{children}</FeatureTheme>
+        ) : (
+          children
+        )}
       </main>
 
-      <UniverseMenu open={universeOpen} onClose={() => setUniverseOpen(false)} />
+      <UniverseMenu
+        open={universeOpen}
+        onClose={() => setUniverseOpen(false)}
+        featureTheme={fullPageTheme}
+      />
     </div>
   );
 }
@@ -166,7 +224,10 @@ export interface WorkspacePageHeaderProps {
 
 export function WorkspacePageHeader({ title, description, actions }: WorkspacePageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pb-6">
+    <div
+      data-feature-heading
+      className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pb-6"
+    >
       <div className="space-y-1">
         <div className="flex items-center gap-2.5">
           <h1 className="font-display text-[length:var(--fs-h1)] leading-[var(--lh-heading)] font-normal text-ws-text">

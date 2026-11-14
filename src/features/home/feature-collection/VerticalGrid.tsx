@@ -11,13 +11,19 @@ export interface VerticalGridProps {
   features: readonly FeatureEntry[];
   layout: FeatureCollectionLayout;
   onLayoutChange: (next: FeatureCollectionLayout) => void;
+  revealComplete?: boolean;
 }
 
 /**
  * Traditional 2-column (>=768px) / 1-column (<768px) Vertical layout
  * with content height only and zero sticky/spacer/scroll listeners (§9.9 & ui_readme.md §11.6).
  */
-export function VerticalGrid({ features, layout, onLayoutChange }: VerticalGridProps) {
+export function VerticalGrid({
+  features,
+  layout,
+  onLayoutChange,
+  revealComplete = true,
+}: VerticalGridProps) {
   const reducedMotion = useReducedMotion();
 
   return (
@@ -33,11 +39,12 @@ export function VerticalGrid({ features, layout, onLayoutChange }: VerticalGridP
             <motion.div
               key={feature.id}
               initial={reducedMotion ? false : { opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.15 }}
+              animate={!reducedMotion && !revealComplete ? { opacity: 0, y: 12 } : undefined}
+              whileInView={reducedMotion || revealComplete ? { opacity: 1, y: 0 } : undefined}
+              viewport={{ once: true, amount: 0.12 }}
               transition={{
                 duration: reducedMotion ? 0 : MOTION_DURATION.reveal,
-                delay: reducedMotion ? 0 : (index % 2) * 0.1,
+                delay: reducedMotion ? 0 : (index % 2) * 0.08,
                 ease: MOTION_EASE,
               }}
             >

@@ -45,7 +45,7 @@ export function TaskMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const board = portal ? triggerRef.current?.closest('[data-day]') : null;
+    const board = portal ? triggerRef.current?.closest('[aria-hidden]') : null;
     if (!open || !board || typeof MutationObserver === 'undefined') return;
     // The menu is outside the board's DOM subtree so inert doesn't hide it.
     const observer = new MutationObserver(() => {
@@ -81,7 +81,7 @@ export function TaskMenu({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={handleTriggerClick}
-        className="inline-flex items-center justify-center h-9 w-9 -mr-1.5 -mt-1 rounded-pill text-ws-text-muted hover:text-ws-text hover:bg-ws-accent-soft transition-colors duration-[var(--dur-fast)] cursor-pointer"
+        className="inline-flex items-center justify-center h-9 w-9 -mr-1.5 -mt-1 rounded-pill text-ws-text-muted hover:text-ws-text hover:bg-ws-accent-soft transition-colors duration-[var(--dur-fast)] motion-reduce:transition-none motion-reduce:duration-0 cursor-pointer"
       >
         <MoreHorizontal size={18} strokeWidth={1.5} />
       </button>
@@ -173,7 +173,7 @@ function MenuActionButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2.5 w-full h-10 px-3 rounded-sm text-[length:var(--fs-ui)] font-normal text-left cursor-pointer transition-colors duration-[var(--dur-fast)]',
+        'flex items-center gap-2.5 w-full h-10 px-3 rounded-sm text-[length:var(--fs-ui)] font-normal text-left cursor-pointer transition-colors duration-[var(--dur-fast)] motion-reduce:transition-none motion-reduce:duration-0',
         destructive
           ? 'text-text-overdue hover:bg-tint-overdue-bg'
           : 'text-ws-text hover:bg-ws-accent-soft',

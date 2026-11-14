@@ -118,6 +118,90 @@ body:has(> [data-home-journey]) {
   transition: none !important;
 }
 
+/* Workspace fields keep rounded keyboard rings without browser-default rectangles. */
+[data-theme='workspace']
+  :is(
+    input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='range'],
+      [type='color'],
+      [type='file'],
+      [type='hidden'],
+      [type='button'],
+      [type='submit'],
+      [type='reset'],
+      [type='image'],
+      [data-frameless-search='true']
+    ),
+    textarea,
+    select
+  ):focus {
+  outline: none;
+  box-shadow: none;
+}
+
+[data-theme='workspace']
+  :is(
+    input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='range'],
+      [type='color'],
+      [type='file'],
+      [type='hidden'],
+      [type='button'],
+      [type='submit'],
+      [type='reset'],
+      [type='image'],
+      [data-frameless-search='true']
+    ),
+    textarea,
+    select
+  ):focus:not([aria-invalid='true']) {
+  border-color: color-mix(in srgb, var(--ws-focus) 45%, var(--ws-border));
+}
+
+[data-theme='workspace']
+  :is(
+    input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='range'],
+      [type='color'],
+      [type='file'],
+      [type='hidden'],
+      [type='button'],
+      [type='submit'],
+      [type='reset'],
+      [type='image'],
+      [data-frameless-search='true']
+    ),
+    textarea,
+    select
+  ):focus-visible {
+  box-shadow:
+    0 0 0 2px var(--ws-surface),
+    0 0 0 4px var(--ws-focus);
+  transition: none !important;
+}
+
+/* Frameless menu search stays continuous with its surface while keeping row focus clear. */
+[data-theme='workspace'] [data-frameless-search='true'],
+[data-theme='workspace'] [data-frameless-search='true']:focus,
+[data-theme='workspace'] [data-frameless-search='true']:focus-visible {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+[data-theme='workspace']
+  [data-frameless-search-row='true']:has([data-frameless-search='true']:focus-visible) {
+  background-color: color-mix(in srgb, var(--ws-accent) 6%, var(--ws-surface));
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ws-focus) 55%, transparent);
+  transition: none !important;
+}
+
 .font-display {
   font-family: var(--font-display);
 }
@@ -156,4 +240,254 @@ body:has(> [data-home-journey]) {
   .animate-task-highlight-glow {
     animation: none;
   }
+}
+
+/* Full-page feature canvases for redesigned non-Task routes */
+[data-theme='workspace'][data-fullpage-theme='true'] {
+  background-color: var(--ws-bg);
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='events'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 42% at 86% 6%,
+      color-mix(in srgb, var(--feature-soft) 52%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 68% 46% at 10% 88%,
+      color-mix(in srgb, var(--feature-soft) 44%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 82%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='notification'] {
+  background-image:
+    radial-gradient(
+      ellipse 76% 42% at 88% 8%,
+      color-mix(in srgb, var(--feature-soft) 58%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 64% 48% at 8% 84%,
+      color-mix(in srgb, var(--feature-soft) 46%, transparent),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 84%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='tracking'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 42% at 88% 6%,
+      color-mix(in srgb, var(--feature-soft) 54%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 66% 48% at 10% 86%,
+      color-mix(in srgb, var(--feature-soft) 46%, transparent),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 84%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='ai-engineering'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 42% at 88% 6%,
+      color-mix(in srgb, var(--feature-soft) 56%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 66% 48% at 10% 86%,
+      color-mix(in srgb, var(--feature-soft) 46%, transparent),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 84%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='blogs-hub'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 44% at 86% 6%,
+      color-mix(in srgb, var(--feature-soft) 58%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 68% 48% at 10% 86%,
+      color-mix(in srgb, var(--feature-soft) 46%, transparent),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 84%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='apcs-hub'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 42% at 88% 6%,
+      color-mix(in srgb, var(--feature-soft) 58%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 66% 48% at 10% 86%,
+      color-mix(in srgb, var(--feature-soft) 46%, transparent),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 84%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='flashcards'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 44% at 86% 6%,
+      color-mix(in srgb, var(--feature-soft) 56%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 68% 48% at 10% 86%,
+      color-mix(in srgb, var(--feature-soft) 48%, transparent),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 82%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='learning-room'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 44% at 86% 6%,
+      color-mix(in srgb, var(--feature-soft) 56%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 68% 48% at 10% 86%,
+      color-mix(in srgb, var(--feature-soft) 46%, transparent),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 84%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='entertainment-hub'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 44% at 86% 6%,
+      color-mix(in srgb, var(--feature-soft) 56%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 68% 48% at 10% 86%,
+      color-mix(in srgb, var(--feature-soft) 46%, transparent),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 84%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='project'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 44% at 86% 6%,
+      color-mix(in srgb, var(--feature-soft) 56%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 68% 48% at 10% 86%,
+      color-mix(in srgb, var(--feature-soft) 46%, transparent),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 84%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='annual-milestones'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 44% at 86% 6%,
+      color-mix(in srgb, var(--feature-soft) 56%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 68% 48% at 10% 86%,
+      color-mix(in srgb, var(--feature-soft) 46%, transparent),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 84%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='personal-achievements'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 44% at 86% 6%,
+      color-mix(in srgb, var(--feature-soft) 56%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 68% 48% at 10% 86%,
+      color-mix(in srgb, var(--feature-soft) 46%, transparent),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 84%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
+}
+
+[data-fullpage-topbar='true'] {
+  background-color: color-mix(in srgb, var(--feature-canvas) 84%, transparent);
+  backdrop-filter: blur(10px);
 }

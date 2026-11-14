@@ -1,8 +1,9 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type PointerEvent, type ReactNode } from 'react';
 import type { FeatureEntry, FeatureThumbnailPreset } from '@/features/registry';
 import { cn } from '@/ui/cn';
+import styles from './feature-collection.module.css';
 
 export interface FeatureThumbnailProps {
   thumbnail: FeatureEntry['thumbnail'];
@@ -50,12 +51,12 @@ function renderPresetArtwork(
             points="72,138 124,96 184,108 242,68"
             fill="none"
             stroke={lineAccent}
-            strokeWidth="0.95"
+            strokeWidth="1"
           />
           <circle cx="72" cy="138" r="1.8" fill={nodeColor} />
           <circle cx="124" cy="96" r="2" fill={nodeColor} />
           <circle cx="184" cy="108" r="1.8" fill={nodeColor} />
-          <FourPointStar x={242} y={68} size={6} color={starColor} />
+          <FourPointStar x={242} y={68} size={6.2} color={starColor} />
         </>
       );
 
@@ -80,12 +81,12 @@ function renderPresetArtwork(
             transform="rotate(18 160 100)"
             fill="none"
             stroke={lineAccent}
-            strokeWidth="0.95"
+            strokeWidth="1"
           />
           <line x1="66" y1="126" x2="254" y2="74" stroke={lineSoft} strokeWidth="0.75" />
           <circle cx="160" cy="100" r="2.2" fill={nodeColor} />
           <circle cx="104" cy="84" r="1.6" fill={nodeColor} />
-          <FourPointStar x={221} y={83} size={5.8} color={starColor} />
+          <FourPointStar x={221} y={83} size={6} color={starColor} />
         </>
       );
 
@@ -100,12 +101,12 @@ function renderPresetArtwork(
             ry="64"
             fill="none"
             stroke={lineAccent}
-            strokeWidth="0.85"
+            strokeWidth="0.95"
           />
           <line x1="80" y1="100" x2="240" y2="100" stroke={lineSoft} strokeWidth="0.8" />
           <line x1="160" y1="24" x2="160" y2="176" stroke={lineSoft} strokeWidth="0.8" />
           <circle cx="128" cy="100" r="1.8" fill={nodeColor} />
-          <FourPointStar x={192} y={68} size={5.6} color={starColor} />
+          <FourPointStar x={192} y={68} size={5.8} color={starColor} />
         </>
       );
 
@@ -113,25 +114,25 @@ function renderPresetArtwork(
       return (
         <>
           <line x1="78" y1="64" x2="158" y2="54" stroke={lineSoft} strokeWidth="0.8" />
-          <line x1="78" y1="64" x2="148" y2="112" stroke={lineAccent} strokeWidth="0.9" />
+          <line x1="78" y1="64" x2="148" y2="112" stroke={lineAccent} strokeWidth="0.95" />
           <line x1="78" y1="136" x2="158" y2="54" stroke={lineSoft} strokeWidth="0.8" />
           <line x1="78" y1="136" x2="148" y2="112" stroke={lineSoft} strokeWidth="0.8" />
-          <line x1="158" y1="54" x2="238" y2="96" stroke={lineAccent} strokeWidth="0.95" />
-          <line x1="148" y1="112" x2="238" y2="96" stroke={lineAccent} strokeWidth="0.95" />
+          <line x1="158" y1="54" x2="238" y2="96" stroke={lineAccent} strokeWidth="1" />
+          <line x1="148" y1="112" x2="238" y2="96" stroke={lineAccent} strokeWidth="1" />
           <line x1="148" y1="112" x2="224" y2="148" stroke={lineSoft} strokeWidth="0.8" />
           <circle cx="78" cy="64" r="2" fill={nodeColor} />
           <circle cx="78" cy="136" r="2" fill={nodeColor} />
           <circle cx="158" cy="54" r="2" fill={nodeColor} />
           <circle cx="148" cy="112" r="2.2" fill={nodeColor} />
           <circle cx="224" cy="148" r="1.8" fill={nodeColor} />
-          <FourPointStar x={238} y={96} size={6} color={starColor} />
+          <FourPointStar x={238} y={96} size={6.2} color={starColor} />
         </>
       );
 
     case 'manuscript-lines':
       return (
         <>
-          <line x1="76" y1="68" x2="218" y2="68" stroke={lineAccent} strokeWidth="0.95" />
+          <line x1="76" y1="68" x2="218" y2="68" stroke={lineAccent} strokeWidth="1" />
           <line x1="76" y1="92" x2="244" y2="92" stroke={lineSoft} strokeWidth="0.85" />
           <line x1="76" y1="116" x2="204" y2="116" stroke={lineSoft} strokeWidth="0.85" />
           <line x1="76" y1="140" x2="156" y2="140" stroke={lineSoft} strokeWidth="0.85" />
@@ -139,9 +140,9 @@ function renderPresetArtwork(
             d="M 214 148 A 56 56 0 0 0 246 62"
             fill="none"
             stroke={lineAccent}
-            strokeWidth="0.85"
+            strokeWidth="0.9"
           />
-          <FourPointStar x={234} y={68} size={5.5} color={starColor} />
+          <FourPointStar x={234} y={68} size={5.8} color={starColor} />
         </>
       );
 
@@ -153,7 +154,7 @@ function renderPresetArtwork(
             points="160,48 206,128 114,128"
             fill="none"
             stroke={lineAccent}
-            strokeWidth="0.9"
+            strokeWidth="0.95"
           />
           <line
             x1="160"
@@ -166,7 +167,7 @@ function renderPresetArtwork(
           />
           <circle cx="114" cy="128" r="1.8" fill={nodeColor} />
           <circle cx="206" cy="128" r="1.8" fill={nodeColor} />
-          <FourPointStar x={160} y={48} size={5.8} color={starColor} />
+          <FourPointStar x={160} y={48} size={6} color={starColor} />
         </>
       );
 
@@ -191,7 +192,7 @@ function renderPresetArtwork(
             rx="8"
             fill="none"
             stroke={lineAccent}
-            strokeWidth="0.95"
+            strokeWidth="1"
           />
           <path
             d="M 112 52 A 74 74 0 0 1 218 70"
@@ -200,7 +201,7 @@ function renderPresetArtwork(
             strokeWidth="0.8"
             strokeDasharray="3 4"
           />
-          <FourPointStar x={184} y={111} size={5.6} color={starColor} />
+          <FourPointStar x={184} y={111} size={5.8} color={starColor} />
         </>
       );
 
@@ -211,7 +212,7 @@ function renderPresetArtwork(
             d="M 52 106 C 96 68, 144 142, 188 100 C 218 72, 246 86, 268 96"
             fill="none"
             stroke={lineAccent}
-            strokeWidth="0.95"
+            strokeWidth="1"
           />
           <path
             d="M 52 122 C 98 92, 146 154, 194 114 C 224 90, 248 102, 268 110"
@@ -220,7 +221,7 @@ function renderPresetArtwork(
             strokeWidth="0.8"
           />
           <circle cx="122" cy="105" r="1.7" fill={nodeColor} />
-          <FourPointStar x={212} y={84} size={5.6} color={starColor} />
+          <FourPointStar x={212} y={84} size={5.8} color={starColor} />
         </>
       );
 
@@ -232,11 +233,11 @@ function renderPresetArtwork(
             points="66,112 108,112 128,76 154,132 178,92 204,112 254,112"
             fill="none"
             stroke={lineAccent}
-            strokeWidth="1"
+            strokeWidth="1.05"
           />
           <circle cx="108" cy="112" r="1.8" fill={nodeColor} />
           <circle cx="178" cy="92" r="1.8" fill={nodeColor} />
-          <FourPointStar x={128} y={76} size={5.8} color={starColor} />
+          <FourPointStar x={128} y={76} size={6} color={starColor} />
         </>
       );
 
@@ -249,7 +250,7 @@ function renderPresetArtwork(
             points="88,146 146,98 196,112 238,60"
             fill="none"
             stroke={lineAccent}
-            strokeWidth="0.95"
+            strokeWidth="1"
           />
           <path
             d="M 88 104 A 42 42 0 0 1 122 118"
@@ -259,18 +260,18 @@ function renderPresetArtwork(
           />
           <circle cx="146" cy="98" r="1.9" fill={nodeColor} />
           <circle cx="196" cy="112" r="1.9" fill={nodeColor} />
-          <FourPointStar x={238} y={60} size={6} color={starColor} />
+          <FourPointStar x={238} y={60} size={6.2} color={starColor} />
         </>
       );
 
     case 'summit-trajectory':
       return (
         <>
-          <path d="M 64 150 Q 148 134 226 56" fill="none" stroke={lineAccent} strokeWidth="1" />
+          <path d="M 64 150 Q 148 134 226 56" fill="none" stroke={lineAccent} strokeWidth="1.05" />
           <circle cx="226" cy="56" r="26" fill="none" stroke={lineSoft} strokeWidth="0.8" />
           <circle cx="114" cy="138" r="1.8" fill={nodeColor} />
           <circle cx="168" cy="108" r="1.9" fill={nodeColor} />
-          <FourPointStar x={226} y={56} size={6} color={starColor} />
+          <FourPointStar x={226} y={56} size={6.2} color={starColor} />
         </>
       );
 
@@ -278,13 +279,13 @@ function renderPresetArtwork(
       return (
         <>
           <circle cx="160" cy="100" r="66" fill="none" stroke={lineSoft} strokeWidth="0.8" />
-          <circle cx="160" cy="100" r="40" fill="none" stroke={lineAccent} strokeWidth="0.95" />
+          <circle cx="160" cy="100" r="40" fill="none" stroke={lineAccent} strokeWidth="1" />
           <circle cx="160" cy="100" r="16" fill="none" stroke={lineSoft} strokeWidth="0.8" />
           <line x1="160" y1="24" x2="160" y2="48" stroke={lineSoft} strokeWidth="0.8" />
           <line x1="160" y1="152" x2="160" y2="176" stroke={lineSoft} strokeWidth="0.8" />
           <line x1="84" y1="100" x2="108" y2="100" stroke={lineSoft} strokeWidth="0.8" />
           <line x1="212" y1="100" x2="236" y2="100" stroke={lineSoft} strokeWidth="0.8" />
-          <FourPointStar x={160} y={100} size={5.8} color={starColor} />
+          <FourPointStar x={160} y={100} size={6} color={starColor} />
         </>
       );
 
@@ -301,44 +302,88 @@ function renderPresetArtwork(
             points="92,132 126,88 160,62 194,88 228,132"
             fill="none"
             stroke={lineAccent}
-            strokeWidth="0.95"
+            strokeWidth="1"
           />
           <circle cx="92" cy="132" r="1.7" fill={nodeColor} />
           <circle cx="126" cy="88" r="1.9" fill={nodeColor} />
           <circle cx="194" cy="88" r="1.9" fill={nodeColor} />
           <circle cx="228" cy="132" r="1.7" fill={nodeColor} />
-          <FourPointStar x={160} y={62} size={6.2} color={starColor} />
+          <FourPointStar x={160} y={62} size={6.4} color={starColor} />
         </>
       );
   }
 }
 
 export function FeatureThumbnail({ thumbnail, className }: FeatureThumbnailProps) {
-  const accentToken =
+  const glow = useRef<HTMLDivElement>(null);
+  const frame = useRef(0);
+  const pointer = useRef({ x: 0, y: 0 });
+  const enabled = useRef(false);
+
+  const hideGlow = () => {
+    cancelAnimationFrame(frame.current);
+    frame.current = 0;
+    glow.current?.removeAttribute('data-active');
+  };
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => {
+      enabled.current = finePointer.matches && !reducedMotion.matches;
+      if (!enabled.current) hideGlow();
+    };
+    update();
+    finePointer.addEventListener('change', update);
+    reducedMotion.addEventListener('change', update);
+    return () => {
+      finePointer.removeEventListener('change', update);
+      reducedMotion.removeEventListener('change', update);
+      cancelAnimationFrame(frame.current);
+    };
+  }, []);
+
+  const moveGlow = (event: PointerEvent<HTMLDivElement>) => {
+    if (!enabled.current || event.pointerType !== 'mouse') return;
+    pointer.current = { x: event.clientX, y: event.clientY };
+    if (frame.current) return;
+    const surface = event.currentTarget;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      if (!glow.current) return;
+      const bounds = surface.getBoundingClientRect();
+      glow.current.style.transform =
+        `translate3d(${pointer.current.x - bounds.left}px, ${pointer.current.y - bounds.top}px, 0)`;
+      glow.current.dataset.active = 'true';
+    });
+  };
+
+  const fallbackAccent =
     thumbnail.accent === 'lavender' ? 'var(--cosmos-lavender)' : 'var(--cosmos-star-blue)';
-  const lineSoft = 'color-mix(in srgb, var(--cosmos-text) 18%, transparent)';
-  const lineAccent = `color-mix(in srgb, ${accentToken} 52%, transparent)`;
-  const nodeColor = 'color-mix(in srgb, var(--cosmos-star-pale) 75%, transparent)';
+  const accentToken = `var(--card-accent, ${fallbackAccent})`;
+  const lineSoft = 'color-mix(in srgb, var(--cosmos-text) 20%, transparent)';
+  const lineAccent = `color-mix(in srgb, ${accentToken} 58%, transparent)`;
+  const nodeColor = 'color-mix(in srgb, var(--cosmos-star-pale) 80%, transparent)';
 
   return (
     <div
+      onPointerEnter={moveGlow}
+      onPointerMove={moveGlow}
+      onPointerLeave={hideGlow}
+      onPointerCancel={hideGlow}
       className={cn(
         'relative aspect-[16/10] w-full overflow-hidden rounded-card select-none',
+        styles.thumbSurface,
         className,
       )}
-      style={{
-        background:
-          'linear-gradient(145deg, var(--cosmos-bg-0) 0%, var(--cosmos-bg-1) 58%, var(--cosmos-bg-2) 100%)',
-        boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--cosmos-text) 10%, transparent)',
-      }}
     >
-      <div
-        className={cn(
-          'h-full w-full transition-[transform,filter] duration-[260ms] ease-[var(--ease)]',
-          '[@media(hover:hover)]:group-hover:brightness-[1.06] group-focus-visible:brightness-[1.06]',
-          'motion-safe:[@media(hover:hover)]:group-hover:scale-[1.018] motion-safe:group-focus-visible:scale-[1.018]',
-        )}
-      >
+      {/* Pre-blended per-feature radial accent glow (compositor opacity/scale only) */}
+      <div aria-hidden="true" className={styles.thumbGlow} />
+      <div ref={glow} aria-hidden="true" className={styles.pointerGlow} />
+
+      {/* Composited SVG vector reveal strictly inside overflow-hidden bounds */}
+      <div className={styles.thumbArtwork}>
         {thumbnail.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -348,35 +393,21 @@ export function FeatureThumbnail({ thumbnail, className }: FeatureThumbnailProps
             className="h-full w-full object-cover"
           />
         ) : (
-          <>
-            {/* Faint radial tonal emphasis per feature */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background: `radial-gradient(circle at 68% 36%, color-mix(in srgb, ${accentToken} 9%, transparent), transparent 66%)`,
-              }}
-            />
-            <svg
-              viewBox="0 0 320 200"
-              aria-hidden="true"
-              className="relative h-full w-full block"
-              preserveAspectRatio="xMidYMid meet"
-            >
-              {renderPresetArtwork(thumbnail.preset, lineSoft, lineAccent, accentToken, nodeColor)}
-            </svg>
-          </>
+          <svg
+            viewBox="0 0 320 200"
+            aria-hidden="true"
+            className="relative block h-full w-full"
+            preserveAspectRatio="xMidYMid meet"
+          >
+            {renderPresetArtwork(thumbnail.preset, lineSoft, lineAccent, accentToken, nodeColor)}
+          </svg>
         )}
       </div>
 
-      {/* Preserve crisp inner hairline above scaled artwork */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 rounded-card"
-        style={{
-          boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--cosmos-text) 10%, transparent)',
-        }}
-      />
+      {/* Resting subtle hairline */}
+      <div aria-hidden="true" className={styles.thumbHairlineBase} />
+      {/* Expressive accent border hairline overlay (opacity only) */}
+      <div aria-hidden="true" className={styles.thumbHairlineAccent} />
     </div>
   );
 }

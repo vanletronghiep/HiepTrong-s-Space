@@ -140,5 +140,13 @@ describe('BellButton & NotificationPopover (§9.11, §15)', () => {
 
     expect(await screen.findByText('All caught up.')).toBeInTheDocument();
     expect(screen.getByText('Your universe is running smoothly.')).toBeInTheDocument();
+
+    const hubLink = screen.getByRole('link', { name: /expand notification center/i });
+    expect(hubLink).toHaveAttribute('href', '/notifications');
+    fireEvent.click(hubLink);
+    expect(pushMock).toHaveBeenCalledWith('/notifications');
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Notifications' })).not.toBeInTheDocument();
+    });
   });
 });

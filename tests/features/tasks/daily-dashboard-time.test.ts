@@ -1,6 +1,16 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
+import { createElement } from 'react';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildZonedInstant, DEFAULT_APP_TIMEZONE } from '@/domain/time';
+import { DailyDashboard } from '@/features/tasks/DailyDashboard';
 import { getDailyClock } from '@/features/tasks/daily-dashboard-time';
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const formatter = new Intl.DateTimeFormat('en-GB', {
   timeZone: DEFAULT_APP_TIMEZONE,
@@ -32,5 +42,50 @@ describe('Daily dashboard clock', () => {
       countdown: '-24:00:00 until 00:00',
       progress: 0,
     });
+  });
+
+  it('updates DayArc on minute boundaries using compositor transform instead of 1Hz layout loops', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-04T16:58:58.000Z')); // 23:58:58 Asia/Ho_Chi_Minh
+
+    render(createElement(DailyDashboard, { done: 1, total: 3, timeZone: DEFAULT_APP_TIMEZONE }));
+
+    const arc = screen.getByRole('region', { name: 'Day arc' });
+    const moon = arc.querySelector('[class*="moon"]') as HTMLElement;
+    const track = moon.parentElement as HTMLElement;
+    const elapsed = arc.querySelector('[class*="arcElapsed"]') as SVGPathElement;
+
+    expect(screen.getByText('23:58')).toBeInTheDocument();
+    expect(moon.style.left).toBe('');
+    expect(moon.style.top).toBe('');
+    expect(track.style.transform).toContain('translate3d(');
+
+    const initialTransform = track.style.transform;
+    const initialClipPath = elapsed.style.clipPath;
+
+    // 1s later within the same minute -> no DOM/style churn
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.getByText('23:58')).toBeInTheDocument();
+    expect(track.style.transform).toBe(initialTransform);
+    expect(elapsed.style.clipPath).toBe(initialClipPath);
+
+    // Cross minute boundary (23:58:59 -> 23:59:00.100) -> discrete step
+    act(() => {
+      vi.advanceTimersByTime(1100);
+    });
+    expect(screen.getByText('23:59')).toBeInTheDocument();
+    expect(track.style.transform).not.toBe(initialTransform);
+    expect(elapsed.style.clipPath).not.toBe(initialClipPath);
+
+    // 2500ms idle within 23:59 -> zero idle updates
+    const settledTransform = track.style.transform;
+    const settledClipPath = elapsed.style.clipPath;
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+    expect(track.style.transform).toBe(settledTransform);
+    expect(elapsed.style.clipPath).toBe(settledClipPath);
   });
 });

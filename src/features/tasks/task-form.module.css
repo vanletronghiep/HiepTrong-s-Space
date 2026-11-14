@@ -1,0 +1,26 @@
+.titleMessage {
+  display: grid;
+}
+.titleMessageSlot {
+  grid-area: 1 / 1;
+}
+.titleReserveText::before {
+  content: attr(data-reserve-text);
+}
+.titleInvalid {
+  animation: title-attention 380ms var(--ease);
+}
+@keyframes title-attention {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  40% {
+    box-shadow: 0 0 0 4px var(--tint-overdue-bg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .titleInvalid {
+    animation: none;
+  }
+}

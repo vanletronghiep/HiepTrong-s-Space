@@ -1,92 +1,177 @@
-.container {
+.pageStack {
+  --milestone-control-border: color-mix(in srgb, var(--ws-text-muted) 64%, var(--ws-border));
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-5);
+  padding-bottom: var(--space-6);
   width: 100%;
 }
 
-.horizonGlow {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 1200px;
-  height: 280px;
+@media (min-width: 1024px) {
+  .pageStack {
+    gap: var(--space-6);
+    padding-bottom: var(--space-7);
+  }
+}
+
+.pennantMarginDecor {
+  display: none;
   pointer-events: none;
-  background: radial-gradient(
-    ellipse 70% 60% at 50% 0%,
-    color-mix(in srgb, var(--cosmos-star) 10%, transparent) 0%,
-    transparent 75%
-  );
+  user-select: none;
+  position: fixed;
+  left: -18px;
+  top: 20%;
+  width: 148px;
+  height: auto;
+  opacity: 0.42;
   z-index: 0;
 }
 
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  position: relative;
-  z-index: 1;
+@media (min-width: 1280px) {
+  .pennantMarginDecor {
+    display: block;
+  }
 }
 
-.titleArea {
+/* Yearbook of Ambitions Masthead */
+.masthead {
+  position: relative;
+  z-index: 1;
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid color-mix(in srgb, var(--ws-border) 82%, transparent);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
+  align-items: flex-start;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .masthead {
+    flex-direction: row;
+    align-items: flex-end;
+    padding-bottom: var(--space-6);
+  }
+}
+
+.mastheadHallArt {
+  display: none;
+  position: absolute;
+  top: -10px;
+  right: 0;
+  width: 320px;
+  height: auto;
+  opacity: 0.72;
+  pointer-events: none;
+  user-select: none;
+  mask-image: linear-gradient(270deg, black 42%, transparent 100%);
+  -webkit-mask-image: linear-gradient(270deg, black 42%, transparent 100%);
+}
+
+@media (min-width: 768px) {
+  .mastheadHallArt {
+    display: block;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mastheadHallArt {
+    width: 376px;
+    opacity: 0.8;
+  }
+}
+
+.mastheadText {
+  position: relative;
+  z-index: 1;
+  max-width: 40rem;
 }
 
 .eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: var(--fs-small);
-  color: var(--cosmos-star);
-  font-weight: 600;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--milestone-control-border);
+  background: color-mix(in srgb, var(--feature-soft) 55%, var(--ws-surface));
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  color: var(--ws-accent);
 }
 
-.title {
+.displayTitle {
+  margin: var(--space-3) 0 0;
   font-family: var(--font-display);
-  font-size: clamp(2rem, 3.2vw, 2.75rem);
-  font-weight: 600;
+  font-weight: 500;
+  font-size: clamp(2.15rem, 4.4vw, 3.35rem);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.02em;
   color: var(--ws-text);
-  line-height: 1.1;
-  margin: 0;
 }
 
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+.mastheadSubtitle {
+  margin: var(--space-2) 0 0;
+  max-width: 36rem;
+  font-size: var(--fs-ui);
+  line-height: var(--lh-body);
+  color: var(--ws-text-muted);
+}
+
+.mastheadActions {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Stationary 3-Card Trajectory Strip */
+.statsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  position: relative;
+  z-index: 1;
+}
+
+@media (min-width: 640px) {
+  .statsGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
 }
 
 .statCard {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 16px 20px;
-  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-item);
   background: var(--ws-surface);
   border: 1px solid var(--ws-border);
-  box-shadow: var(--shadow-sm);
-  transition: border-color var(--dur-fast) ease-out;
-}
-
-.statCard:hover {
-  border-color: color-mix(in srgb, var(--cosmos-star) 40%, var(--ws-border));
+  box-shadow: var(--shadow-task);
+  min-width: 0;
 }
 
 .statValue {
-  font-family: var(--font-sans);
-  font-size: 2rem;
+  font-family: var(--font-ui);
+  font-size: 1.875rem;
   font-weight: 700;
   color: var(--ws-text);
-  line-height: 1;
+  line-height: 1.05;
   font-variant-numeric: tabular-nums;
+}
+
+.statValueCompleted {
+  color: var(--text-completed);
+}
+
+.statValueAccent {
+  color: var(--ws-accent);
 }
 
 .statLabel {
@@ -94,35 +179,129 @@
   color: var(--ws-text-muted);
 }
 
+/* Chapter & Filter Controls */
+.controlsBar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  position: relative;
+  z-index: 1;
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.filterCluster {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+@media (min-width: 768px) {
+  .filterCluster {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4);
+  }
+}
+
+.filterGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.filterGroupLabel {
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  color: var(--ws-text-muted);
+  margin-right: var(--space-1);
+}
+
+.filterChip {
+  min-height: 44px;
+}
+
+.filterChip:not([aria-pressed='true']) {
+  border-color: var(--milestone-control-border);
+}
+
+@media (min-width: 768px) {
+  .filterChip {
+    min-height: 32px;
+  }
+}
+
+/* Folio Cards */
 .milestonesList {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-5);
+  position: relative;
+  z-index: 1;
 }
 
 .milestoneCard {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 24px 28px;
-  border-radius: var(--radius-lg);
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
   background: var(--ws-surface);
   border: 1px solid var(--ws-border);
-  box-shadow: var(--shadow-sm);
-  transition: border-color var(--dur-fast) ease-out, box-shadow var(--dur-fast) ease-out;
+  box-shadow: var(--shadow-task);
+  min-width: 0;
 }
 
-.milestoneCard:hover {
-  border-color: color-mix(in srgb, var(--cosmos-star) 40%, var(--ws-border));
-  box-shadow: var(--shadow-md);
+@media (min-width: 640px) {
+  .milestoneCard {
+    padding: var(--space-5);
+  }
+}
+
+.milestoneCard[data-achieved='true'] {
+  border-color: color-mix(in srgb, var(--ws-accent) 45%, var(--ws-border));
+  background: linear-gradient(
+    145deg,
+    var(--ws-surface) 0%,
+    color-mix(in srgb, var(--ws-accent-soft) 36%, var(--ws-surface)) 100%
+  );
 }
 
 .cardHeaderRow {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+@media (min-width: 640px) {
+  .cardHeaderRow {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+}
+
+.cardHeaderMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.cardMetaLine {
+  display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .timeframeBadge {
@@ -131,25 +310,56 @@
   gap: 6px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--cosmos-star) 14%, var(--ws-surface));
+  background: color-mix(in srgb, var(--ws-accent-soft) 72%, var(--ws-surface));
+  border: 1px solid var(--ws-border);
   color: var(--ws-text);
-  font-size: var(--fs-micro, 11px);
+  font-size: var(--fs-micro);
   font-weight: 600;
 }
 
+.categoryLabel {
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  color: var(--ws-text-muted);
+}
+
+.targetDateLabel {
+  font-size: var(--fs-micro);
+  color: var(--ws-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .cardTitle {
-  font-family: var(--font-sans);
-  font-weight: 700;
-  font-size: 1.25rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(1.375rem, 2.2vw, 1.75rem);
   color: var(--ws-text);
-  line-height: 1.25;
+  line-height: var(--lh-heading);
+  overflow-wrap: anywhere;
+}
+
+.cardHeaderAside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.progressReadout {
+  font-size: var(--fs-ui);
+  font-weight: 700;
+  color: var(--ws-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .cardMeaning {
-  font-size: var(--fs-ui);
+  font-size: var(--fs-body);
   color: var(--ws-text);
-  line-height: 1.55;
+  line-height: var(--lh-body);
   font-style: italic;
+  max-width: 66ch;
+  overflow-wrap: anywhere;
 }
 
 .reflectionBox {
@@ -158,58 +368,97 @@
   gap: 4px;
   padding: 12px 16px;
   border-radius: var(--radius-sm);
-  background: var(--ws-bg);
-  border-left: 3px solid var(--cosmos-star);
+  background: color-mix(in srgb, var(--ws-bg) 75%, var(--ws-surface));
+  border-left: 3px solid var(--ws-accent);
   font-size: var(--fs-small);
+  line-height: var(--lh-body);
 }
 
 .reflectionLabel {
-  font-size: var(--fs-micro, 11px);
+  font-size: var(--fs-micro);
   font-weight: 700;
   color: var(--ws-text-muted);
 }
 
+.reflectionText {
+  color: var(--ws-text);
+  max-width: 66ch;
+  overflow-wrap: anywhere;
+}
+
+/* Landmarks Checklist */
 .landmarksSection {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 .landmarksHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
   font-size: var(--fs-small);
   font-weight: 600;
   color: var(--ws-text);
 }
 
+.landmarksCount {
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  color: var(--ws-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .landmarksList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
-.landmarkItem {
+.landmarkRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
+  min-height: 44px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  background: var(--ws-accent-soft);
+  background: color-mix(in srgb, var(--ws-accent-soft) 52%, var(--ws-surface));
   border: 1px solid var(--ws-border);
-  cursor: pointer;
-  transition: background var(--dur-fast) ease-out;
 }
 
-.landmarkItem:hover {
-  background: color-mix(in srgb, var(--ws-accent-soft) 80%, var(--ws-accent-soft));
+@media (min-width: 768px) {
+  .landmarkRow {
+    min-height: 38px;
+  }
+}
+
+.landmarkCheckboxTouch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -8px 0 -8px -8px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .landmarkCheckboxTouch {
+    min-width: 28px;
+    min-height: 28px;
+    margin: 0;
+  }
 }
 
 .landmarkTitle {
   font-size: var(--fs-small);
+  line-height: var(--lh-body);
   color: var(--ws-text);
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .landmarkTitleDone {
@@ -217,46 +466,161 @@
   color: var(--ws-text-muted);
 }
 
-.modalBackdrop {
-  position: fixed;
-  inset: 0;
-  background: color-mix(in srgb, var(--cosmos-bg) 50%, transparent);
-  backdrop-filter: blur(4px);
-  z-index: var(--z-drawer);
+/* Card Footer Actions */
+.cardFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--ws-border);
+}
+
+.statusControlGroup {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 20px;
+  gap: var(--space-2);
 }
 
-.modalWindow {
-  position: relative;
-  width: 100%;
-  max-width: 540px;
-  border-radius: var(--radius-lg);
+.statusSelect {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--milestone-control-border);
+  background: var(--ws-surface);
+  color: var(--ws-text);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.statusSelect:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (min-width: 768px) {
+  .statusSelect {
+    min-height: 34px;
+  }
+}
+
+.cardActionButtons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.emptyContainer {
+  border-radius: var(--radius-card);
   background: var(--ws-surface);
   border: 1px solid var(--ws-border);
-  box-shadow: var(--shadow-lg);
-  padding: 28px;
+  box-shadow: var(--shadow-task);
+  position: relative;
+  z-index: 1;
+}
+
+/* Section Divider & Footer Colophon */
+.streamerDividerWrap {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-1);
+  pointer-events: none;
+  user-select: none;
+  position: relative;
+  z-index: 1;
+}
+
+.streamerDivider {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+  opacity: 0.72;
+}
+
+@media (min-width: 768px) {
+  .streamerDivider {
+    max-width: 380px;
+  }
+}
+
+.colophonFooter {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid color-mix(in srgb, var(--ws-border) 82%, transparent);
+}
+
+.colophonText {
+  font-size: var(--fs-small);
+  color: var(--ws-text-muted);
+  max-width: 44ch;
+}
+
+.colophonRibbon {
+  width: 96px;
+  height: auto;
+  opacity: 0.72;
+  pointer-events: none;
+  user-select: none;
+  margin-left: auto;
+}
+
+@media (min-width: 768px) {
+  .colophonRibbon {
+    width: 132px;
+  }
+}
+
+/* Editor Form Controls (WCAG 1.4.11 >= 3:1 Border Contrast) */
+.editorControl {
+  --milestone-control-border: color-mix(in srgb, var(--ws-text-muted) 64%, var(--ws-border));
+  width: 100%;
+  border-radius: var(--radius-item);
+  border: 1px solid var(--milestone-control-border);
+  background: var(--ws-surface);
+  color: var(--ws-text);
+  font-size: var(--fs-ui);
+}
+
+.editorControlInput {
+  height: 44px;
+  padding: 0 14px;
+}
+
+.editorControlTextarea {
+  padding: 12px 14px;
+  line-height: var(--lh-body);
+}
+
+.editorLandmarkList {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-2);
 }
 
-.modalCloseButton {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: transparent;
-  border: none;
-  color: var(--ws-text-muted);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: var(--radius-pill);
+.editorLandmarkRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.modalCloseButton:hover {
-  color: var(--ws-text);
-  background: var(--ws-accent-soft);
+.editorLandmarkInput {
+  flex: 1 1 200px;
+  min-width: 0;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .statusSelect {
+    transition: none;
+  }
+}

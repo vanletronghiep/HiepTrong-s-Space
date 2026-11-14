@@ -94,7 +94,7 @@ export function MonthView({
         ))}
       </div>
 
-      <section key={monthLabel} className={styles.grid} aria-label={`${monthLabel} calendar`}>
+      <section className={styles.grid} aria-label={`${monthLabel} calendar`}>
         {cells.map((cell, index) => {
           const dayTasks = tasksByDate.get(cell.scheduledDate) ?? [];
           let completedCount = 0;
@@ -110,7 +110,7 @@ export function MonthView({
 
           return (
             <button
-              key={cell.scheduledDate}
+              key={index}
               type="button"
               onClick={() => setSelectedDate(cell.scheduledDate)}
               aria-current={isToday ? 'date' : undefined}
@@ -122,7 +122,7 @@ export function MonthView({
                 !cell.inCurrentMonth && styles.adjacent,
                 isToday && styles.today,
               )}
-              style={{ animationDelay: `${Math.floor(index / 7) * 26 + (index % 7) * 8}ms` }}
+              style={{ animationDelay: `${Math.floor(index / 7) * 12}ms` }}
             >
               <span className={styles.cellHeader} aria-hidden="true">
                 <span>{cell.dayNumber}</span>

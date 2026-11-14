@@ -51,3 +51,74 @@ export function getFeatureCollectionLayoutPreference(): FeatureCollectionLayout 
 export function setFeatureCollectionLayoutPreference(layout: FeatureCollectionLayout): void {
   safeSetItem(STORAGE_KEYS.featureCollectionLayout, layout);
 }
+
+export type DraftStorageReadResult =
+  | { ok: true; raw: string | null }
+  | { ok: false; error: string };
+
+export type DraftStorageWriteResult = { ok: true } | { ok: false; error: string };
+
+function formatStorageError(error: unknown, fallback: string): string {
+  if (
+    error instanceof DOMException &&
+    (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+  ) {
+    return 'Could not save draft locally because browser storage is full.';
+  }
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function hasLocalStorage(): boolean {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+export function readDraftStorageRaw(key: string): DraftStorageReadResult {
+  if (!hasLocalStorage()) {
+    return { ok: false, error: 'Browser storage is unavailable outside a client session.' };
+  }
+  try {
+    return { ok: true, raw: window.localStorage.getItem(key) };
+  } catch (error) {
+    return { ok: false, error: formatStorageError(error, 'Could not read saved draft from local storage.') };
+  }
+}
+
+export function writeDraftStorageRaw(key: string, value: string): DraftStorageWriteResult {
+  if (!hasLocalStorage()) {
+    return { ok: false, error: 'Browser storage is unavailable outside a client session.' };
+  }
+  try {
+    window.localStorage.setItem(key, value);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: formatStorageError(error, 'Could not save draft to local storage.') };
+  }
+}
+
+export function removeDraftStorageRaw(key: string): DraftStorageWriteResult {
+  if (!hasLocalStorage()) {
+    return { ok: false, error: 'Browser storage is unavailable outside a client session.' };
+  }
+  try {
+    window.localStorage.removeItem(key);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: formatStorageError(error, 'Could not remove saved draft from local storage.') };
+  }
+}
+
+export function listDraftStorageKeys(prefix: string): { ok: true; keys: string[] } | { ok: false; error: string } {
+  if (!hasLocalStorage()) {
+    return { ok: false, error: 'Browser storage is unavailable outside a client session.' };
+  }
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith(prefix)) keys.push(k);
+    }
+    return { ok: true, keys };
+  } catch (error) {
+    return { ok: false, error: formatStorageError(error, 'Could not inspect saved drafts in local storage.') };
+  }
+}

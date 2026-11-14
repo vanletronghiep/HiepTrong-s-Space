@@ -40,18 +40,33 @@
   box-shadow:
     inset 0 0 0 1px var(--ws-surface),
     var(--shadow-task);
-  transform: translateX(calc(var(--distance) * (var(--carousel-step-percent) + 12px)))
+  transform: translate3d(calc(var(--distance) * (var(--carousel-step-percent) + 12px)), 0, 0)
     scale(max(0.48, calc(1 - var(--separation) * 0.52)));
   opacity: max(0, min(calc(1 - var(--separation) * 0.38), calc(1.24 - var(--separation) * 0.62)));
-  filter: blur(min(0.8px, calc(var(--separation) * 0.8px)));
+}
+
+.stage[data-moving='true'] .board,
+.stage[data-dragging='true'] .board {
+  will-change: transform;
+}
+
+.stage:not([data-moving='true']):not([data-dragging='true']) .board:not([data-offset='0']) {
+  filter: blur(0.8px);
 }
 
 .board[data-offset='0'] {
   z-index: 2;
 }
 
-.board:not([data-offset='0']) {
-  pointer-events: none;
+.previewSelect {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  cursor: pointer;
+}
+.previewSelect:focus-visible {
+  outline-offset: -4px;
 }
 
 .board::before {
@@ -90,56 +105,23 @@
   pointer-events: none;
 }
 
-.controls {
-  position: absolute;
-  z-index: 3;
-  inset: 50% 8px auto;
-  pointer-events: none;
+.daySelector {
+  display: none;
 }
-
-.controls button {
-  position: absolute;
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  transform: translateY(-50%);
-  border: 1px solid var(--ws-border);
+.daySelector button {
+  min-height: 44px;
+  padding: 8px 12px;
   border-radius: var(--radius-pill);
-  background: radial-gradient(var(--ws-surface) 33%, var(--daily-pill));
-  color: var(--ws-text);
-  box-shadow: var(--shadow-task);
-  pointer-events: auto;
   cursor: pointer;
-  transition:
-    background-color var(--dur-fast),
-    opacity var(--dur-base),
-    scale var(--dur-base);
+  color: var(--ws-text-muted);
 }
-
-.controls button:disabled {
-  opacity: 0;
-  scale: 0.85;
-  pointer-events: none;
+.daySelector button[aria-pressed='true'] {
+  color: var(--ws-text);
+  background: var(--daily-pill);
 }
-
-.controls button:hover {
-  background: var(--ws-accent-soft);
-}
-.controls button:focus-visible {
-  outline: 2px solid var(--ws-focus);
-  outline-offset: 3px;
-}
-.previous {
-  left: 0;
-}
-.next {
-  right: 0;
-}
-
 @media (max-width: 759px) {
   .carousel {
-    padding-top: 48px;
+    padding-top: 0;
   }
   .board {
     --carousel-step-percent: 100%;
@@ -147,13 +129,13 @@
     min-height: 280px;
     opacity: max(0, calc(1 - var(--separation)));
   }
-  .controls {
-    inset: 24px 6px auto;
+  .daySelector {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .controls button {
-    transition: none;
+  .previewSelect {
+    display: none;
   }
 }

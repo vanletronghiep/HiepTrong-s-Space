@@ -1,133 +1,465 @@
 'use client';
 
-import { useItemAnchor } from '@/ui/use-item-anchor';
-
-import { Dialog } from '@/ui/Dialog';
-
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import Image from 'next/image';
 import {
-  Code,
-  Plus,
-  X,
-  ExternalLink,
-  CheckCircle2,
   AlertCircle,
   ArrowRight,
+  Calendar,
+  Code,
+  Compass,
+  ExternalLink,
+  Plus,
+  RotateCcw,
 } from 'lucide-react';
 import {
-  useProjects,
+  clearEditorDraft,
+  isEditorDraftStale,
+  listSavedEditDraftRecordIds,
+  loadEditorDraft,
+  saveEditorDraft,
+  type EditorDraftPayload,
+} from '@/client/editor-drafts';
+import {
   useCreateProject,
-  useUpdateProject,
   useDeleteProject,
+  useProjects,
+  useUpdateProject,
 } from '@/client/queries/projects';
 import type { ProjectItem, ProjectStatus } from '@/contracts/project';
 import { computeProjectStats } from '@/domain/project-domain';
+import { DEFAULT_APP_TIMEZONE, formatDisplayDate } from '@/domain/time';
+import { Badge, type BadgeTone } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
+import { Chip } from '@/ui/Chip';
+import { cn } from '@/ui/cn';
+import { ConfirmDialog } from '@/ui/Dialog';
+import { EmptyState } from '@/ui/EmptyState';
+import { FeatureThemeProvider, useFeatureTheme } from '@/ui/FeatureTheme';
+import {
+  LargeEditorDialog,
+  LargeEditorTwoColumn,
+  type DraftSaveOutcome,
+} from '@/ui/LargeEditorDialog';
+import { Skeleton } from '@/ui/Skeleton';
+import { useItemAnchor } from '@/ui/use-item-anchor';
+import {
+  defaultProjectEditorValues,
+  isProjectDraftValues,
+  projectEditorCreateInput,
+  projectEditorPatch,
+  projectEditorValues,
+  sameProjectEditorValues,
+  type ProjectEditorValues,
+} from './project-editor';
 import styles from './projects.module.css';
 
+const PROJECT_FORM_ID = 'project';
+const PROJECT_EDITOR_DOM_FORM_ID = 'project-large-editor-form';
+
+const STATUS_META: Record<ProjectStatus, { label: string; tone: BadgeTone; badgeClass?: string }> =
+  {
+    active: { label: 'Active', tone: 'general' },
+    in_progress: { label: 'In progress', tone: 'due-soon' },
+    completed: { label: 'Completed', tone: 'completed' },
+    on_hold: { label: 'On hold', tone: 'optional', badgeClass: styles.statusBadgeOnHold },
+  };
+
+const FILTER_OPTIONS: readonly { key: 'all' | ProjectStatus; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'in_progress', label: 'In progress' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'on_hold', label: 'On hold' },
+];
+
+function formatDraftTimestamp(iso: string): string {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) {
+    return 'recently';
+  }
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: DEFAULT_APP_TIMEZONE,
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(ms));
+}
+
+function formatTargetDate(deadlineAt: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(deadlineAt)) {
+    return formatDisplayDate(`${deadlineAt}T12:00:00+07:00`, new Date(), DEFAULT_APP_TIMEZONE);
+  }
+  const parsed = Date.parse(deadlineAt);
+  if (Number.isNaN(parsed)) {
+    return deadlineAt;
+  }
+  return formatDisplayDate(new Date(parsed), new Date(), DEFAULT_APP_TIMEZONE);
+}
+
+function isSafeExternalUrl(raw: string | null | undefined): raw is string {
+  if (!raw) {
+    return false;
+  }
+  return /^https?:\/\//i.test(raw.trim());
+}
+
 export function ProjectsView() {
+  const inheritedTheme = useFeatureTheme();
   const { data: projects = [], isLoading, isError: loadFailed, refetch } = useProjects();
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
   const deleteMutation = useDeleteProject();
 
+  const savingRef = useRef(false);
+  const editorTitleInputRef = useRef<HTMLInputElement>(null);
+
   const [activeFilter, setActiveFilter] = useState<'all' | ProjectStatus>('all');
-  const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(null);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [pendingProgressId, setPendingProgressId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectItem | null>(null);
+
+  // Unified LargeEditorDialog + explicit local drafts state
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<ProjectItem | null>(null);
+  const [initialFormValues, setInitialFormValues] = useState<ProjectEditorValues>(() =>
+    defaultProjectEditorValues(),
+  );
+  const [formValues, setFormValues] = useState<ProjectEditorValues>(() =>
+    defaultProjectEditorValues(),
+  );
+  const [editorError, setEditorError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadedDraft, setLoadedDraft] = useState<EditorDraftPayload<ProjectEditorValues> | null>(
+    null,
+  );
+  const [draftSyncVersion, setDraftSyncVersion] = useState(0);
 
   useItemAnchor(projects);
+
+  const refreshOrphanedDrafts = useCallback(() => {
+    setDraftSyncVersion((v) => v + 1);
+  }, []);
+
+  const orphanedDraftIds = useMemo(() => {
+    void draftSyncVersion;
+    if (isLoading || loadFailed) {
+      return [];
+    }
+    const ids = listSavedEditDraftRecordIds(PROJECT_FORM_ID);
+    return ids.filter((id) => !projects.some((project) => project.id === id));
+  }, [draftSyncVersion, isLoading, loadFailed, projects]);
 
   const stats = useMemo(() => computeProjectStats(projects), [projects]);
 
   const filteredProjects = useMemo(() => {
-    if (activeFilter === 'all') return projects;
-    return projects.filter((p) => p.status === activeFilter);
-  }, [projects, activeFilter]);
+    if (activeFilter === 'all') {
+      return projects;
+    }
+    return projects.filter((project) => project.status === activeFilter);
+  }, [activeFilter, projects]);
 
-  // Form state for creating a project
-  const [newTitle, setNewTitle] = useState('');
-  const [newOverview, setNewOverview] = useState('');
-  const [newStatus, setNewStatus] = useState<ProjectStatus>('active');
-  const [newProgress, setNewProgress] = useState(0);
-  const [newNextStep, setNewNextStep] = useState('');
-  const [newBlockers, setNewBlockers] = useState('');
-  const [newTechStack, setNewTechStack] = useState('');
+  const isEditorDirty = editorOpen && !sameProjectEditorValues(initialFormValues, formValues);
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const openCreateEditor = () => {
+    const base = defaultProjectEditorValues();
+    const existing = loadEditorDraft<ProjectEditorValues>(
+      PROJECT_FORM_ID,
+      null,
+      isProjectDraftValues,
+    );
+    setEditingProject(null);
+    setInitialFormValues(base);
+    setFormValues(base);
+    setEditorError('');
+    setLoadedDraft(existing.ok ? existing.draft : null);
+    setEditorOpen(true);
+  };
+
+  const openEditEditor = (project: ProjectItem) => {
+    const base = projectEditorValues(project);
+    const existing = loadEditorDraft<ProjectEditorValues>(
+      PROJECT_FORM_ID,
+      project.id,
+      isProjectDraftValues,
+    );
+    setEditingProject(project);
+    setInitialFormValues(base);
+    setFormValues(base);
+    setEditorError('');
+    setLoadedDraft(existing.ok ? existing.draft : null);
+    setEditorOpen(true);
+  };
+
+  const closeEditor = useCallback(() => {
+    setEditorOpen(false);
+    setEditingProject(null);
+    setEditorError('');
+    setLoadedDraft(null);
+  }, []);
+
+  const handleSaveDraft = (): DraftSaveOutcome => {
+    const result = saveEditorDraft({
+      formId: PROJECT_FORM_ID,
+      recordId: editingProject?.id ?? null,
+      recordUpdatedAt: editingProject?.updatedAt ?? null,
+      values: formValues,
+    });
+    if (!result.ok) {
+      return { ok: false, error: result.error };
+    }
+    setLoadedDraft(null);
+    setInitialFormValues(formValues);
+    refreshOrphanedDrafts();
+    return {
+      ok: true,
+      message: `Draft saved locally (${formatDraftTimestamp(result.draft.savedAt)}).`,
+    };
+  };
+
+  const submitEditor = useCallback(async () => {
+    if (savingRef.current) {
+      return;
+    }
+    const trimmedTitle = formValues.title.trim();
+    if (!trimmedTitle) {
+      setEditorError('Enter a project title.');
+      editorTitleInputRef.current?.focus();
+      return;
+    }
+    if (trimmedTitle.length > 200) {
+      setEditorError('Project title must be 200 characters or fewer.');
+      editorTitleInputRef.current?.focus();
+      return;
+    }
+    if (
+      !Number.isFinite(formValues.progressPercent) ||
+      formValues.progressPercent < 0 ||
+      formValues.progressPercent > 100
+    ) {
+      setEditorError('Progress must be between 0 and 100.');
+      return;
+    }
+
+    savingRef.current = true;
+    setIsSubmitting(true);
+    setEditorError('');
+    setActionError('');
+
+    try {
+      if (editingProject) {
+        const patch = projectEditorPatch(editingProject, formValues);
+        await updateMutation.mutateAsync({
+          id: editingProject.id,
+          patch,
+        });
+        clearEditorDraft(PROJECT_FORM_ID, editingProject.id);
+      } else {
+        await createMutation.mutateAsync(projectEditorCreateInput(formValues));
+        clearEditorDraft(PROJECT_FORM_ID, null);
+      }
+      refreshOrphanedDrafts();
+      closeEditor();
+    } catch (error) {
+      setEditorError(
+        error instanceof Error
+          ? error.message
+          : 'Could not save this project. Your input is retained.',
+      );
+    } finally {
+      savingRef.current = false;
+      setIsSubmitting(false);
+    }
+  }, [
+    closeEditor,
+    createMutation,
+    editingProject,
+    formValues,
+    refreshOrphanedDrafts,
+    updateMutation,
+  ]);
+
+  const handleEditorSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    void submitEditor();
+  };
 
-    createMutation.mutate(
+  useEffect(() => {
+    if (!editorOpen || deleteTarget !== null) {
+      return undefined;
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        void submitEditor();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [deleteTarget, editorOpen, submitEditor]);
+
+  const handleProgressChange = (project: ProjectItem, delta: number) => {
+    if (pendingProgressId === project.id) {
+      return;
+    }
+    const nextProgress = Math.max(0, Math.min(100, project.progressPercent + delta));
+    const nextStatus =
+      nextProgress === 100
+        ? 'completed'
+        : project.status === 'completed'
+          ? 'in_progress'
+          : project.status;
+    setActionError('');
+    setPendingProgressId(project.id);
+    updateMutation.mutate(
       {
-        title: newTitle.trim(),
-        overview: newOverview.trim(),
-        status: newStatus,
-        progressPercent: Number(newProgress),
-        deadlineAt: null,
-        nextStep: newNextStep.trim() || null,
-        blockers: newBlockers.trim() || null,
-        techStack: newTechStack
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-        linkedTaskIds: [],
-        linkedMilestoneIds: [],
+        id: project.id,
+        patch: {
+          progressPercent: nextProgress,
+          status: nextStatus,
+        },
       },
       {
-        onSuccess: () => {
-          setIsCreateOpen(false);
-          setNewTitle('');
-          setNewOverview('');
-          setNewProgress(0);
-          setNewNextStep('');
-          setNewBlockers('');
-          setNewTechStack('');
+        onError: (error) => {
+          setActionError(
+            error instanceof Error
+              ? error.message
+              : 'Could not update project progress right now. Retry when ready.',
+          );
+        },
+        onSettled: () => {
+          setPendingProgressId((current) => (current === project.id ? null : current));
         },
       },
     );
   };
 
-  const handleProgressChange = (project: ProjectItem, delta: number) => {
-    const nextProgress = Math.max(0, Math.min(100, project.progressPercent + delta));
-    const nextStatus = nextProgress === 100 ? 'completed' : project.status === 'completed' ? 'in_progress' : project.status;
-    updateMutation.mutate({
-      id: project.id,
-      patch: {
-        progressPercent: nextProgress,
-        status: nextStatus,
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) {
+      return;
+    }
+    const targetId = deleteTarget.id;
+    setActionError('');
+    deleteMutation.mutate(targetId, {
+      onSuccess: () => {
+        clearEditorDraft(PROJECT_FORM_ID, targetId);
+        refreshOrphanedDrafts();
+        setDeleteTarget(null);
+        if (editingProject?.id === targetId) {
+          closeEditor();
+        }
+      },
+      onError: (error) => {
+        setActionError(
+          error instanceof Error
+            ? error.message
+            : 'Could not delete this project right now. Retry when ready.',
+        );
+        setDeleteTarget(null);
       },
     });
   };
 
+  const handleDiscardOrphanedDrafts = () => {
+    for (const orphanId of orphanedDraftIds) {
+      clearEditorDraft(PROJECT_FORM_ID, orphanId);
+    }
+    refreshOrphanedDrafts();
+  };
 
+  const workspaceContent = (
+    <div data-feature-theme={inheritedTheme ? undefined : 'project'} className={styles.pageStack}>
+      <Image
+        src="/visuals/project/auspicious-cloud-pillar.svg"
+        alt=""
+        aria-hidden="true"
+        width={200}
+        height={480}
+        loading="eager"
+        unoptimized
+        className={styles.cloudPillarDecor}
+      />
 
-  if (loadFailed) return <div role="alert">Could not load this space. <button type="button" onClick={() => void refetch()}>Retry</button></div>;
-
-  return (
-    <div className={styles.container}>
-      {[createMutation, updateMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">The change could not be saved. Retry the action.</p>}
-      <div className={styles.techGlow} aria-hidden="true" />
-
-      {/* Header */}
-      <header className={styles.header}>
-        <div className={styles.titleArea}>
+      {/* Eastern Strategy Masthead */}
+      <section className={styles.masthead} aria-labelledby="projects-page-heading">
+        <Image
+          src="/visuals/project/dragon-over-the-ridge.svg"
+          alt=""
+          aria-hidden="true"
+          width={480}
+          height={300}
+          loading="eager"
+          unoptimized
+          className={styles.dragonMastheadArt}
+        />
+        <div className={styles.mastheadText}>
           <div className={styles.eyebrow}>
-            <Code size={16} />
-            <span>Engineering & Creations</span>
+            <Compass size={15} strokeWidth={1.6} aria-hidden="true" />
+            <span>Eastern strategy &amp; engineering</span>
           </div>
-          <h1 className={styles.title}>In Progress Projects</h1>
+          <h1 id="projects-page-heading" className={styles.displayTitle}>
+            In progress <span className={styles.displayTitleEmphasis}>projects</span>
+          </h1>
+          <p className={styles.mastheadSubtitle}>
+            Keep active builds legible with clear next steps, blockers, and steady progress.
+          </p>
         </div>
 
-        <Button leftIcon={<Plus size={16} className="mr-1" />}
-          variant="primary"
-          size="sm"
-          onClick={() => setIsCreateOpen(true)}
-          className="bg-ws-text hover:bg-text-accent text-white"
-        >
+        <div className={styles.mastheadActions}>
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={<Plus size={16} aria-hidden="true" />}
+            onClick={openCreateEditor}
+          >
+            New project
+          </Button>
+        </div>
+      </section>
 
-          <span>New project</span>
-        </Button>
-      </header>
+      {loadFailed ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-tint-overdue-border bg-tint-overdue-bg px-4 py-3 text-[length:var(--fs-ui)] text-text-overdue"
+        >
+          <span>Could not load your projects right now. Check connection or retry.</span>
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<RotateCcw size={14} aria-hidden="true" />}
+            onClick={() => void refetch()}
+          >
+            Retry
+          </Button>
+        </div>
+      ) : null}
+
+      {actionError ? (
+        <div
+          role="alert"
+          className="rounded-card border border-tint-overdue-border bg-tint-overdue-bg px-4 py-3 text-[length:var(--fs-ui)] text-text-overdue"
+        >
+          {actionError}
+        </div>
+      ) : null}
+
+      {orphanedDraftIds.length > 0 ? (
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-ws-border bg-ws-accent-soft px-4 py-3 text-[length:var(--fs-small)] text-ws-text"
+        >
+          <span>
+            {orphanedDraftIds.length === 1
+              ? '1 saved local edit draft refers to a project that is no longer in your workspace.'
+              : `${orphanedDraftIds.length} saved local edit drafts refer to projects no longer in your workspace.`}
+          </span>
+          <Button variant="secondary" size="sm" onClick={handleDiscardOrphanedDrafts}>
+            Discard missing drafts
+          </Button>
+        </div>
+      ) : null}
 
       {/* Overview Statistics */}
       <section className={styles.statsGrid} aria-label="Project statistics">
@@ -136,13 +468,11 @@ export function ProjectsView() {
           <span className={styles.statLabel}>Total projects</span>
         </div>
         <div className={styles.statCard}>
-          <span className={styles.statValue} style={{ color: 'var(--daily-priority-normal)' }}>
-            {stats.activeCount}
-          </span>
+          <span className={cn(styles.statValue, styles.statValueAccent)}>{stats.activeCount}</span>
           <span className={styles.statLabel}>Active development</span>
         </div>
         <div className={styles.statCard}>
-          <span className={styles.statValue} style={{ color: 'var(--text-completed)' }}>
+          <span className={cn(styles.statValue, styles.statValueCompleted)}>
             {stats.completedCount}
           </span>
           <span className={styles.statLabel}>Completed</span>
@@ -153,112 +483,181 @@ export function ProjectsView() {
         </div>
       </section>
 
-      {/* Filter Tabs */}
+      {/* Filter Chips */}
       <div className={styles.controlsBar}>
-        <div className={styles.filterTabs} role="tablist" aria-label="Project status filter">
-          {(['all', 'active', 'in_progress', 'completed'] as const).map((st) => (
-            <button
-              key={st}
-              role="tab"
-              aria-selected={activeFilter === st}
-              className={`${styles.filterTab} ${activeFilter === st ? styles.filterTabActive : ''}`}
-              onClick={() => setActiveFilter(st)}
+        <div className={styles.filterGroup} role="group" aria-label="Project status filter">
+          {FILTER_OPTIONS.map((option) => (
+            <Chip
+              key={option.key}
+              active={activeFilter === option.key}
+              onClick={() => setActiveFilter(option.key)}
+              className={styles.filterChip}
             >
-              {st === 'all'
-                ? 'All'
-                : st === 'active'
-                  ? 'Active'
-                  : st === 'in_progress'
-                    ? 'In progress'
-                    : 'Completed'}
-            </button>
+              {option.label}
+            </Chip>
           ))}
         </div>
+        <span className="text-[length:var(--fs-small)] text-ws-text-muted tabular-nums">
+          Showing {filteredProjects.length} of {projects.length}
+        </span>
       </div>
 
-      {/* Projects Grid */}
-      {isLoading ? (
-        <div className="py-16 text-center text-ws-text-muted">Loading projects…</div>
+      {/* Cloud Scroll Divider */}
+      <div className={styles.cloudScrollDividerWrap} aria-hidden="true">
+        <Image
+          src="/visuals/project/auspicious-cloud-scroll.svg"
+          alt=""
+          aria-hidden="true"
+          width={720}
+          height={100}
+          loading="eager"
+          unoptimized
+          className={styles.cloudScrollDivider}
+        />
+      </div>
+
+      {/* Projects Grid / Loading / Empty */}
+      {isLoading && projects.length === 0 ? (
+        <div className={styles.projectsGrid} aria-label="Loading projects">
+          <Skeleton className="h-64 w-full rounded-card" />
+          <Skeleton className="h-64 w-full rounded-card" />
+          <Skeleton className="h-64 w-full rounded-card" />
+        </div>
+      ) : filteredProjects.length === 0 ? (
+        <div className={styles.emptyContainer}>
+          <EmptyState
+            title={
+              loadFailed
+                ? 'Projects unavailable right now.'
+                : projects.length === 0
+                  ? 'No projects in progress yet.'
+                  : `No ${STATUS_META[activeFilter === 'all' ? 'active' : activeFilter].label.toLowerCase()} projects right now.`
+            }
+            description={
+              loadFailed
+                ? 'Retry loading above once your connection is restored.'
+                : projects.length === 0
+                  ? 'Create a project to track your overview, next meaningful step, blockers, and target date.'
+                  : 'Try another status filter or view all projects.'
+            }
+            action={
+              loadFailed ? (
+                <Button variant="secondary" size="sm" onClick={() => void refetch()}>
+                  Retry
+                </Button>
+              ) : projects.length === 0 ? (
+                <Button variant="primary" size="sm" onClick={openCreateEditor}>
+                  New project
+                </Button>
+              ) : (
+                <Button variant="secondary" size="sm" onClick={() => setActiveFilter('all')}>
+                  Show all projects
+                </Button>
+              )
+            }
+          />
+        </div>
       ) : (
         <div className={styles.projectsGrid}>
-          {filteredProjects.length === 0 ? (
-            <div className="col-span-full py-16 text-center text-ws-text-muted">
-              No projects found in this view.
-            </div>
-          ) : (
-            filteredProjects.map((project) => (
-              <article id={`item-${project.id}`} tabIndex={-1} key={project.id} className={styles.projectCard}>
+          {filteredProjects.map((project) => {
+            const statusMeta = STATUS_META[project.status];
+            const isProgressPending = pendingProgressId === project.id;
+            const hasRepoUrl = isSafeExternalUrl(project.repoUrl);
+            const hasLiveUrl = isSafeExternalUrl(project.liveUrl);
+
+            return (
+              <article
+                id={`item-${project.id}`}
+                tabIndex={-1}
+                key={project.id}
+                className={styles.projectCard}
+              >
                 <div className={styles.projectCardTop}>
                   <div className={styles.cardHeaderRow}>
                     <h2 className={styles.cardTitle}>{project.title}</h2>
-                    <span
-                      className={`${styles.statusBadge} ${
-                        styles[`statusBadge_${project.status}` as keyof typeof styles] ?? ''
-                      }`}
-                    >
-                      {project.status === 'completed' && <CheckCircle2 size={12} />}
-                      <span>{project.status.replace('_', ' ')}</span>
-                    </span>
+                    <Badge tone={statusMeta.tone} withDot className={statusMeta.badgeClass}>
+                      {statusMeta.label}
+                    </Badge>
                   </div>
 
-                  <p className={styles.cardOverview}>{project.overview}</p>
+                  {project.overview ? (
+                    <p className={styles.cardOverview}>{project.overview}</p>
+                  ) : null}
+
+                  {project.deadlineAt ? (
+                    <div className={styles.deadlineLine}>
+                      <Calendar size={14} className="text-ws-accent shrink-0" aria-hidden="true" />
+                      <span>Target {formatTargetDate(project.deadlineAt)}</span>
+                    </div>
+                  ) : null}
 
                   {/* Progress Bar & Controls */}
                   <div className={styles.progressSection}>
                     <div className={styles.progressHeader}>
                       <span className="text-ws-text-muted">Manual progress</span>
-                      <div className="flex items-center gap-2">
+                      <div className={styles.progressControls}>
                         <button
                           type="button"
+                          disabled={isProgressPending}
                           onClick={() => handleProgressChange(project, -5)}
-                          className="px-1.5 py-0.5 rounded text-xs bg-ws-accent-soft hover:bg-ws-border text-ws-text"
-                          title="-5%"
+                          aria-label={`Decrease progress for ${project.title} by 5%`}
+                          className={styles.progressStepButton}
                         >
                           -5%
                         </button>
                         <span className={styles.progressPercent}>{project.progressPercent}%</span>
                         <button
                           type="button"
+                          disabled={isProgressPending}
                           onClick={() => handleProgressChange(project, 5)}
-                          className="px-1.5 py-0.5 rounded text-xs bg-ws-accent-soft hover:bg-ws-border text-ws-text"
-                          title="+5%"
+                          aria-label={`Increase progress for ${project.title} by 5%`}
+                          className={styles.progressStepButton}
                         >
                           +5%
                         </button>
                       </div>
                     </div>
-                    <div className={styles.progressBar}>
+                    <div
+                      className={styles.progressBar}
+                      role="progressbar"
+                      aria-label={`${project.title} progress`}
+                      aria-valuenow={project.progressPercent}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    >
                       <div
                         className={styles.progressFill}
-                        style={{ width: `${project.progressPercent}%` }}
+                        style={{ transform: `scaleX(${project.progressPercent / 100})` }}
                       />
                     </div>
                   </div>
 
                   {/* Next Step */}
-                  {project.nextStep && (
+                  {project.nextStep ? (
                     <div className={styles.nextStepBox}>
-                      <div className="flex items-center gap-1.5 text-daily-sky">
-                        <ArrowRight size={13} />
+                      <div className="flex items-center gap-1.5 text-ws-accent">
+                        <ArrowRight size={13} aria-hidden="true" />
                         <span className={styles.nextStepLabel}>Next meaningful step</span>
                       </div>
-                      <p className="text-ws-text font-medium">{project.nextStep}</p>
+                      <p className="text-ws-text font-medium [overflow-wrap:anywhere]">
+                        {project.nextStep}
+                      </p>
                     </div>
-                  )}
+                  ) : null}
 
-                  {/* Blocker (if any) */}
-                  {project.blockers && (
+                  {/* Blocker */}
+                  {project.blockers ? (
                     <div className={styles.blockerBox}>
                       <div className="flex items-center gap-1.5 text-text-overdue">
-                        <AlertCircle size={13} />
+                        <AlertCircle size={13} aria-hidden="true" />
                         <span className={styles.blockerLabel}>Current blocker</span>
                       </div>
-                      <p className="text-ws-text">{project.blockers}</p>
+                      <p className="text-ws-text [overflow-wrap:anywhere]">{project.blockers}</p>
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Tech stack tags */}
-                  {project.techStack.length > 0 && (
+                  {project.techStack.length > 0 ? (
                     <div className={styles.techTags}>
                       {project.techStack.map((tech) => (
                         <span key={tech} className={styles.techTag}>
@@ -266,210 +665,217 @@ export function ProjectsView() {
                         </span>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-ws-border">
-                  <div className="flex items-center gap-2">
-                    {project.repoUrl && (
+                <div className={styles.cardFooter}>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {hasRepoUrl ? (
                       <a
-                        href={project.repoUrl}
+                        href={project.repoUrl!}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-ws-accent hover:underline"
+                        className="inline-flex items-center gap-1 text-[length:var(--fs-micro)] font-medium text-ws-accent hover:underline"
                       >
-                        <Code size={13} />
+                        <Code size={13} aria-hidden="true" />
                         <span>Source</span>
                       </a>
-                    )}
-                    {project.liveUrl && (
+                    ) : null}
+                    {hasLiveUrl ? (
                       <a
-                        href={project.liveUrl}
+                        href={project.liveUrl!}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-ws-accent hover:underline"
+                        className="inline-flex items-center gap-1 text-[length:var(--fs-micro)] font-medium text-ws-accent hover:underline"
                       >
-                        <ExternalLink size={13} />
+                        <ExternalLink size={13} aria-hidden="true" />
                         <span>Launch</span>
                       </a>
-                    )}
+                    ) : null}
                   </div>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedProject(project)}
-                    className="text-xs text-ws-text-muted hover:text-ws-text"
-                  >
-                    Edit details
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Delete ${project.title}`}
+                      className="text-text-overdue hover:bg-tint-overdue-bg"
+                      onClick={() => setDeleteTarget(project)}
+                    >
+                      Delete
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      aria-label={`Edit details for ${project.title}`}
+                      onClick={() => openEditEditor(project)}
+                    >
+                      Edit details
+                    </Button>
+                  </div>
                 </div>
               </article>
-            ))
-          )}
+            );
+          })}
         </div>
       )}
 
-      {/* Edit Details Dialog */}
-      {selectedProject && (
-        <Dialog open portal className="max-h-[90svh] overflow-y-auto" title="Edit" onClose={() => setSelectedProject(null)}>
-          {[createMutation, updateMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
-          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              className={styles.modalCloseButton}
-              onClick={() => setSelectedProject(null)}
-              aria-label="Close dialog"
+      {/* Unified LargeEditorDialog + Two-Column Layout + Local Drafts */}
+      <LargeEditorDialog
+        open={editorOpen}
+        onClose={closeEditor}
+        eyebrow="Eastern strategy ledger"
+        title={editingProject ? 'Edit project' : 'New project'}
+        description="Update project scope, next meaningful step, blockers, and target schedule."
+        formId={PROJECT_EDITOR_DOM_FORM_ID}
+        isDirty={isEditorDirty}
+        isSubmitting={isSubmitting}
+        submitLabel={editingProject ? 'Save changes' : 'Create project'}
+        submittingLabel={editingProject ? 'Saving…' : 'Creating…'}
+        closeAriaLabel="Close project editor"
+        initialFocusRef={editorTitleInputRef}
+        errorMessage={editorError}
+        draftRecovery={
+          loadedDraft
+            ? {
+                savedAtLabel: formatDraftTimestamp(loadedDraft.savedAt),
+                stale: Boolean(
+                  editingProject && isEditorDraftStale(loadedDraft, editingProject.updatedAt),
+                ),
+                staleMessage:
+                  'This project was updated after your local draft was saved. Review changes before saving.',
+                onResume: () => {
+                  setFormValues(loadedDraft.values);
+                  setLoadedDraft(null);
+                },
+                onDiscard: () => {
+                  clearEditorDraft(PROJECT_FORM_ID, editingProject?.id ?? null);
+                  setLoadedDraft(null);
+                  refreshOrphanedDrafts();
+                },
+              }
+            : null
+        }
+        onSaveDraft={handleSaveDraft}
+        footerActions={
+          editingProject ? (
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isSubmitting}
+              onClick={() => setDeleteTarget(editingProject)}
             >
-              <X size={18} />
-            </button>
-
-
-
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Next meaningful step</label>
-                <input
-                  type="text"
-                  defaultValue={selectedProject.nextStep ?? ''}
-                  id="edit-next-step"
-                  className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Current blockers</label>
-                <textarea
-                  rows={2}
-                  defaultValue={selectedProject.blockers ?? ''}
-                  id="edit-blockers"
-                  className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none resize-none"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-ws-text">Status</label>
-                <select
-                  defaultValue={selectedProject.status}
-                  id="edit-status"
-                  className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none"
-                >
-                  <option value="active">Active</option>
-                  <option value="in_progress">In progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="on_hold">On hold</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-ws-border">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-text-overdue hover:bg-ws-accent-soft"
-                  onClick={() => {
-                    deleteMutation.mutate(selectedProject.id, { onSuccess: () => setSelectedProject(null) });
-                  }}
-                >
-                  Delete project
-                </Button>
-
-                <div className="flex items-center gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => setSelectedProject(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      const nextStep = (
-                        document.getElementById('edit-next-step') as HTMLInputElement
-                      )?.value;
-                      const blockers = (
-                        document.getElementById('edit-blockers') as HTMLTextAreaElement
-                      )?.value;
-                      const status = (
-                        document.getElementById('edit-status') as HTMLSelectElement
-                      )?.value as ProjectStatus;
-
-                      updateMutation.mutate({
-                        id: selectedProject.id,
-                        patch: {
-                          nextStep: nextStep?.trim() || null,
-                          blockers: blockers?.trim() || null,
-                          status,
-                        },
-                      }, { onSuccess: () => setSelectedProject(null) });
-                    }}
+              Delete project
+            </Button>
+          ) : null
+        }
+      >
+        <form id={PROJECT_EDITOR_DOM_FORM_ID} noValidate onSubmit={handleEditorSubmit}>
+          <LargeEditorTwoColumn
+            primary={
+              <>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="project-editor-title"
+                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
                   >
-                    Save changes
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Dialog>
-      )}
-
-      {/* Create Project Modal Dialog */}
-      {isCreateOpen && (
-        <Dialog open portal className="max-h-[90svh] overflow-y-auto" title="Create new project" onClose={() => setIsCreateOpen(false)}>
-          {[createMutation, updateMutation, deleteMutation].some(mutation => mutation.isError) && <p role="alert">Could not save. Your input is retained; retry.</p>}
-          <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              className={styles.modalCloseButton}
-              onClick={() => setIsCreateOpen(false)}
-              aria-label="Close dialog"
-            >
-              <X size={18} />
-            </button>
-
-
-
-            <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="projects-field-1" className="text-xs font-semibold text-ws-text">Project title</label>
-                <input id="projects-field-1"
-                  type="text"
-                  required
-                  placeholder="e.g. Go Game AI or Compiler"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="projects-field-2" className="text-xs font-semibold text-ws-text">Overview & description</label>
-                <textarea id="projects-field-2"
-                  rows={2}
-                  required
-                  placeholder="What is this project and what problem does it solve?"
-                  value={newOverview}
-                  onChange={(e) => setNewOverview(e.target.value)}
-                  className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none resize-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="projects-field-3" className="text-xs font-semibold text-ws-text">Initial progress (%)</label>
-                  <input id="projects-field-3"
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={newProgress}
-                    onChange={(e) => setNewProgress(Number(e.target.value))}
-                    className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none"
+                    Title
+                  </label>
+                  <input
+                    ref={editorTitleInputRef}
+                    id="project-editor-title"
+                    type="text"
+                    value={formValues.title}
+                    onChange={(e) => {
+                      setFormValues((prev) => ({ ...prev, title: e.target.value }));
+                      if (editorError) setEditorError('');
+                    }}
+                    placeholder="e.g. Go Game AI or Compiler"
+                    className={cn(styles.editorControl, styles.editorControlInput)}
                   />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="projects-field-4" className="text-xs font-semibold text-ws-text">Status</label>
-                  <select id="projects-field-4"
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value as ProjectStatus)}
-                    className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none"
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="project-editor-overview"
+                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
+                  >
+                    Overview
+                  </label>
+                  <textarea
+                    id="project-editor-overview"
+                    rows={5}
+                    value={formValues.overview}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({ ...prev, overview: e.target.value }))
+                    }
+                    placeholder="What is this project and what outcome does it deliver?"
+                    className={cn(
+                      styles.editorControl,
+                      styles.editorControlTextarea,
+                      'max-w-[66ch]',
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="project-editor-next-step"
+                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
+                  >
+                    Next meaningful step
+                  </label>
+                  <input
+                    id="project-editor-next-step"
+                    type="text"
+                    value={formValues.nextStep}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({ ...prev, nextStep: e.target.value }))
+                    }
+                    placeholder="The next concrete action to move this build forward"
+                    className={cn(styles.editorControl, styles.editorControlInput)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="project-editor-blockers"
+                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
+                  >
+                    Current blockers
+                  </label>
+                  <textarea
+                    id="project-editor-blockers"
+                    rows={3}
+                    value={formValues.blockers}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({ ...prev, blockers: e.target.value }))
+                    }
+                    placeholder="Dependencies, unknowns, or constraints currently blocking progress"
+                    className={cn(styles.editorControl, styles.editorControlTextarea)}
+                  />
+                </div>
+              </>
+            }
+            metadata={
+              <>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="project-editor-status"
+                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
+                  >
+                    Status
+                  </label>
+                  <select
+                    id="project-editor-status"
+                    value={formValues.status}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({
+                        ...prev,
+                        status: e.target.value as ProjectStatus,
+                      }))
+                    }
+                    className={cn(styles.editorControl, styles.editorControlInput)}
                   >
                     <option value="active">Active</option>
                     <option value="in_progress">In progress</option>
@@ -477,47 +883,153 @@ export function ProjectsView() {
                     <option value="on_hold">On hold</option>
                   </select>
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="projects-field-5" className="text-xs font-semibold text-ws-text">Next meaningful step</label>
-                <input id="projects-field-5"
-                  type="text"
-                  placeholder="The next concrete action to take"
-                  value={newNextStep}
-                  onChange={(e) => setNewNextStep(e.target.value)}
-                  className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none"
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="project-editor-progress"
+                      className="text-[length:var(--fs-small)] font-medium text-ws-text block"
+                    >
+                      Progress (%)
+                    </label>
+                    <input
+                      id="project-editor-progress"
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formValues.progressPercent}
+                      onChange={(e) => {
+                        const parsed = Number(e.target.value);
+                        setFormValues((prev) => ({
+                          ...prev,
+                          progressPercent: Number.isNaN(parsed) ? 0 : parsed,
+                        }));
+                        if (editorError) setEditorError('');
+                      }}
+                      className={cn(
+                        styles.editorControl,
+                        styles.editorControlInput,
+                        'tabular-nums',
+                      )}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="project-editor-deadline"
+                      className="text-[length:var(--fs-small)] font-medium text-ws-text block"
+                    >
+                      Target date
+                    </label>
+                    <input
+                      id="project-editor-deadline"
+                      type="date"
+                      value={formValues.deadlineDate}
+                      onChange={(e) =>
+                        setFormValues((prev) => ({ ...prev, deadlineDate: e.target.value }))
+                      }
+                      className={cn(
+                        styles.editorControl,
+                        styles.editorControlInput,
+                        'tabular-nums',
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="project-editor-tech-stack"
+                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
+                  >
+                    Tech stack (comma-separated)
+                  </label>
+                  <input
+                    id="project-editor-tech-stack"
+                    type="text"
+                    value={formValues.techStackText}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({ ...prev, techStackText: e.target.value }))
+                    }
+                    placeholder="e.g. TypeScript, Next.js, SQLite"
+                    className={cn(styles.editorControl, styles.editorControlInput)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="project-editor-repo-url"
+                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
+                  >
+                    Repository URL
+                  </label>
+                  <input
+                    id="project-editor-repo-url"
+                    type="text"
+                    value={formValues.repoUrl}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({ ...prev, repoUrl: e.target.value }))
+                    }
+                    placeholder="https://github.com/..."
+                    className={cn(styles.editorControl, styles.editorControlInput)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="project-editor-live-url"
+                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
+                  >
+                    Live URL
+                  </label>
+                  <input
+                    id="project-editor-live-url"
+                    type="text"
+                    value={formValues.liveUrl}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({ ...prev, liveUrl: e.target.value }))
+                    }
+                    placeholder="https://..."
+                    className={cn(styles.editorControl, styles.editorControlInput)}
+                  />
+                </div>
+
+                <Image
+                  src="/visuals/project/jade-knot-talisman.svg"
+                  alt=""
+                  aria-hidden="true"
+                  width={240}
+                  height={240}
+                  loading="eager"
+                  unoptimized
+                  className={styles.jadeEditorOrnament}
                 />
-              </div>
+              </>
+            }
+          />
+        </form>
+      </LargeEditorDialog>
 
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="projects-field-6" className="text-xs font-semibold text-ws-text">Tech stack (comma-separated)</label>
-                <input id="projects-field-6"
-                  type="text"
-                  placeholder="e.g. Python, Pygame, NumPy"
-                  value={newTechStack}
-                  onChange={(e) => setNewTechStack(e.target.value)}
-                  className="px-3 py-2 rounded-sm bg-ws-bg border border-ws-border text-sm text-ws-text focus:outline-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <Button variant="ghost" size="sm" onClick={() => setIsCreateOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="sm"
-                  disabled={createMutation.isPending}
-                >
-                  Create project
-                </Button>
-              </div>
-            </form>
-          </div>
-        </Dialog>
-      )}
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        portal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete project?"
+        description={
+          deleteTarget
+            ? `“${deleteTarget.title}” and any saved local draft for it will be permanently removed.`
+            : ''
+        }
+        isSubmitting={deleteMutation.isPending}
+      />
     </div>
   );
+
+  if (inheritedTheme) {
+    return workspaceContent;
+  }
+
+  return <FeatureThemeProvider name="project">{workspaceContent}</FeatureThemeProvider>;
 }
