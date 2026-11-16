@@ -2,11 +2,32 @@
 
 import { useEffect, useRef, type PointerEvent, type ReactNode } from 'react';
 import type { FeatureEntry, FeatureThumbnailPreset } from '@/features/registry';
+import { ZodiacIllumination } from '@/features/zodiac/ZodiacIllumination';
+import type { ZodiacControllerSnapshot } from '@/features/zodiac/types';
 import { cn } from '@/ui/cn';
 import styles from './feature-collection.module.css';
 
+export interface ZodiacThumbnailControl {
+  /** Controlled playhead override in [0, 1] for preview scrubbing/inspection. */
+  manualProgress?: number;
+  /** Suppress completed-state moving glow loop (for static fidelity comparison). */
+  disableGlow?: boolean;
+  /** Preview-only guide overlay toggle. */
+  showGuides?: boolean;
+  /** Optional imperative frame telemetry hook (called without React re-renders). */
+  onFrame?: (snapshot: ZodiacControllerSnapshot) => void;
+  /** Optional external override for active intent (used by preview Play Inward/Outward). */
+  activeOverride?: boolean;
+}
+
 export interface FeatureThumbnailProps {
   thumbnail: FeatureEntry['thumbnail'];
+  /** Whether the owning card link is hovered or :focus-visible. */
+  active?: boolean;
+  /** External lifecycle gate (e.g. collection revealComplete). Defaults to true. */
+  illuminationEnabled?: boolean;
+  /** Preview-only external controls for Zodiac illumination. */
+  zodiacControl?: ZodiacThumbnailControl;
   className?: string;
 }
 
@@ -314,7 +335,13 @@ function renderPresetArtwork(
   }
 }
 
-export function FeatureThumbnail({ thumbnail, className }: FeatureThumbnailProps) {
+export function FeatureThumbnail({
+  thumbnail,
+  active = false,
+  illuminationEnabled = true,
+  zodiacControl,
+  className,
+}: FeatureThumbnailProps) {
   const glow = useRef<HTMLDivElement>(null);
   const frame = useRef(0);
   const pointer = useRef({ x: 0, y: 0 });
@@ -353,8 +380,7 @@ export function FeatureThumbnail({ thumbnail, className }: FeatureThumbnailProps
       frame.current = 0;
       if (!glow.current) return;
       const bounds = surface.getBoundingClientRect();
-      glow.current.style.transform =
-        `translate3d(${pointer.current.x - bounds.left}px, ${pointer.current.y - bounds.top}px, 0)`;
+      glow.current.style.transform = `translate3d(${pointer.current.x - bounds.left}px, ${pointer.current.y - bounds.top}px, 0)`;
       glow.current.dataset.active = 'true';
     });
   };
@@ -384,7 +410,19 @@ export function FeatureThumbnail({ thumbnail, className }: FeatureThumbnailProps
 
       {/* Composited SVG vector reveal strictly inside overflow-hidden bounds */}
       <div className={styles.thumbArtwork}>
-        {thumbnail.imageUrl ? (
+        {thumbnail.zodiacSign ? (
+          <div className={styles.zodiacInset}>
+            <ZodiacIllumination
+              sign={thumbnail.zodiacSign}
+              active={zodiacControl?.activeOverride ?? active}
+              enabled={illuminationEnabled}
+              manualProgress={zodiacControl?.manualProgress}
+              disableGlow={zodiacControl?.disableGlow}
+              showGuides={zodiacControl?.showGuides}
+              onFrame={zodiacControl?.onFrame}
+            />
+          </div>
+        ) : thumbnail.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbnail.imageUrl}

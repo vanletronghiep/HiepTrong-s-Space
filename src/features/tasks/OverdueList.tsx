@@ -17,6 +17,7 @@ export interface OverdueListProps {
   now: Date;
   timeZone?: string;
   recentlyCreatedId: string | null;
+  onInspect?: (task: TaskDto) => void;
   onToggleComplete: (task: TaskDto) => void;
   onEdit: (task: TaskDto) => void;
   onScheduleDate: (task: TaskDto, scheduledDate: string | null) => void;
@@ -30,6 +31,7 @@ export function OverdueList({
   now,
   timeZone = DEFAULT_APP_TIMEZONE,
   recentlyCreatedId,
+  onInspect,
   onToggleComplete,
   onEdit,
   onScheduleDate,
@@ -87,6 +89,7 @@ export function OverdueList({
               timeZone={timeZone}
               context="overdue"
               isNew={recentlyCreatedId === task.id}
+              onInspect={onInspect}
               onToggleComplete={onToggleComplete}
               onEdit={onEdit}
               onScheduleDate={onScheduleDate}

@@ -16,8 +16,19 @@ import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
 import { cn } from '@/ui/cn';
 import { Dialog } from '@/ui/Dialog';
+import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
+import { RichNoteEditor } from '@/ui/RichNoteEditor';
+import { SelectField, type SelectOption } from '@/ui/SelectField';
 import { Skeleton } from '@/ui/Skeleton';
+import { TimeFieldControl } from '@/ui/TimeFieldControl';
 import styles from './tracking.module.css';
+
+const HABIT_CATEGORY_OPTIONS: readonly SelectOption<HabitCategory>[] = [
+  { value: 'routine', label: 'Routine' },
+  { value: 'health', label: 'Health' },
+  { value: 'learning', label: 'Learning' },
+  { value: 'mindfulness', label: 'Mindfulness' },
+];
 
 const CATEGORY_LABELS: Record<HabitCategory, string> = {
   routine: 'Routine',
@@ -411,7 +422,9 @@ export function TrackingView() {
                       <span className={styles.logTimeRange}>
                         {log.bedTime} → {log.wakeTime}
                       </span>
-                      {log.notes ? <span className={styles.logNotes}>{log.notes}</span> : null}
+                      {log.notes ? (
+                        <FormattedNoteContent value={log.notes} className={styles.logNotes} />
+                      ) : null}
                     </div>
 
                     <div className={styles.logMeta}>
@@ -500,7 +513,9 @@ export function TrackingView() {
                     <div key={log.id} className={styles.logItem}>
                       <div className={styles.logMain}>
                         <span className={styles.logDate}>{formatTrackingLogDate(log.date)}</span>
-                        {log.notes ? <span className={styles.logNotes}>{log.notes}</span> : null}
+                        {log.notes ? (
+                          <FormattedNoteContent value={log.notes} className={styles.logNotes} />
+                        ) : null}
                       </div>
 
                       <div className={styles.logMeta}>
@@ -570,17 +585,12 @@ export function TrackingView() {
                 <label htmlFor={habitCategoryId} className={styles.fieldLabel}>
                   Category
                 </label>
-                <select
+                <SelectField
                   id={habitCategoryId}
-                  className={styles.selectField}
                   value={habitCategory}
-                  onChange={(e) => setHabitCategory(e.target.value as HabitCategory)}
-                >
-                  <option value="routine">Routine</option>
-                  <option value="health">Health</option>
-                  <option value="learning">Learning</option>
-                  <option value="mindfulness">Mindfulness</option>
-                </select>
+                  onChange={setHabitCategory}
+                  options={HABIT_CATEGORY_OPTIONS}
+                />
               </div>
 
               <div className={styles.modalFooter}>
@@ -618,24 +628,20 @@ export function TrackingView() {
                   <label htmlFor={sleepBedTimeId} className={styles.fieldLabel}>
                     Bedtime
                   </label>
-                  <input
+                  <TimeFieldControl
                     id={sleepBedTimeId}
-                    type="time"
-                    className={styles.inputField}
                     value={sleepBedTime}
-                    onChange={(e) => setSleepBedTime(e.target.value)}
+                    onChange={setSleepBedTime}
                   />
                 </div>
                 <div>
                   <label htmlFor={sleepWakeTimeId} className={styles.fieldLabel}>
                     Wake time
                   </label>
-                  <input
+                  <TimeFieldControl
                     id={sleepWakeTimeId}
-                    type="time"
-                    className={styles.inputField}
                     value={sleepWakeTime}
-                    onChange={(e) => setSleepWakeTime(e.target.value)}
+                    onChange={setSleepWakeTime}
                   />
                 </div>
               </div>
@@ -675,16 +681,20 @@ export function TrackingView() {
               </div>
 
               <div>
-                <label htmlFor={sleepNotesId} className={styles.fieldLabel}>
+                <label
+                  id={`${sleepNotesId}-label`}
+                  htmlFor={sleepNotesId}
+                  className={styles.fieldLabel}
+                >
                   Restfulness notes
                 </label>
-                <input
+                <RichNoteEditor
                   id={sleepNotesId}
-                  type="text"
-                  className={styles.inputField}
+                  ariaLabelledBy={`${sleepNotesId}-label`}
                   placeholder="e.g., Felt energized upon waking"
                   value={sleepNotes}
-                  onChange={(e) => setSleepNotes(e.target.value)}
+                  onChange={setSleepNotes}
+                  minHeightClassName="min-h-[84px]"
                 />
               </div>
 
@@ -752,16 +762,20 @@ export function TrackingView() {
               </div>
 
               <div>
-                <label htmlFor={scrNotesId} className={styles.fieldLabel}>
+                <label
+                  id={`${scrNotesId}-label`}
+                  htmlFor={scrNotesId}
+                  className={styles.fieldLabel}
+                >
                   Activities &amp; context
                 </label>
-                <input
+                <RichNoteEditor
                   id={scrNotesId}
-                  type="text"
-                  className={styles.inputField}
+                  ariaLabelledBy={`${scrNotesId}-label`}
                   placeholder="e.g., Coding and essay research"
                   value={scrNotes}
-                  onChange={(e) => setScrNotes(e.target.value)}
+                  onChange={setScrNotes}
+                  minHeightClassName="min-h-[84px]"
                 />
               </div>
 

@@ -7,7 +7,6 @@ import { useMinuteTicker } from '@/client/use-minute-ticker';
 import { DEFAULT_APP_TIMEZONE } from '@/domain/time';
 import { StarIcon } from '@/ui/StarIcon';
 import { getDailyClock } from './daily-dashboard-time';
-import { DailyRingedPlanet } from './DailySky';
 import styles from './daily-foundation.module.css';
 
 const FORECAST =
@@ -161,7 +160,6 @@ export function DailyDashboard({
             <h2 className={styles.eyebrow}>Cosmic forecast</h2>
             <p>{FORECAST}</p>
           </div>
-          <DailyRingedPlanet className={styles.forecastPlanet} />
         </section>
         <section className={styles.progress} aria-label="Today's progress">
           <div className={styles.progressHeader}>

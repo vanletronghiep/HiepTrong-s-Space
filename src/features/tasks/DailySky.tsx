@@ -6,123 +6,34 @@ import { useIsTransitioning } from '@/features/transitions/TransitionProvider';
 import styles from './daily-foundation.module.css';
 
 const sparkle = 'M0 -8Q1 -1 8 0Q1 1 0 8Q-1 1 -8 0Q-1 -1 0 -8Z';
-const zodiac = [
-  'M12 21V12C12 1 2 2 3 9M12 12C12 1 22 2 21 9',
-  'M3 3c2 0 4 5 9 5s7-5 9-5M18 14a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z',
-  'M4 4c5 2 11 2 16 0M4 20c5-2 11-2 16 0M8 6v12m8-12v12',
-  'M4 10c3-5 8-6 15-4M9 9a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM20 14c-3 5-8 6-15 4m10-3a3 3 0 1 1 6 0 3 3 0 0 1-6 0Z',
-  'M8 14C4 5 10 1 15 4c6 4-3 12 0 16 2 3 5 0 5-2M9 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
-  'M3 6c4-3 4 1 4 5v8M7 10c2-5 6-7 6 0v8m0-8c3-5 6-6 6 0 0 6-3 10-6 11m3-4 5 4',
-  'M3 20h18M3 16h6c-5-5-1-10 3-10s8 5 3 10h6',
-  'M3 6c4-3 4 1 4 5v8M7 10c2-5 6-7 6 0v9m0-9c3-5 6-6 6 0v7c0 3 2 3 4 0m-3-1 3 1-1 3',
-  'm4 21 16-17m-8 0h8v8M7 11l6 6',
-  'M3 7c4-2 5 2 5 6v7m0-8c3-7 8-8 8-3 0 4-5 7-3 10 3 5 10-1 7-4-2-2-5 0-6 2',
-  'm3 10 5-4 3 4 5-4 4 4M3 17l5-4 3 4 5-4 4 4',
-  'M5 4c7 5 7 11 0 16M19 4c-7 5-7 11 0 16M3 12h18',
-];
+const ZODIAC_WHEEL_URL = '/visuals/daily-v2/zodiac-wheel.svg';
 
 function Astrolabe() {
   return (
-    <svg viewBox="-220 -220 440 440" fill="none" stroke="currentColor">
-      {[71, 81, 99, 108, 139, 177, 195, 207, 214].map((radius) => (
-        <circle key={radius} r={radius} strokeWidth={radius > 190 ? 0.9 : 0.65} />
-      ))}
-      {Array.from({ length: 72 }, (_, index) => (
-        <path
-          key={index}
-          d={index % 6 === 0 ? 'M0 -177v69' : 'M0 -207v4'}
-          transform={`rotate(${index * 5})`}
-        />
-      ))}
-      {zodiac.map((sign, index) => (
-        <path
-          key={sign}
-          d={sign}
-          transform={`rotate(${index * 30 + 15}) translate(-9 -167) scale(.76)`}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity=".72"
-        />
-      ))}
-      {Array.from({ length: 48 }, (_, index) => (
-        <path
-          key={index}
-          d="M0 -28Q4 -50 0 -70Q-3 -52 0 -28"
-          transform={`rotate(${index * 7.5})`}
-          strokeWidth=".65"
-        />
-      ))}
-      <circle r="28" strokeWidth="1.2" />
+    <svg viewBox="0 0 700 700" aria-hidden="true">
+      <image
+        data-daily-zodiac="upper-left"
+        href={ZODIAC_WHEEL_URL}
+        width="700"
+        height="700"
+        preserveAspectRatio="xMidYMid meet"
+      />
     </svg>
   );
 }
 
-const cornerSigns = [6, 7, 8, 2, 9, 10, 11, 0, 1, 3, 4, 5] as const;
-const cornerCurl = 'M11 20c0-4-1-6-4-7-6-2-4-8 1-7 5 1 5 7 3 10m0-6c4-6 10-2 8 2-1 3-6 3-7 0';
-
 function ZodiacCorner() {
   return (
-    <svg
+    <image
+      data-daily-zodiac="lower-right"
+      href={ZODIAC_WHEEL_URL}
       x="976"
       y="-20"
       width="420"
       height="420"
-      viewBox="-220 -220 440 440"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <g opacity=".34" strokeWidth=".8">
-        {[27, 64, 70, 80, 87, 105, 115, 161, 207, 214].map((radius) => (
-          <circle key={radius} r={radius} />
-        ))}
-        {Array.from({ length: 12 }, (_, index) => (
-          <path
-            key={index}
-            d="M0 -207v46m0 46v28m0 17v39"
-            transform={`rotate(${4 - index * 30})`}
-          />
-        ))}
-        {Array.from({ length: 72 }, (_, index) => (
-          <path
-            key={index}
-            d="M0 -114v3M0 -86v2"
-            transform={`rotate(${index * 5})`}
-            strokeWidth=".6"
-          />
-        ))}
-      </g>
-      <g opacity=".64">
-        {cornerSigns.map((sign, index) => (
-          <g key={sign} transform={`rotate(${-8 - index * 26})`}>
-            <path
-              d={sign === 8 ? cornerCurl : zodiac[sign]}
-              transform="translate(-14 -197) scale(1.16)"
-              strokeWidth="2.05"
-            />
-            <path
-              d={zodiac[sign]}
-              transform="translate(-4 -101) scale(.34)"
-              strokeWidth="2"
-              opacity=".7"
-            />
-          </g>
-        ))}
-      </g>
-      <g opacity=".32">
-        <circle r="23" fill="var(--daily-planet)" strokeWidth="1" />
-        {Array.from({ length: 60 }, (_, index) => (
-          <path
-            key={index}
-            d={index % 3 === 0 ? 'M0 -23Q2 -41 0 -63' : 'M0 -23Q-1.7 -39 0 -50'}
-            transform={`rotate(${index * 6})`}
-            strokeWidth={index % 3 === 0 ? '.82' : '.55'}
-          />
-        ))}
-      </g>
-    </svg>
+      opacity=".64"
+      preserveAspectRatio="xMidYMid meet"
+    />
   );
 }
 
@@ -186,7 +97,6 @@ const bottomStars = [
 
 function BottomSky() {
   const cloud = useId();
-  const glint = useId();
   return (
     <svg className={styles.bottomSky} data-daily-bottom-art viewBox="0 0 1186 190" fill="none">
       <defs>
@@ -194,11 +104,6 @@ function BottomSky() {
           <stop stopColor="var(--daily-planet)" stopOpacity=".63" />
           <stop offset=".48" stopColor="var(--daily-arc-line)" stopOpacity=".31" />
           <stop offset="1" stopColor="var(--daily-arc-line)" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id={glint}>
-          <stop stopColor="var(--ws-surface)" stopOpacity=".98" />
-          <stop offset=".31" stopColor="var(--daily-shooting-star)" stopOpacity=".35" />
-          <stop offset="1" stopColor="var(--daily-shooting-star)" stopOpacity="0" />
         </radialGradient>
       </defs>
       <g className={styles.clouds} opacity=".62" fill={`url(#${cloud})`}>
@@ -230,18 +135,6 @@ function BottomSky() {
       <DailyRingedPlanet x="65" y="126" width="140" height="82" opacity=".52" />
       <DailyRingedPlanet x="647" y="66" width="156" height="80" opacity=".54" />
       <ZodiacCorner />
-      <g color="var(--daily-shooting-star)" opacity=".55">
-        <path d="m785 173 170-55" stroke="currentColor" strokeWidth=".6" />
-        {[
-          [132, 113, 14],
-          [790, 169, 9],
-          [954, 118, 10],
-        ].map(([x, y, r]) => (
-          <circle key={x} cx={x} cy={y} r={r} fill={`url(#${glint})`} />
-        ))}
-        <path d={sparkle} transform="translate(132 113) scale(.64)" fill="var(--ws-surface)" />
-        <path d={sparkle} transform="translate(954 118) scale(.38)" fill="var(--ws-surface)" />
-      </g>
       <g fill="currentColor" opacity=".48">
         {bottomStars.map(([x, y], i) => (
           <circle key={x} cx={x} cy={y} r={i % 4 === 0 ? 1.05 : 0.67} />
@@ -357,7 +250,6 @@ export function DailySky() {
       <div className={styles.astrolabe}>
         <Astrolabe />
       </div>
-      <div className={styles.galaxy} />
       <div className={styles.upperPlanet} />
       <div className={styles.nebulaBank} />
       <BottomSky />

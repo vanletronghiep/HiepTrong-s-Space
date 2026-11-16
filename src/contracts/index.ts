@@ -2,6 +2,7 @@ export * from './task';
 export * from './notification';
 export * from './api';
 export * from './event';
+export * from './event-draft';
 export * from './project';
 export * from './milestone';
 export * from './apcs';

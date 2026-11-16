@@ -49,12 +49,21 @@ export interface LargeEditorDialogProps {
   initialFocusRef?: RefObject<HTMLElement | null>;
   errorMessage?: string | null;
   draftRecovery?: EditorDraftRecoveryConfig | null;
-  onSaveDraft?: () => DraftSaveOutcome | boolean | void;
+  onSaveDraft?: () => DraftSaveOutcome | boolean | void | Promise<DraftSaveOutcome | boolean | void>;
   onDiscardChanges?: () => void;
   footerActions?: ReactNode;
   portal?: boolean;
   className?: string;
   children: ReactNode;
+}
+
+function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'then' in value &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
 }
 
 function normalizeDraftOutcome(result: DraftSaveOutcome | boolean | void): DraftSaveOutcome {
@@ -118,12 +127,14 @@ export function LargeEditorDialog({
   const [closePromptOpen, setClosePromptOpen] = useState(false);
   const [draftNotice, setDraftNotice] = useState('');
   const [draftError, setDraftError] = useState('');
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   useEffect(() => {
     if (open) {
       setClosePromptOpen(false);
       setDraftNotice('');
       setDraftError('');
+      setIsSavingDraft(false);
       pendingNavigationRef.current = null;
     }
   }, [open]);
@@ -170,37 +181,116 @@ export function LargeEditorDialog({
     onClose: requestClose,
   });
 
-  const handleExplicitSaveDraft = () => {
-    if (!onSaveDraft) {
-      return;
-    }
-    const outcome = normalizeDraftOutcome(onSaveDraft());
+  const applyExplicitDraftOutcome = (outcome: DraftSaveOutcome) => {
     if (!outcome.ok) {
       setDraftNotice('');
       setDraftError(outcome.error);
       return;
     }
     setDraftError('');
-    setDraftNotice(outcome.message ?? 'Draft saved locally on this device.');
+    setDraftNotice(outcome.message ?? 'Draft saved.');
   };
 
-  const handleConfirmSaveDraftAndClose = () => {
-    if (onSaveDraft) {
-      const outcome = normalizeDraftOutcome(onSaveDraft());
-      if (!outcome.ok) {
-        pendingNavigationRef.current = null;
-        setClosePromptOpen(false);
-        setDraftNotice('');
-        setDraftError(outcome.error);
+  const handleExplicitSaveDraft = () => {
+    if (!onSaveDraft || isSavingDraft) {
+      return;
+    }
+    setDraftError('');
+    try {
+      const raw = onSaveDraft();
+      if (isPromiseLike(raw)) {
+        setIsSavingDraft(true);
+        void Promise.resolve(raw)
+          .then((resolved) => {
+            applyExplicitDraftOutcome(normalizeDraftOutcome(resolved));
+          })
+          .catch((error: unknown) => {
+            setDraftNotice('');
+            setDraftError(
+              error instanceof Error && error.message
+                ? error.message
+                : 'Could not save your draft right now.',
+            );
+          })
+          .finally(() => {
+            setIsSavingDraft(false);
+          });
         return;
       }
+      applyExplicitDraftOutcome(normalizeDraftOutcome(raw));
+    } catch (error) {
+      setDraftNotice('');
+      setDraftError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Could not save your draft right now.',
+      );
     }
+  };
+
+  const completeConfirmSaveDraftClose = () => {
     const proceed = pendingNavigationRef.current;
     pendingNavigationRef.current = null;
     setClosePromptOpen(false);
     setDraftError('');
     onClose();
     proceed?.();
+  };
+
+  const handleConfirmSaveDraftError = (message: string) => {
+    pendingNavigationRef.current = null;
+    setClosePromptOpen(false);
+    setDraftNotice('');
+    setDraftError(message);
+  };
+
+  const handleConfirmSaveDraftAndClose = () => {
+    if (isSavingDraft) {
+      return;
+    }
+    if (!onSaveDraft) {
+      completeConfirmSaveDraftClose();
+      return;
+    }
+    setDraftError('');
+    try {
+      const raw = onSaveDraft();
+      if (isPromiseLike(raw)) {
+        setIsSavingDraft(true);
+        void Promise.resolve(raw)
+          .then((resolved) => {
+            const outcome = normalizeDraftOutcome(resolved);
+            if (!outcome.ok) {
+              handleConfirmSaveDraftError(outcome.error);
+              return;
+            }
+            completeConfirmSaveDraftClose();
+          })
+          .catch((error: unknown) => {
+            handleConfirmSaveDraftError(
+              error instanceof Error && error.message
+                ? error.message
+                : 'Could not save your draft right now.',
+            );
+          })
+          .finally(() => {
+            setIsSavingDraft(false);
+          });
+        return;
+      }
+      const outcome = normalizeDraftOutcome(raw);
+      if (!outcome.ok) {
+        handleConfirmSaveDraftError(outcome.error);
+        return;
+      }
+      completeConfirmSaveDraftClose();
+    } catch (error) {
+      handleConfirmSaveDraftError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Could not save your draft right now.',
+      );
+    }
   };
 
   const handleDiscardAndClose = () => {
@@ -368,10 +458,10 @@ export function LargeEditorDialog({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={handleExplicitSaveDraft}
-                    disabled={isSubmitting}
+                    onClick={() => void handleExplicitSaveDraft()}
+                    disabled={isSubmitting || isSavingDraft}
                   >
-                    {draftLabel}
+                    {isSavingDraft ? 'Saving draft…' : draftLabel}
                   </Button>
                 ) : (
                   <span />
@@ -381,7 +471,7 @@ export function LargeEditorDialog({
                     variant="secondary"
                     size="sm"
                     onClick={requestClose}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isSavingDraft}
                   >
                     {cancelLabel}
                   </Button>
@@ -391,7 +481,7 @@ export function LargeEditorDialog({
                     form={formId}
                     variant="primary"
                     size="sm"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isSavingDraft}
                   >
                     {isSubmitting ? (submittingLabel ?? submitLabel) : submitLabel}
                   </Button>
@@ -408,22 +498,45 @@ export function LargeEditorDialog({
         title="Save changes before closing?"
         description={
           pendingNavigationRef.current
-            ? 'You have unsaved edits. Save a local draft, discard your changes, or keep editing before leaving this page.'
+            ? 'You have unsaved edits. Save a draft, discard your changes, or keep editing before leaving this page.'
             : 'Your edits have not been applied yet.'
         }
         portal={portal}
-        className="max-w-[440px]"
+        className="max-w-[540px]"
         footer={
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={handleDiscardAndClose}>
+          <div
+            className={cn(
+              'w-full grid gap-2.5 items-stretch',
+              onSaveDraft ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2',
+            )}
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={isSavingDraft}
+              onClick={handleDiscardAndClose}
+              className="w-full h-full min-h-[2.75rem] whitespace-normal leading-snug py-2 text-center"
+            >
               Discard changes
             </Button>
-            <Button variant="secondary" size="sm" onClick={handleContinueEditing}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isSavingDraft}
+              onClick={handleContinueEditing}
+              className="w-full h-full min-h-[2.75rem] whitespace-normal leading-snug py-2 text-center"
+            >
               Continue editing
             </Button>
             {onSaveDraft ? (
-              <Button variant="primary" size="sm" onClick={handleConfirmSaveDraftAndClose}>
-                Save draft and close
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={isSavingDraft}
+                onClick={() => void handleConfirmSaveDraftAndClose()}
+                className="w-full h-full min-h-[2.75rem] whitespace-normal leading-snug py-2 text-center"
+              >
+                {isSavingDraft ? 'Saving draft…' : 'Save draft and close'}
               </Button>
             ) : null}
           </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import type { Ref } from 'react';
 import type { FeatureCollectionLayout } from '@/client/preferences';
 import { COLLECTION_SUBTITLE_COPY } from '@/features/home/home-journey';
 import { SegmentedControl, type SegmentedOption } from '@/ui/SegmentedControl';
@@ -14,10 +15,16 @@ const LAYOUT_OPTIONS: readonly SegmentedOption<FeatureCollectionLayout>[] = [
 export interface CollectionHeaderProps {
   layout: FeatureCollectionLayout;
   onLayoutChange: (next: FeatureCollectionLayout) => void;
+  controlsRef?: Ref<HTMLDivElement>;
   className?: string;
 }
 
-export function CollectionHeader({ layout, onLayoutChange, className }: CollectionHeaderProps) {
+export function CollectionHeader({
+  layout,
+  onLayoutChange,
+  controlsRef,
+  className,
+}: CollectionHeaderProps) {
   return (
     <div
       className={cn(
@@ -32,13 +39,15 @@ export function CollectionHeader({ layout, onLayoutChange, className }: Collecti
         <p className={styles.collectionSubtitle}>{COLLECTION_SUBTITLE_COPY}</p>
       </div>
 
-      <SegmentedControl
-        tone="cosmos"
-        aria-label="Feature collection layout"
-        options={LAYOUT_OPTIONS}
-        value={layout}
-        onChange={onLayoutChange}
-      />
+      <div ref={controlsRef} data-collection-controls data-layout-mode={layout}>
+        <SegmentedControl
+          tone="cosmos"
+          aria-label="Feature collection layout"
+          options={LAYOUT_OPTIONS}
+          value={layout}
+          onChange={onLayoutChange}
+        />
+      </div>
     </div>
   );
 }

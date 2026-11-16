@@ -1,13 +1,15 @@
 'use client';
 
-import { useRef, useState, type FormEvent, type RefObject } from 'react';
-import { AlertCircle, Calendar } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { AlertCircle } from 'lucide-react';
 import type { TaskDto } from '@/contracts';
 import { buildDeadlineFromInputs, isFutureInstant, resolveDateInput } from '@/domain/date-input';
 import { DEFAULT_APP_TIMEZONE, formatScheduledDate, shiftScheduledDate } from '@/domain/time';
 import { Button } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
+import { DatePickerField } from '@/ui/DatePickerField';
 import { Dialog } from '@/ui/Dialog';
+import { TimeFieldControl } from '@/ui/TimeFieldControl';
 
 export interface TransferDialogProps {
   task: TaskDto | null;
@@ -52,7 +54,6 @@ export function TransferDialog({
   isSubmitting = false,
   portal = false,
 }: TransferDialogProps) {
-  const dateFieldRef = useRef<HTMLInputElement>(null);
   const isOpen = open && task !== null;
   const [prevOpen, setPrevOpen] = useState(isOpen);
   const [openSeq, setOpenSeq] = useState(isOpen ? 1 : 0);
@@ -72,7 +73,6 @@ export function TransferDialog({
       onClose={onClose}
       title="Transfer overdue task"
       description={task ? `Choose a new date and deadline time for “${task.title}”.` : undefined}
-      initialFocusRef={dateFieldRef}
     >
       {isOpen ? (
         <TransferDialogBody
@@ -83,7 +83,6 @@ export function TransferDialog({
           now={now}
           timeZone={timeZone}
           isSubmitting={isSubmitting}
-          dateFieldRef={dateFieldRef}
         />
       ) : null}
     </Dialog>
@@ -97,7 +96,6 @@ interface TransferDialogBodyProps {
   now: Date;
   timeZone: string;
   isSubmitting: boolean;
-  dateFieldRef: RefObject<HTMLInputElement | null>;
 }
 
 function TransferDialogBody({
@@ -107,17 +105,16 @@ function TransferDialogBody({
   now,
   timeZone,
   isSubmitting,
-  dateFieldRef,
 }: TransferDialogBodyProps) {
   const todayStr = formatScheduledDate(now, timeZone);
   const tomorrowStr = shiftScheduledDate(todayStr, 1, timeZone);
+  const referenceYear = Number(todayStr.slice(0, 4));
 
   const [initialDraft] = useState(() => buildInitialTransferDraft(now, timeZone));
   const [dateInput, setDateInput] = useState(initialDraft.dateInput);
   const [canonicalDate, setCanonicalDate] = useState<string | null>(initialDraft.canonicalDate);
   const [timeInput, setTimeInput] = useState('23:59');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const nativeDateRef = useRef<HTMLInputElement>(null);
 
   const resolvedDate = resolveDateInput(dateInput, now, timeZone, canonicalDate);
 
@@ -184,70 +181,32 @@ function TransferDialogBody({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label
-            htmlFor="transfer-date-input"
-            className="block text-[length:var(--fs-ui)] font-medium text-ws-text mb-1.5"
-          >
-            New date (DD/MM)
-          </label>
-          <div className="relative flex items-center">
-            <input
-              ref={dateFieldRef}
-              id="transfer-date-input"
-              type="text"
-              placeholder="31/10"
-              value={dateInput}
-              onChange={(e) => {
-                setDateInput(e.target.value);
-                setCanonicalDate(null);
-                setErrorMessage(null);
-              }}
-              className="w-full h-11 rounded-item bg-ws-surface border border-ws-border px-3.5 pr-10 text-[length:var(--fs-ui)] text-ws-text tabular-nums"
-            />
-            <button
-              type="button"
-              aria-label="Open calendar picker"
-              onClick={() => nativeDateRef.current?.showPicker?.()}
-              className="absolute right-2 inline-flex items-center justify-center h-8 w-8 rounded-sm text-ws-text-muted hover:text-ws-text hover:bg-ws-accent-soft cursor-pointer"
-            >
-              <Calendar size={16} strokeWidth={1.5} />
-            </button>
-            <input
-              ref={nativeDateRef}
-              type="date"
-              tabIndex={-1}
-              aria-hidden="true"
-              value={resolvedDate?.scheduledDate ?? ''}
-              onChange={(e) => {
-                if (e.target.value) {
-                  applyPresetDate(e.target.value);
-                }
-              }}
-              className="sr-only"
-            />
-          </div>
-        </div>
+        <DatePickerField
+          id="transfer-date-input"
+          label="New date (DD/MM)"
+          mode="task"
+          referenceYear={referenceYear}
+          placeholder="31/10"
+          value={dateInput}
+          error={Boolean(errorMessage)}
+          onChange={(nextValue) => {
+            setDateInput(nextValue);
+            setCanonicalDate(null);
+            setErrorMessage(null);
+          }}
+        />
 
-        <div>
-          <label
-            htmlFor="transfer-time-input"
-            className="block text-[length:var(--fs-ui)] font-medium text-ws-text mb-1.5"
-          >
-            New time (24h)
-          </label>
-          <input
-            id="transfer-time-input"
-            type="text"
-            placeholder="23:59"
-            value={timeInput}
-            onChange={(e) => {
-              setTimeInput(e.target.value);
-              setErrorMessage(null);
-            }}
-            className="w-full h-11 rounded-item bg-ws-surface border border-ws-border px-3.5 text-[length:var(--fs-ui)] text-ws-text tabular-nums"
-          />
-        </div>
+        <TimeFieldControl
+          id="transfer-time-input"
+          label="New time (24h)"
+          placeholder="23:59"
+          value={timeInput}
+          error={Boolean(errorMessage)}
+          onChange={(nextValue) => {
+            setTimeInput(nextValue);
+            setErrorMessage(null);
+          }}
+        />
       </div>
 
       {resolvedDate ? (
@@ -308,7 +267,6 @@ export function ScheduleDateDialog({
   isSubmitting = false,
   portal = false,
 }: ScheduleDateDialogProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const isOpen = open && task !== null;
   const [prevOpen, setPrevOpen] = useState(isOpen);
   const [openSeq, setOpenSeq] = useState(isOpen ? 1 : 0);
@@ -330,7 +288,6 @@ export function ScheduleDateDialog({
       description={
         task ? `Place “${task.title}” on a Daily column without changing its deadline.` : undefined
       }
-      initialFocusRef={inputRef}
     >
       {isOpen ? (
         <ScheduleDateDialogBody
@@ -341,7 +298,6 @@ export function ScheduleDateDialog({
           now={now}
           timeZone={timeZone}
           isSubmitting={isSubmitting}
-          inputRef={inputRef}
         />
       ) : null}
     </Dialog>
@@ -355,7 +311,6 @@ interface ScheduleDateDialogBodyProps {
   now: Date;
   timeZone: string;
   isSubmitting: boolean;
-  inputRef: RefObject<HTMLInputElement | null>;
 }
 
 function ScheduleDateDialogBody({
@@ -365,16 +320,15 @@ function ScheduleDateDialogBody({
   now,
   timeZone,
   isSubmitting,
-  inputRef,
 }: ScheduleDateDialogBodyProps) {
   const todayStr = formatScheduledDate(now, timeZone);
   const tomorrowStr = shiftScheduledDate(todayStr, 1, timeZone);
+  const referenceYear = Number(todayStr.slice(0, 4));
 
   const [initialDraft] = useState(() => buildInitialScheduleDraft(task, now, timeZone));
   const [dateInput, setDateInput] = useState(initialDraft.dateInput);
   const [canonicalDate, setCanonicalDate] = useState<string | null>(initialDraft.canonicalDate);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const nativeDateRef = useRef<HTMLInputElement>(null);
 
   const resolvedDate = resolveDateInput(dateInput, now, timeZone, canonicalDate);
 
@@ -421,50 +375,20 @@ function ScheduleDateDialogBody({
         </Chip>
       </div>
 
-      <div>
-        <label
-          htmlFor="schedule-date-input"
-          className="block text-[length:var(--fs-ui)] font-medium text-ws-text mb-1.5"
-        >
-          Day (DD/MM)
-        </label>
-        <div className="relative flex items-center">
-          <input
-            ref={inputRef}
-            id="schedule-date-input"
-            type="text"
-            placeholder="30/10"
-            value={dateInput}
-            onChange={(e) => {
-              setDateInput(e.target.value);
-              setCanonicalDate(null);
-              setErrorMessage(null);
-            }}
-            className="w-full h-11 rounded-item bg-ws-surface border border-ws-border px-3.5 pr-10 text-[length:var(--fs-ui)] text-ws-text tabular-nums"
-          />
-          <button
-            type="button"
-            aria-label="Open calendar picker"
-            onClick={() => nativeDateRef.current?.showPicker?.()}
-            className="absolute right-2 inline-flex items-center justify-center h-8 w-8 rounded-sm text-ws-text-muted hover:text-ws-text hover:bg-ws-accent-soft cursor-pointer"
-          >
-            <Calendar size={16} strokeWidth={1.5} />
-          </button>
-          <input
-            ref={nativeDateRef}
-            type="date"
-            tabIndex={-1}
-            aria-hidden="true"
-            value={resolvedDate?.scheduledDate ?? ''}
-            onChange={(e) => {
-              if (e.target.value) {
-                applyPreset(e.target.value);
-              }
-            }}
-            className="sr-only"
-          />
-        </div>
-      </div>
+      <DatePickerField
+        id="schedule-date-input"
+        label="Day (DD/MM)"
+        mode="task"
+        referenceYear={referenceYear}
+        placeholder="30/10"
+        value={dateInput}
+        error={Boolean(errorMessage)}
+        onChange={(nextValue) => {
+          setDateInput(nextValue);
+          setCanonicalDate(null);
+          setErrorMessage(null);
+        }}
+      />
 
       {resolvedDate ? (
         <p className="text-[length:var(--fs-small)] text-ws-text-muted">

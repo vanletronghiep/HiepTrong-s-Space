@@ -1,17 +1,40 @@
-import type { EventItem, CreateEventInput } from '@/contracts/event';
+import type { CreateEventInput, EventItem } from '@/contracts/event';
+import type { EventDraftEditorValues } from '@/contracts/event-draft';
+import { isValidScheduledDate } from '@/contracts/task';
 import { buildZonedInstant, DEFAULT_APP_TIMEZONE, formatScheduledDate } from '@/domain/time';
 
-export function eventEditorValues(event: EventItem) {
+const TIME_24H_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+export function isValidEventTimeHm(value: string): boolean {
+  return TIME_24H_RE.test(value.trim());
+}
+
+export function isEventDraftPublishable(values: EventDraftEditorValues): boolean {
+  const title = values.title.trim();
+  return (
+    title.length > 0 &&
+    title.length <= 200 &&
+    isValidScheduledDate(values.date.trim()) &&
+    isValidEventTimeHm(values.time)
+  );
+}
+
+export function formatZonedTime24(date: Date, timeZone: string = DEFAULT_APP_TIMEZONE): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    hourCycle: 'h23',
+  }).format(date);
+}
+
+export function eventEditorValues(event: EventItem): EventDraftEditorValues {
   return {
     title: event.title,
     category: event.category,
     date: formatScheduledDate(new Date(event.startAt), DEFAULT_APP_TIMEZONE),
-    time: new Intl.DateTimeFormat('en-GB', {
-      timeZone: DEFAULT_APP_TIMEZONE,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(new Date(event.startAt)),
+    time: formatZonedTime24(new Date(event.startAt), DEFAULT_APP_TIMEZONE),
     location: event.location ?? '',
     isOnline: event.locationType === 'online',
     isExam: event.isExam,
@@ -19,7 +42,10 @@ export function eventEditorValues(event: EventItem) {
   };
 }
 
-export function eventEditorPatch(event: EventItem, values: ReturnType<typeof eventEditorValues>) {
+export function eventEditorPatch(
+  event: EventItem,
+  values: EventDraftEditorValues,
+): Partial<CreateEventInput> {
   const previous = eventEditorValues(event);
   const patch: Partial<CreateEventInput> = {};
   if (values.title !== previous.title) patch.title = values.title.trim();

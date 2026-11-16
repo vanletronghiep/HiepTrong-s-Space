@@ -80,6 +80,29 @@
   will-change: transform;
 }
 
+.layoutStage {
+  opacity: 1;
+  transition: opacity 150ms var(--ease);
+}
+
+.layoutStage[data-layout-transition='fading-out'] {
+  opacity: 0;
+  transition: opacity 150ms var(--ease);
+}
+
+.layoutStage[data-layout-transition='fading-in'] {
+  opacity: 1;
+  transition: opacity 170ms var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layoutStage,
+  .layoutStage[data-layout-transition='fading-out'],
+  .layoutStage[data-layout-transition='fading-in'] {
+    transition-duration: 0ms;
+  }
+}
+
 /* ─── Expressive Feature Cards (compositor-safe, stationary hit box) ─── */
 .featureCard {
   display: block;
@@ -142,6 +165,16 @@
     transform 260ms var(--ease),
     opacity 220ms var(--ease);
   will-change: transform, opacity;
+}
+
+.zodiacInset {
+  position: absolute;
+  inset: 6%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* A small pre-painted light moves on the compositor, clipped by the thumbnail. */

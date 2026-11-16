@@ -30,6 +30,7 @@ export interface MonthViewProps {
   now: Date;
   timeZone?: string;
   recentlyCreatedId: string | null;
+  onInspect?: (task: TaskDto) => void;
   onToggleComplete: (task: TaskDto) => void;
   onEdit: (task: TaskDto) => void;
   onScheduleDate: (task: TaskDto, scheduledDate: string | null) => void;
@@ -44,6 +45,7 @@ export function MonthView({
   now,
   timeZone = DEFAULT_APP_TIMEZONE,
   recentlyCreatedId,
+  onInspect,
   onToggleComplete,
   onEdit,
   onScheduleDate,
@@ -194,6 +196,7 @@ export function MonthView({
                     timeZone={timeZone}
                     context="daily"
                     isNew={recentlyCreatedId === task.id}
+                    onInspect={onInspect}
                     onToggleComplete={onToggleComplete}
                     onEdit={onEdit}
                     onScheduleDate={onScheduleDate}

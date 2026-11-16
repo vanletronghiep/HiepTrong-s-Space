@@ -1,3 +1,5 @@
+import type { ZodiacSign } from '@/features/zodiac/types';
+
 export type FeatureThumbnailPreset =
   | 'constellation-arc'
   | 'dual-orbit'
@@ -24,6 +26,7 @@ export interface FeatureEntry {
     preset: FeatureThumbnailPreset;
     accent: 'lavender' | 'blue';
     imageUrl?: string;
+    zodiacSign?: ZodiacSign;
   };
 }
 
@@ -35,7 +38,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'Tasks',
     href: '/tasks/daily',
     status: 'built',
-    thumbnail: { preset: 'constellation-arc', accent: 'lavender' },
+    thumbnail: { preset: 'constellation-arc', accent: 'lavender', zodiacSign: 'aries' },
   },
   {
     id: 'tasks-hub',
@@ -53,7 +56,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'Schedule',
     href: '/events',
     status: 'built',
-    thumbnail: { preset: 'meridian-grid', accent: 'lavender' },
+    thumbnail: { preset: 'meridian-grid', accent: 'lavender', zodiacSign: 'taurus' },
   },
   {
     id: 'ai-engineering',
@@ -62,7 +65,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'Learning',
     href: '/ai-engineering',
     status: 'built',
-    thumbnail: { preset: 'neural-lattice', accent: 'blue' },
+    thumbnail: { preset: 'neural-lattice', accent: 'blue', zodiacSign: 'gemini' },
   },
   {
     id: 'blogs',
@@ -71,7 +74,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'Writing',
     href: '/blogs',
     status: 'built',
-    thumbnail: { preset: 'manuscript-lines', accent: 'lavender' },
+    thumbnail: { preset: 'manuscript-lines', accent: 'lavender', zodiacSign: 'cancer' },
   },
   {
     id: 'apcs',
@@ -80,7 +83,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'University',
     href: '/apcs',
     status: 'built',
-    thumbnail: { preset: 'academic-compass', accent: 'blue' },
+    thumbnail: { preset: 'academic-compass', accent: 'blue', zodiacSign: 'leo' },
   },
   {
     id: 'flashcards',
@@ -89,7 +92,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'Learning',
     href: '/flashcards',
     status: 'built',
-    thumbnail: { preset: 'paired-cards', accent: 'lavender' },
+    thumbnail: { preset: 'paired-cards', accent: 'lavender', zodiacSign: 'virgo' },
   },
   {
     id: 'entertainment',
@@ -98,7 +101,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'Personal',
     href: '/entertainment',
     status: 'built',
-    thumbnail: { preset: 'harmonic-waves', accent: 'blue' },
+    thumbnail: { preset: 'harmonic-waves', accent: 'blue', zodiacSign: 'libra' },
   },
   {
     id: 'tracking',
@@ -107,7 +110,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'Tracking',
     href: '/tracking',
     status: 'built',
-    thumbnail: { preset: 'pulse-timeline', accent: 'lavender' },
+    thumbnail: { preset: 'pulse-timeline', accent: 'lavender', zodiacSign: 'scorpio' },
   },
   {
     id: 'projects',
@@ -116,7 +119,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'Projects',
     href: '/projects',
     status: 'built',
-    thumbnail: { preset: 'blueprint-vectors', accent: 'blue' },
+    thumbnail: { preset: 'blueprint-vectors', accent: 'blue', zodiacSign: 'sagittarius' },
   },
   {
     id: 'milestones',
@@ -125,7 +128,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'Personal',
     href: '/milestones',
     status: 'built',
-    thumbnail: { preset: 'summit-trajectory', accent: 'lavender' },
+    thumbnail: { preset: 'summit-trajectory', accent: 'lavender', zodiacSign: 'capricorn' },
   },
   {
     id: 'learning-room',
@@ -134,7 +137,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'Learning',
     href: '/learning-room',
     status: 'built',
-    thumbnail: { preset: 'focus-aperture', accent: 'blue' },
+    thumbnail: { preset: 'focus-aperture', accent: 'blue', zodiacSign: 'aquarius' },
   },
   {
     id: 'achievements',
@@ -143,7 +146,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     label: 'Personal',
     href: '/achievements',
     status: 'built',
-    thumbnail: { preset: 'zenith-crown', accent: 'lavender' },
+    thumbnail: { preset: 'zenith-crown', accent: 'lavender', zodiacSign: 'pisces' },
   },
 ] as const;
 

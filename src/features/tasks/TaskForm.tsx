@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, type FormEvent, type RefObject } from 'react';
-import { AlertCircle, Calendar } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { ClientApiError } from '@/client/api-client';
 import type { CreateTaskInput, Priority, TaskDto, UpdateTaskInput } from '@/contracts';
 import {
@@ -14,8 +14,11 @@ import { DEFAULT_APP_TIMEZONE, formatScheduledDate } from '@/domain/time';
 import { Button } from '@/ui/Button';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import styles from './task-form.module.css';
+import { DatePickerField } from '@/ui/DatePickerField';
 import { Drawer } from '@/ui/Drawer';
+import { RichNoteEditor } from '@/ui/RichNoteEditor';
 import { SegmentedControl, type SegmentedOption } from '@/ui/SegmentedControl';
+import { TimeFieldControl } from '@/ui/TimeFieldControl';
 import { cn } from '@/ui/cn';
 
 const FIELD_FEEDBACK_CLASS = 'mt-1.5 flex items-center gap-1.5 text-[length:var(--fs-small)]';
@@ -188,9 +191,8 @@ function TaskFormBody({
   onCreate,
   onUpdate,
 }: TaskFormBodyProps) {
-  const nativeDateRef = useRef<HTMLInputElement>(null);
-
   const reducedMotion = useReducedMotion();
+  const referenceYear = Number(formatScheduledDate(now, timeZone).slice(0, 4));
 
   const [initialDraft] = useState(() =>
     buildInitialTaskDraft({ mode, initialTask, defaultScheduledDate, now, timeZone }),
@@ -205,15 +207,6 @@ function TaskFormBody({
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const resolvedDate = resolveDateInput(dateInput, now, timeZone, canonicalDate);
-
-  const applyPresetDate = (isoDate: string) => {
-    const resolved = resolveDateInput(isoDate, now, timeZone);
-    if (resolved) {
-      setDateInput(resolved.displayInput);
-      setCanonicalDate(resolved.scheduledDate);
-      setErrors((prev) => ({ ...prev, deadlineDate: undefined, form: undefined }));
-    }
-  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -377,75 +370,36 @@ function TaskFormBody({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="task-date-input" className="sr-only">
-              Deadline date (DD/MM)
-            </label>
-            <div className="relative flex items-center">
-              <input
-                id="task-date-input"
-                type="text"
-                placeholder="30/10"
-                value={dateInput}
-                onChange={(e) => {
-                  setDateInput(e.target.value);
-                  setCanonicalDate(null);
-                  if (errors.deadlineDate) {
-                    setErrors((prev) => ({ ...prev, deadlineDate: undefined }));
-                  }
-                }}
-                aria-invalid={Boolean(errors.deadlineDate)}
-                className={cn(
-                  'w-full h-11 rounded-item bg-ws-surface border px-3.5 pr-10 text-[length:var(--fs-ui)] text-ws-text placeholder:text-ws-text-muted tabular-nums',
-                  errors.deadlineDate ? 'border-tint-overdue-border' : 'border-ws-border',
-                )}
-              />
-              <button
-                type="button"
-                aria-label="Pick date from calendar"
-                onClick={() => nativeDateRef.current?.showPicker?.()}
-                className="absolute right-2 inline-flex items-center justify-center h-8 w-8 rounded-sm text-ws-text-muted hover:text-ws-text hover:bg-ws-accent-soft cursor-pointer"
-              >
-                <Calendar size={16} strokeWidth={1.5} />
-              </button>
-              <input
-                ref={nativeDateRef}
-                type="date"
-                tabIndex={-1}
-                aria-hidden="true"
-                value={resolvedDate?.scheduledDate ?? ''}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    applyPresetDate(e.target.value);
-                  }
-                }}
-                className="sr-only"
-              />
-            </div>
-          </div>
+          <DatePickerField
+            id="task-date-input"
+            ariaLabel="Deadline date (DD/MM)"
+            mode="task"
+            referenceYear={referenceYear}
+            placeholder="30/10"
+            value={dateInput}
+            error={Boolean(errors.deadlineDate)}
+            onChange={(nextValue) => {
+              setDateInput(nextValue);
+              setCanonicalDate(null);
+              if (errors.deadlineDate) {
+                setErrors((prev) => ({ ...prev, deadlineDate: undefined }));
+              }
+            }}
+          />
 
-          <div>
-            <label htmlFor="task-time-input" className="sr-only">
-              Deadline time (HH:mm)
-            </label>
-            <input
-              id="task-time-input"
-              type="text"
-              placeholder="23:59"
-              value={timeInput}
-              onChange={(e) => {
-                setTimeInput(e.target.value);
-                if (errors.deadlineTime) {
-                  setErrors((prev) => ({ ...prev, deadlineTime: undefined }));
-                }
-              }}
-              aria-invalid={Boolean(errors.deadlineTime)}
-              className={cn(
-                'w-full h-11 rounded-item bg-ws-surface border px-3.5 text-[length:var(--fs-ui)] text-ws-text placeholder:text-ws-text-muted tabular-nums',
-                errors.deadlineTime ? 'border-tint-overdue-border' : 'border-ws-border',
-              )}
-            />
-          </div>
+          <TimeFieldControl
+            id="task-time-input"
+            ariaLabel="Deadline time (HH:mm)"
+            placeholder="23:59"
+            value={timeInput}
+            error={Boolean(errors.deadlineTime)}
+            onChange={(nextValue) => {
+              setTimeInput(nextValue);
+              if (errors.deadlineTime) {
+                setErrors((prev) => ({ ...prev, deadlineTime: undefined }));
+              }
+            }}
+          />
         </div>
 
         {resolvedDate ? (
@@ -475,6 +429,7 @@ function TaskFormBody({
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label
+            id="task-desc-label"
             htmlFor="task-desc-input"
             className="text-[length:var(--fs-ui)] font-medium text-ws-text"
           >
@@ -491,20 +446,17 @@ function TaskFormBody({
             </span>
           ) : null}
         </div>
-        <textarea
+        <RichNoteEditor
           id="task-desc-input"
-          rows={4}
+          ariaLabelledBy="task-desc-label"
           placeholder="Optional notes or context…"
           value={description}
-          onChange={(e) => {
-            setDescription(e.target.value);
+          maxLength={2000}
+          error={Boolean(errors.description)}
+          onChange={(nextValue) => {
+            setDescription(nextValue);
             if (errors.description) setErrors((prev) => ({ ...prev, description: undefined }));
           }}
-          aria-invalid={Boolean(errors.description)}
-          className={cn(
-            'w-full min-h-[104px] max-h-[180px] resize-y rounded-item bg-ws-surface border p-3.5 text-[length:var(--fs-ui)] leading-relaxed text-ws-text placeholder:text-ws-text-muted',
-            errors.description ? 'border-tint-overdue-border' : 'border-ws-border',
-          )}
         />
         {errors.description ? <InlineFieldError message={errors.description} /> : null}
       </div>

@@ -405,7 +405,120 @@
   );
 }
 
+/* Quiet bottom-corner Earth imagery credits disclosure on the Homepage intro stage */
+.earthCredits {
+  position: absolute;
+  z-index: 4;
+  left: 24px;
+  right: 24px;
+  bottom: 18px;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.earthCredits[data-earth-credits-locked='true'] {
+  opacity: 0;
+}
+
+.earthCreditsTrigger {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--cosmos-text) 14%, transparent);
+  background: color-mix(in srgb, var(--cosmos-bg-0) 64%, transparent);
+  color: color-mix(in srgb, var(--cosmos-text-muted) 86%, transparent);
+  font-family: var(--font-ui);
+  font-size: var(--fs-micro);
+  line-height: 1.2;
+  letter-spacing: var(--ls-support);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.earthCreditsTrigger:hover,
+.earthCreditsTrigger[aria-expanded='true'] {
+  color: var(--cosmos-text);
+  border-color: color-mix(in srgb, var(--cosmos-lavender) 40%, transparent);
+  background: color-mix(in srgb, var(--cosmos-navy-0) 86%, transparent);
+}
+
+.earthCreditsTrigger:focus-visible {
+  outline: 2px solid var(--cosmos-focus);
+  outline-offset: 2px;
+  transition: none !important;
+}
+
+.earthCredits[data-earth-credits-locked='true'] .earthCreditsTrigger,
+.earthCreditsTrigger:disabled {
+  pointer-events: none;
+  cursor: default;
+}
+
+.earthCreditsPanel {
+  pointer-events: auto;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  width: 21rem;
+  max-width: 100%;
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-item);
+  border: 1px solid color-mix(in srgb, var(--cosmos-text) 16%, transparent);
+  background: color-mix(in srgb, var(--cosmos-navy-0) 94%, var(--journey-space-black));
+  box-shadow: var(--shadow-cosmos);
+  color: var(--cosmos-text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-body);
+  text-align: left;
+}
+
+.earthCreditsPanel[hidden] {
+  display: none;
+}
+
+.earthCreditsHeading {
+  margin: 0 0 0.375rem;
+  color: var(--cosmos-text);
+  font-weight: 500;
+  font-size: var(--fs-micro);
+}
+
+.earthCreditsBody {
+  margin: 0;
+}
+
+.earthCreditsLink {
+  color: var(--cosmos-star-pale);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.earthCreditsLink:hover {
+  color: var(--cosmos-text);
+}
+
+.earthCreditsLink:focus-visible {
+  outline: 2px solid var(--cosmos-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 @media (max-width: 1023px) {
+  .earthCredits {
+    left: 20px;
+    right: 20px;
+    bottom: 10px;
+  }
   .introColumn {
     left: 0;
     right: 0;
@@ -510,10 +623,26 @@
     padding-left: 12px;
     font-size: clamp(1.0625rem, 4.3vw, 1.25rem);
   }
+
+  .earthCredits {
+    left: 16px;
+    right: 16px;
+    bottom: 4px;
+  }
+
+  .earthCreditsTrigger {
+    min-height: 22px;
+    padding: 0.125rem 0.5rem;
+  }
 }
 
 /* Keep the introduction beside the Earth in short landscape / browser zoom. */
 @media (max-width: 1023px) and (max-height: 519px) and (min-width: 560px) {
+  .earthCredits {
+    left: 16px;
+    right: 16px;
+    bottom: 8px;
+  }
   .introColumn {
     left: var(--earth-right, 37vw);
     right: 0;
@@ -826,7 +955,9 @@
     height: 0;
   }
 
-  .collectionSignature {
+  .collectionSignature,
+  .earthCredits,
+  .earthCreditsTrigger {
     transition-duration: 0ms;
   }
 }

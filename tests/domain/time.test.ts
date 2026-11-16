@@ -10,7 +10,10 @@ import {
   buildZonedInstant,
   formatDisplayDate,
   formatDisplayDateTime,
+  formatHubDeadline,
+  formatInspectorDeadline,
   formatScheduledDate,
+  formatScheduledDateWithYear,
   shiftScheduledDate,
 } from '@/domain/time';
 
@@ -91,5 +94,24 @@ describe('domain/time', () => {
   it('normalizes offset ISO instants to canonical UTC .toISOString() in isoInstantSchema (C05)', () => {
     expect(isoInstantSchema.parse('2026-10-30T23:59:00+07:00')).toBe('2026-10-30T16:59:00.000Z');
     expect(isoInstantSchema.parse('2026-10-30T16:59:00Z')).toBe('2026-10-30T16:59:00.000Z');
+  });
+
+  it('formats Hub deadlines as HH:mm · ddd · d MMM without year in timezone', () => {
+    // 2026-11-15T12:00:00Z = 19:00 on Sun 15 Nov 2026 in Asia/Saigon (+07:00)
+    expect(formatHubDeadline('2026-11-15T12:00:00.000Z', 'Asia/Saigon')).toBe('19:00 · Sun · 15 Nov');
+    // 2026-11-04T18:05:00Z = 01:05 on Thu 5 Nov 2026 in Asia/Saigon (+07:00)
+    expect(formatHubDeadline('2026-11-04T18:05:00.000Z', 'Asia/Saigon')).toBe('01:05 · Thu · 5 Nov');
+  });
+
+  it('formats Inspector deadlines and scheduled dates with full year', () => {
+    expect(formatInspectorDeadline('2026-11-15T12:00:00.000Z', 'Asia/Saigon')).toBe(
+      '19:00 · Sun · 15 Nov 2026',
+    );
+    expect(formatInspectorDeadline('2027-01-01T01:30:00.000Z', 'Asia/Saigon')).toBe(
+      '08:30 · Fri · 1 Jan 2027',
+    );
+    expect(formatScheduledDateWithYear('2026-11-15', 'Asia/Saigon')).toBe('Sun · 15 Nov 2026');
+    expect(formatScheduledDateWithYear('2026-11-05', 'Asia/Saigon')).toBe('Thu · 5 Nov 2026');
+    expect(() => formatScheduledDateWithYear('2026-02-29', 'Asia/Saigon')).toThrow(RangeError);
   });
 });

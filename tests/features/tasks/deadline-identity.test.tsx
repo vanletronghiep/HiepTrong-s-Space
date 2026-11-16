@@ -93,11 +93,11 @@ describe('Deadline identity and canonical date resolution (C02)', () => {
     expect(payload.deadlineAt).toBe('2026-11-05T11:00:00.000Z');
   });
 
-  it('keeps an explicit past date selected through the native date picker during edit', async () => {
+  it('keeps an explicit past date entered as ISO in DatePickerField during edit', async () => {
     const task = makeTask({ deadlineAt: '2026-11-10T16:59:00.000Z' });
     const onUpdate = vi.fn().mockResolvedValue(task);
 
-    const { container } = render(
+    render(
       <TaskForm
         open
         mode="edit"
@@ -109,10 +109,10 @@ describe('Deadline identity and canonical date resolution (C02)', () => {
       />,
     );
 
-    const nativeDate = container.querySelector('input[type="date"]') as HTMLInputElement;
-    fireEvent.change(nativeDate, { target: { value: '2026-10-15' } });
+    const dateField = screen.getByLabelText(/Deadline date/i);
+    fireEvent.change(dateField, { target: { value: '2026-10-15' } });
 
-    expect(screen.getByLabelText(/Deadline date/i)).toHaveValue('15/10');
+    expect(dateField).toHaveValue('2026-10-15');
     expect(screen.getByText(/Resolves to Thursday, 15 Oct 2026/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));

@@ -15,6 +15,9 @@ import { cn } from '@/ui/cn';
 import { Dialog } from '@/ui/Dialog';
 import { EmptyState } from '@/ui/EmptyState';
 import { FeatureThemeProvider, useFeatureTheme } from '@/ui/FeatureTheme';
+import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
+import { RichNoteEditor } from '@/ui/RichNoteEditor';
+import { SelectField } from '@/ui/SelectField';
 import { Skeleton } from '@/ui/Skeleton';
 import styles from './entertainment.module.css';
 
@@ -452,7 +455,12 @@ export function EntertainmentView() {
 
                     <h3 className={styles.bookTitle}>{book.title}</h3>
                     <p className={styles.bookAuthor}>By {book.author}</p>
-                    {book.thoughts ? <p className={styles.bookThoughts}>{book.thoughts}</p> : null}
+                    {book.thoughts ? (
+                      <FormattedNoteContent
+                        value={book.thoughts}
+                        className={styles.bookThoughts}
+                      />
+                    ) : null}
                   </div>
 
                   <div>
@@ -684,16 +692,17 @@ export function EntertainmentView() {
                 <label htmlFor={bookStatusId} className={styles.fieldLabel}>
                   Status
                 </label>
-                <select
+                <SelectField<BookStatus>
                   id={bookStatusId}
-                  className={styles.selectField}
+                  ariaLabel="Status"
                   value={bookStatus}
-                  onChange={(e) => setBookStatus(e.target.value as BookStatus)}
-                >
-                  <option value="reading">Currently reading</option>
-                  <option value="completed">Completed</option>
-                  <option value="want_to_read">Want to read</option>
-                </select>
+                  onChange={setBookStatus}
+                  options={[
+                    { value: 'reading', label: 'Currently reading' },
+                    { value: 'completed', label: 'Completed' },
+                    { value: 'want_to_read', label: 'Want to read' },
+                  ]}
+                />
               </div>
 
               <div>
@@ -714,14 +723,15 @@ export function EntertainmentView() {
 
             <div>
               <label htmlFor={bookThoughtsId} className={styles.fieldLabel}>
-                Takeaways & reflection
+                Takeaways &amp; reflection
               </label>
-              <textarea
+              <RichNoteEditor
                 id={bookThoughtsId}
-                className={styles.textareaField}
+                ariaLabel="Takeaways & reflection"
                 placeholder="Key concepts or memorable impressions..."
                 value={bookThoughts}
-                onChange={(e) => setBookThoughts(e.target.value)}
+                onChange={setBookThoughts}
+                minHeightClassName="min-h-[84px]"
               />
             </div>
 
@@ -789,16 +799,17 @@ export function EntertainmentView() {
                 <label htmlFor={gameStatusId} className={styles.fieldLabel}>
                   Status
                 </label>
-                <select
+                <SelectField<GameStatus>
                   id={gameStatusId}
-                  className={styles.selectField}
+                  ariaLabel="Status"
                   value={gameStatus}
-                  onChange={(e) => setGameStatus(e.target.value as GameStatus)}
-                >
-                  <option value="playing">Currently playing</option>
-                  <option value="completed">Completed</option>
-                  <option value="backlog">In backlog</option>
-                </select>
+                  onChange={setGameStatus}
+                  options={[
+                    { value: 'playing', label: 'Currently playing' },
+                    { value: 'completed', label: 'Completed' },
+                    { value: 'backlog', label: 'In backlog' },
+                  ]}
+                />
               </div>
             </div>
 

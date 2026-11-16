@@ -19,11 +19,14 @@ import type { FlashcardDeck, FlashcardItem } from '@/contracts/flashcard';
 import { DEFAULT_APP_TIMEZONE } from '@/domain/time';
 import { Button } from '@/ui/Button';
 import { Dialog } from '@/ui/Dialog';
+import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
 import {
   LargeEditorDialog,
   LargeEditorTwoColumn,
   type DraftSaveOutcome,
 } from '@/ui/LargeEditorDialog';
+import { RichNoteEditor } from '@/ui/RichNoteEditor';
+import { SelectField } from '@/ui/SelectField';
 import { Skeleton } from '@/ui/Skeleton';
 import styles from './flashcards.module.css';
 
@@ -490,7 +493,10 @@ export function FlashcardsView() {
                   <div className={styles.cardAnswerBox} role="status">
                     <p className={styles.cardAnswer}>{currentStudyCard.answer}</p>
                     {currentStudyCard.notes && (
-                      <p className={styles.cardNotes}>{currentStudyCard.notes}</p>
+                      <FormattedNoteContent
+                        value={currentStudyCard.notes}
+                        className={styles.cardNotes}
+                      />
                     )}
                   </div>
                 )}
@@ -596,7 +602,10 @@ export function FlashcardsView() {
                       <span className={styles.deckTopic}>{deck.topic}</span>
                       <h3 className={styles.deckName}>{deck.name}</h3>
                       {deck.description ? (
-                        <p className={styles.deckDesc}>{deck.description}</p>
+                        <FormattedNoteContent
+                          value={deck.description}
+                          className={styles.deckDesc}
+                        />
                       ) : null}
                       <div className={styles.deckProgressTrack} aria-hidden="true">
                         <div className={styles.deckProgressFill} style={{ width: `${mastery}%` }} />
@@ -720,15 +729,15 @@ export function FlashcardsView() {
                   <label htmlFor={notesInputId} className={styles.fieldLabel}>
                     Context &amp; example sentence
                   </label>
-                  <textarea
+                  <RichNoteEditor
                     id={notesInputId}
-                    rows={3}
-                    className={styles.textareaField}
+                    ariaLabel="Context & example sentence"
                     placeholder="e.g., Demonstrating epistemic humility in research."
                     value={cardFormValues.notes}
-                    onChange={(e) =>
-                      setCardFormValues((prev) => ({ ...prev, notes: e.target.value }))
+                    onChange={(nextValue) =>
+                      setCardFormValues((prev) => ({ ...prev, notes: nextValue }))
                     }
+                    minHeightClassName="min-h-[84px]"
                   />
                 </div>
               </>
@@ -739,20 +748,15 @@ export function FlashcardsView() {
                   <label htmlFor={deckSelectId} className={styles.fieldLabel}>
                     Target deck
                   </label>
-                  <select
+                  <SelectField
                     id={deckSelectId}
-                    className={styles.selectField}
+                    ariaLabel="Target deck"
                     value={cardFormValues.deckId}
-                    onChange={(e) =>
-                      setCardFormValues((prev) => ({ ...prev, deckId: e.target.value }))
+                    onChange={(nextDeckId) =>
+                      setCardFormValues((prev) => ({ ...prev, deckId: nextDeckId }))
                     }
-                  >
-                    {decks.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={decks.map((d) => ({ value: d.id, label: d.name }))}
+                  />
                 </div>
 
                 <p className={styles.metaHintCard}>
@@ -846,13 +850,13 @@ export function FlashcardsView() {
             <label htmlFor={deckDescId} className={styles.fieldLabel}>
               Description
             </label>
-            <textarea
+            <RichNoteEditor
               id={deckDescId}
-              rows={3}
-              className={styles.textareaField}
+              ariaLabel="Description"
               placeholder="Purpose of this vocabulary set..."
               value={newDeckDesc}
-              onChange={(e) => setNewDeckDesc(e.target.value)}
+              onChange={setNewDeckDesc}
+              minHeightClassName="min-h-[84px]"
             />
           </div>
         </form>

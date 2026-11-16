@@ -1,17 +1,21 @@
 'use client';
 
+import type { Ref } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import type { FeatureCollectionLayout } from '@/client/preferences';
 import { MOTION_DURATION, MOTION_EASE } from '@/design/motion';
 import type { FeatureEntry } from '@/features/registry';
 import { CollectionHeader } from './CollectionHeader';
 import { FeatureCard } from './FeatureCard';
+import type { ZodiacThumbnailControl } from './FeatureThumbnail';
 
 export interface VerticalGridProps {
   features: readonly FeatureEntry[];
   layout: FeatureCollectionLayout;
   onLayoutChange: (next: FeatureCollectionLayout) => void;
   revealComplete?: boolean;
+  controlsRef?: Ref<HTMLDivElement>;
+  getZodiacControl?: (feature: FeatureEntry) => ZodiacThumbnailControl | undefined;
 }
 
 /**
@@ -23,6 +27,8 @@ export function VerticalGrid({
   layout,
   onLayoutChange,
   revealComplete = true,
+  controlsRef,
+  getZodiacControl,
 }: VerticalGridProps) {
   const reducedMotion = useReducedMotion();
 
@@ -32,7 +38,11 @@ export function VerticalGrid({
       className="w-full pb-20 pt-[calc(var(--journey-safe-top,64px)+16px)]"
     >
       <div className="mx-auto w-full max-w-[var(--max-content)] px-[var(--gutter)] lg:px-[var(--gutter-lg)]">
-        <CollectionHeader layout={layout} onLayoutChange={onLayoutChange} />
+        <CollectionHeader
+          layout={layout}
+          onLayoutChange={onLayoutChange}
+          controlsRef={controlsRef}
+        />
 
         <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-12">
           {features.map((feature, index) => (
@@ -48,7 +58,11 @@ export function VerticalGrid({
                 ease: MOTION_EASE,
               }}
             >
-              <FeatureCard feature={feature} />
+              <FeatureCard
+                feature={feature}
+                revealComplete={revealComplete}
+                zodiacControl={getZodiacControl?.(feature)}
+              />
             </motion.div>
           ))}
         </div>

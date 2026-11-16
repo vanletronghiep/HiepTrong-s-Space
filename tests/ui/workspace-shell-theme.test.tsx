@@ -6,6 +6,7 @@ import { ToastProvider } from '@/ui/Toast';
 import { WorkspaceShell } from '@/ui/WorkspaceShell';
 
 let mockedPathname = '/events';
+const transitionPush = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockedPathname,
@@ -28,7 +29,7 @@ vi.mock('@/client/queries/notifications', () => ({
 
 vi.mock('@/features/transitions/TransitionProvider', () => ({
   useTransitionRouter: () => ({
-    push: vi.fn(),
+    push: transitionPush,
     replace: vi.fn(),
     isTransitioning: false,
   }),
@@ -46,11 +47,46 @@ vi.mock('@/features/tasks/DailySky', () => ({
 describe('WorkspaceShell full-page feature theme & overlay isolation', () => {
   beforeEach(() => {
     mockedPathname = '/events';
+    transitionPush.mockClear();
   });
 
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it.each([
+    ['/tasks/daily', 'Tasks Hub', '/tasks/hub'],
+    ['/tasks/hub', 'Daily', '/tasks/daily'],
+  ])('places the %s shortcut in the topbar and navigates to %s', (pathname, label, href) => {
+    mockedPathname = pathname;
+    const { container } = render(
+      <ToastProvider>
+        <WorkspaceShell><div>Task content</div></WorkspaceShell>
+      </ToastProvider>,
+    );
+    const shortcut = screen.getByRole('link', { name: label });
+    const header = container.querySelector('header')!;
+    expect(header).toContainElement(shortcut);
+    expect(container.querySelector('main')).not.toContainElement(shortcut);
+    expect(shortcut).toHaveAttribute('href', href);
+    expect(shortcut.nextElementSibling).toBe(
+      pathname === '/tasks/daily'
+        ? screen.getByText('Daily date')
+        : screen.getByRole('button', { name: 'Open universe menu' }),
+    );
+    fireEvent.click(shortcut);
+    expect(transitionPush).toHaveBeenCalledWith(href);
+  });
+
+  it.each(['/events', '/tracking', '/notifications'])('omits task shortcuts on %s', (pathname) => {
+    mockedPathname = pathname;
+    const { container } = render(
+      <ToastProvider>
+        <WorkspaceShell><div>Feature content</div></WorkspaceShell>
+      </ToastProvider>,
+    );
+    expect(container.querySelector('[data-task-shortcut]')).not.toBeInTheDocument();
   });
 
   it('extends events palette to workspace shell and Universe menu while keeping Notifications sakura', () => {

@@ -35,12 +35,16 @@ import { Chip } from '@/ui/Chip';
 import { cn } from '@/ui/cn';
 import { ConfirmDialog } from '@/ui/Dialog';
 import { EmptyState } from '@/ui/EmptyState';
+import { DatePickerField } from '@/ui/DatePickerField';
 import { FeatureThemeProvider, useFeatureTheme } from '@/ui/FeatureTheme';
+import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
 import {
   LargeEditorDialog,
   LargeEditorTwoColumn,
   type DraftSaveOutcome,
 } from '@/ui/LargeEditorDialog';
+import { RichNoteEditor } from '@/ui/RichNoteEditor';
+import { SelectField } from '@/ui/SelectField';
 import { Skeleton } from '@/ui/Skeleton';
 import { useItemAnchor } from '@/ui/use-item-anchor';
 import {
@@ -581,7 +585,10 @@ export function ProjectsView() {
                   </div>
 
                   {project.overview ? (
-                    <p className={styles.cardOverview}>{project.overview}</p>
+                    <FormattedNoteContent
+                      value={project.overview}
+                      className={styles.cardOverview}
+                    />
                   ) : null}
 
                   {project.deadlineAt ? (
@@ -652,7 +659,10 @@ export function ProjectsView() {
                         <AlertCircle size={13} aria-hidden="true" />
                         <span className={styles.blockerLabel}>Current blocker</span>
                       </div>
-                      <p className="text-ws-text [overflow-wrap:anywhere]">{project.blockers}</p>
+                      <FormattedNoteContent
+                        value={project.blockers}
+                        className="text-ws-text [overflow-wrap:anywhere]"
+                      />
                     </div>
                   ) : null}
 
@@ -797,24 +807,22 @@ export function ProjectsView() {
 
                 <div className="space-y-1.5">
                   <label
+                    id="project-editor-overview-label"
                     htmlFor="project-editor-overview"
                     className="text-[length:var(--fs-small)] font-medium text-ws-text block"
                   >
                     Overview
                   </label>
-                  <textarea
+                  <RichNoteEditor
                     id="project-editor-overview"
-                    rows={5}
+                    ariaLabel="Overview"
                     value={formValues.overview}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, overview: e.target.value }))
+                    onChange={(nextValue) =>
+                      setFormValues((prev) => ({ ...prev, overview: nextValue }))
                     }
                     placeholder="What is this project and what outcome does it deliver?"
-                    className={cn(
-                      styles.editorControl,
-                      styles.editorControlTextarea,
-                      'max-w-[66ch]',
-                    )}
+                    className="max-w-[66ch]"
+                    minHeightClassName="min-h-[108px]"
                   />
                 </div>
 
@@ -844,15 +852,15 @@ export function ProjectsView() {
                   >
                     Current blockers
                   </label>
-                  <textarea
+                  <RichNoteEditor
                     id="project-editor-blockers"
-                    rows={3}
+                    ariaLabel="Current blockers"
                     value={formValues.blockers}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, blockers: e.target.value }))
+                    onChange={(nextValue) =>
+                      setFormValues((prev) => ({ ...prev, blockers: nextValue }))
                     }
                     placeholder="Dependencies, unknowns, or constraints currently blocking progress"
-                    className={cn(styles.editorControl, styles.editorControlTextarea)}
+                    minHeightClassName="min-h-[84px]"
                   />
                 </div>
               </>
@@ -866,22 +874,23 @@ export function ProjectsView() {
                   >
                     Status
                   </label>
-                  <select
+                  <SelectField<ProjectStatus>
                     id="project-editor-status"
+                    ariaLabel="Status"
                     value={formValues.status}
-                    onChange={(e) =>
+                    onChange={(nextStatus) =>
                       setFormValues((prev) => ({
                         ...prev,
-                        status: e.target.value as ProjectStatus,
+                        status: nextStatus,
                       }))
                     }
-                    className={cn(styles.editorControl, styles.editorControlInput)}
-                  >
-                    <option value="active">Active</option>
-                    <option value="in_progress">In progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="on_hold">On hold</option>
-                  </select>
+                    options={[
+                      { value: 'active', label: 'Active' },
+                      { value: 'in_progress', label: 'In progress' },
+                      { value: 'completed', label: 'Completed' },
+                      { value: 'on_hold', label: 'On hold' },
+                    ]}
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -921,18 +930,14 @@ export function ProjectsView() {
                     >
                       Target date
                     </label>
-                    <input
+                    <DatePickerField
                       id="project-editor-deadline"
-                      type="date"
+                      mode="iso"
+                      ariaLabel="Target date"
                       value={formValues.deadlineDate}
-                      onChange={(e) =>
-                        setFormValues((prev) => ({ ...prev, deadlineDate: e.target.value }))
+                      onChange={(nextDate) =>
+                        setFormValues((prev) => ({ ...prev, deadlineDate: nextDate }))
                       }
-                      className={cn(
-                        styles.editorControl,
-                        styles.editorControlInput,
-                        'tabular-nums',
-                      )}
                     />
                   </div>
                 </div>

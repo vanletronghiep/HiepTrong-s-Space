@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TaskDto } from '@/contracts';
 import { TaskForm, type TaskFormProps } from '@/features/tasks/TaskForm';
@@ -55,22 +55,57 @@ function formProps(overrides: Partial<TaskFormProps> = {}): TaskFormProps {
 }
 
 describe('TaskForm draft session (C01)', () => {
-  it('keeps typed edit fields across a minute tick and a refreshed task object', () => {
-    const props = formProps();
+  it('keeps typed edit fields and rich-note edits across a minute tick and a refreshed task object', async () => {
+    const props = formProps({
+      initialTask: makeTask({ description: 'Original notes' }),
+    });
     const { rerender } = render(<TaskForm {...props} />);
+
+    // Allow RichNoteEditor's post-create microtask guard to settle before formatting actions
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Draft title' } });
     fireEvent.change(screen.getByLabelText(/Deadline time/i), { target: { value: '15:15' } });
-    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Draft notes' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Bullet list' }));
+
+    const descBox = screen.getByRole('textbox', { name: 'Description' });
+    expect(descBox.querySelector('ul')).not.toBeNull();
 
     rerender(<TaskForm {...props} now={T1} />);
     rerender(
-      <TaskForm {...props} now={T1} initialTask={makeTask({ updatedAt: T1.toISOString() })} />,
+      <TaskForm
+        {...props}
+        now={T1}
+        initialTask={makeTask({ description: 'Remote notes', updatedAt: T1.toISOString() })}
+      />,
     );
 
     expect(screen.getByLabelText('Title')).toHaveValue('Draft title');
     expect(screen.getByLabelText(/Deadline time/i)).toHaveValue('15:15');
-    expect(screen.getByLabelText('Description')).toHaveValue('Draft notes');
+    expect(screen.getByRole('textbox', { name: 'Description' }).querySelector('ul')).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveTextContent('Original notes');
+  });
+
+  it('preserves untouched rich or legacy description verbatim when editing only the title', async () => {
+    const legacyDescription = '# Untouched heading\n*literal marker*';
+    const onUpdate = vi.fn().mockResolvedValue(makeTask());
+    const props = formProps({
+      initialTask: makeTask({ description: legacyDescription }),
+      onUpdate,
+    });
+
+    render(<TaskForm {...props} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Edited title only' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
+    expect(onUpdate.mock.calls[0]?.[1]?.description).toBe(legacyDescription);
   });
 
   it('keeps typed create fields across the midnight tick', () => {

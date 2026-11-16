@@ -216,6 +216,17 @@ it('handles rapid keyboard arrow switches cleanly and clears motion flag on sett
   expect(stage.style.getPropertyValue('--carousel-position')).toBe('0');
 });
 
+it.each(['day', 'week', 'month'] as const)('keeps the Daily %s content free of a standalone navigation button', (mode) => {
+  setDailyViewPreference(mode);
+  render(
+    <ToastProvider>
+      <DailyBoard />
+    </ToastProvider>,
+  );
+
+  expect(screen.queryByRole('link', { name: 'Tasks Hub' })).not.toBeInTheDocument();
+});
+
 it('renders persisted Daily view mode immediately without day flash and prevents overlapping modePanel buildup on rapid toggles', async () => {
   setDailyViewPreference('week');
   const { container } = render(
@@ -272,6 +283,16 @@ it('defers DailySky twinkle activation while Cosmic Launch or popstate quick-fad
   expect(sky.querySelectorAll('[class*="twinkle"]').length).toBe(8);
   expect(sky.querySelectorAll('svg[class*="stars"] circle').length).toBe(114);
   expect(sky.querySelectorAll('svg[class*="stars"] path').length).toBe(4);
+  const wheels = sky.querySelectorAll('image[data-daily-zodiac]');
+  expect(wheels).toHaveLength(2);
+  for (const wheel of wheels) {
+    expect(wheel).toHaveAttribute('href', '/visuals/daily-v2/zodiac-wheel.svg');
+    expect(wheel).toHaveAttribute('preserveAspectRatio', 'xMidYMid meet');
+  }
+  expect(wheels[0]).toHaveAttribute('data-daily-zodiac', 'upper-left');
+  expect(wheels[1]).toHaveAttribute('data-daily-zodiac', 'lower-right');
+  expect(wheels[1]).toHaveAttribute('x', '976');
+  expect(wheels[1]).toHaveAttribute('width', '420');
 
   act(() => {
     vi.advanceTimersByTime(100);

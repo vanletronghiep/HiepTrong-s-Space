@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { EventItem } from '@/contracts/event';
-import { eventEditorPatch, eventEditorValues } from '@/features/events/event-editor';
+import {
+  eventEditorPatch,
+  eventEditorValues,
+  formatZonedTime24,
+  isEventDraftPublishable,
+  isValidEventTimeHm,
+} from '@/features/events/event-editor';
 
 export const event: EventItem = {
   id: 'meeting',
@@ -56,5 +62,56 @@ describe('event editing preserves fields outside the editor', () => {
     ] as const) {
       expect(result[field]).toEqual(event[field]);
     }
+  });
+
+  it('formats midnight in 24-hour 00:mm format and validates publishable drafts cleanly', () => {
+    const midnightEvent: EventItem = {
+      ...event,
+      startAt: '2026-11-20T17:15:00.000Z', // 00:15+07:00
+    };
+    expect(formatZonedTime24(new Date(midnightEvent.startAt))).toBe('00:15');
+    expect(eventEditorValues(midnightEvent).time).toBe('00:15');
+
+    expect(isValidEventTimeHm('00:00')).toBe(true);
+    expect(isValidEventTimeHm('23:59')).toBe(true);
+    expect(isValidEventTimeHm('24:00')).toBe(false);
+    expect(isValidEventTimeHm('9:00')).toBe(false);
+
+    expect(
+      isEventDraftPublishable({
+        title: 'Lab checkoff',
+        category: 'school',
+        date: '2026-11-25',
+        time: '00:15',
+        location: '',
+        isOnline: false,
+        isExam: false,
+        notes: '',
+      }),
+    ).toBe(true);
+    expect(
+      isEventDraftPublishable({
+        title: '   ',
+        category: 'school',
+        date: '2026-11-25',
+        time: '00:15',
+        location: '',
+        isOnline: false,
+        isExam: false,
+        notes: '',
+      }),
+    ).toBe(false);
+    expect(
+      isEventDraftPublishable({
+        title: 'Incomplete date',
+        category: 'school',
+        date: '2026-02-30',
+        time: '19:00',
+        location: '',
+        isOnline: false,
+        isExam: false,
+        notes: '',
+      }),
+    ).toBe(false);
   });
 });

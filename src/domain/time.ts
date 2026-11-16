@@ -47,6 +47,56 @@ export function formatDisplayDateTime(
   return `${datePart} ${format(target, 'HH:mm')}`;
 }
 
+function parseScheduledDateParts(scheduledDate: string): {
+  year: number;
+  month: number;
+  day: number;
+} {
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(scheduledDate);
+  if (!dateMatch) {
+    throw new RangeError(`Invalid scheduledDate: "${scheduledDate}"`);
+  }
+  const year = Number(dateMatch[1]);
+  const month = Number(dateMatch[2]);
+  const day = Number(dateMatch[3]);
+  if (!isValidCalendarDay(year, month, day)) {
+    throw new RangeError(`Non-existent calendar date: "${scheduledDate}"`);
+  }
+  return { year, month, day };
+}
+
+/**
+ * Formats an instant as 'HH:mm · ddd · d MMM' in `timeZone` (for compact Hub cards).
+ */
+export function formatHubDeadline(
+  instant: Date | string,
+  timeZone: string = DEFAULT_APP_TIMEZONE,
+): string {
+  return format(toZonedDate(instant, timeZone), 'HH:mm · EEE · d MMM');
+}
+
+/**
+ * Formats an instant as 'HH:mm · ddd · d MMM yyyy' in `timeZone` (for Task Inspector).
+ */
+export function formatInspectorDeadline(
+  instant: Date | string,
+  timeZone: string = DEFAULT_APP_TIMEZONE,
+): string {
+  return format(toZonedDate(instant, timeZone), 'HH:mm · EEE · d MMM yyyy');
+}
+
+/**
+ * Formats a 'YYYY-MM-DD' scheduled date as 'ddd · d MMM yyyy' in `timeZone`.
+ */
+export function formatScheduledDateWithYear(
+  scheduledDate: string,
+  timeZone: string = DEFAULT_APP_TIMEZONE,
+): string {
+  const { year, month, day } = parseScheduledDateParts(scheduledDate);
+  const anchor = new TZDate(year, month - 1, day, 12, 0, 0, 0, timeZone);
+  return format(anchor, 'EEE · d MMM yyyy');
+}
+
 /**
  * Combines a 'YYYY-MM-DD' calendar date and 'HH:mm' 24h time in `timeZone`
  * and returns a canonical UTC ISO-8601 instant string.
@@ -56,19 +106,16 @@ export function buildZonedInstant(
   timeHm: string,
   timeZone: string = DEFAULT_APP_TIMEZONE,
 ): string {
-  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(scheduledDate);
   const timeMatch = /^(\d{2}):(\d{2})$/.exec(timeHm);
-  if (!dateMatch || !timeMatch) {
+  if (!timeMatch) {
     throw new RangeError(`Invalid date/time input: "${scheduledDate}" "${timeHm}"`);
   }
 
-  const year = Number(dateMatch[1]);
-  const month = Number(dateMatch[2]);
-  const day = Number(dateMatch[3]);
+  const { year, month, day } = parseScheduledDateParts(scheduledDate);
   const hour = Number(timeMatch[1]);
   const minute = Number(timeMatch[2]);
 
-  if (!isValidCalendarDay(year, month, day) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
     throw new RangeError(`Out-of-range date/time input: "${scheduledDate}" "${timeHm}"`);
   }
 
@@ -84,16 +131,7 @@ export function shiftScheduledDate(
   deltaDays: number,
   timeZone: string = DEFAULT_APP_TIMEZONE,
 ): string {
-  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(scheduledDate);
-  if (!dateMatch) {
-    throw new RangeError(`Invalid scheduledDate: "${scheduledDate}"`);
-  }
-  const year = Number(dateMatch[1]);
-  const month = Number(dateMatch[2]);
-  const day = Number(dateMatch[3]);
-  if (!isValidCalendarDay(year, month, day)) {
-    throw new RangeError(`Non-existent calendar date: "${scheduledDate}"`);
-  }
+  const { year, month, day } = parseScheduledDateParts(scheduledDate);
   // Use noon in the target timezone so DST transitions (if another timezone is configured) cannot skip/repeat a day.
   const anchor = new TZDate(year, month - 1, day, 12, 0, 0, 0, timeZone);
   return format(addDays(anchor, deltaDays), 'yyyy-MM-dd');

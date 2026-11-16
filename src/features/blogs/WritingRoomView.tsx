@@ -31,11 +31,14 @@ import { Button } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
 import { EmptyState } from '@/ui/EmptyState';
 import { FeatureThemeProvider, useFeatureTheme } from '@/ui/FeatureTheme';
+import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
 import {
   LargeEditorDialog,
   LargeEditorTwoColumn,
   type DraftSaveOutcome,
 } from '@/ui/LargeEditorDialog';
+import { RichNoteEditor } from '@/ui/RichNoteEditor';
+import { SelectField } from '@/ui/SelectField';
 import { Skeleton } from '@/ui/Skeleton';
 import styles from './writing-room.module.css';
 
@@ -565,7 +568,10 @@ export function WritingRoomView() {
                   <Clock size={14} strokeWidth={2} aria-hidden="true" />
                   <span>The short version</span>
                 </h2>
-                <p className={styles.shortVersionText}>{activeArticle.shortVersion}</p>
+                <FormattedNoteContent
+                  value={activeArticle.shortVersion}
+                  className={styles.shortVersionText}
+                />
               </section>
             )}
 
@@ -575,7 +581,10 @@ export function WritingRoomView() {
                 <h2 className={styles.commentaryHeading}>
                   <span>Hiep&apos;s commentary &amp; takeaways</span>
                 </h2>
-                <p className={styles.commentaryText}>{activeArticle.commentary}</p>
+                <FormattedNoteContent
+                  value={activeArticle.commentary}
+                  className={styles.commentaryText}
+                />
               </section>
             )}
 
@@ -796,7 +805,7 @@ export function WritingRoomView() {
                     {article.shortVersion && (
                       <div className={styles.cardSummaryBox}>
                         <strong>The short version: </strong>
-                        <span>{article.shortVersion}</span>
+                        <FormattedNoteContent value={article.shortVersion} className="inline" />
                       </div>
                     )}
 
@@ -930,40 +939,42 @@ export function WritingRoomView() {
                   <label htmlFor={categorySelectId} className={styles.formLabel}>
                     Category
                   </label>
-                  <select
+                  <SelectField<BlogCategory>
                     id={categorySelectId}
-                    className={styles.selectField}
+                    ariaLabel="Category"
                     value={formValues.category}
-                    onChange={(e) =>
+                    onChange={(nextCategory) =>
                       setFormValues((prev) => ({
                         ...prev,
-                        category: e.target.value as BlogCategory,
+                        category: nextCategory,
                       }))
                     }
-                  >
-                    <option value="ideas_and_perspectives">Ideas &amp; perspectives</option>
-                    <option value="personal_stories">Personal stories</option>
-                  </select>
+                    options={[
+                      { value: 'ideas_and_perspectives', label: 'Ideas & perspectives' },
+                      { value: 'personal_stories', label: 'Personal stories' },
+                    ]}
+                  />
                 </div>
 
                 <div className={styles.formGroup}>
                   <label htmlFor={authorshipSelectId} className={styles.formLabel}>
                     Authorship
                   </label>
-                  <select
+                  <SelectField<BlogAuthorship>
                     id={authorshipSelectId}
-                    className={styles.selectField}
+                    ariaLabel="Authorship"
                     value={formValues.authorship}
-                    onChange={(e) =>
+                    onChange={(nextAuthorship) =>
                       setFormValues((prev) => ({
                         ...prev,
-                        authorship: e.target.value as BlogAuthorship,
+                        authorship: nextAuthorship,
                       }))
                     }
-                  >
-                    <option value="by_hiep">By Hiep</option>
-                    <option value="saved_from_others">Saved from others</option>
-                  </select>
+                    options={[
+                      { value: 'by_hiep', label: 'By Hiep' },
+                      { value: 'saved_from_others', label: 'Saved from others' },
+                    ]}
+                  />
                 </div>
 
                 {formValues.authorship === 'saved_from_others' && (
@@ -988,15 +999,15 @@ export function WritingRoomView() {
                       <label htmlFor={commentaryInputId} className={styles.formLabel}>
                         Hiep&apos;s personal commentary
                       </label>
-                      <textarea
+                      <RichNoteEditor
                         id={commentaryInputId}
-                        rows={3}
-                        className={styles.textareaField}
+                        ariaLabel="Hiep's personal commentary"
                         placeholder="Why did this piece resonate with you?"
                         value={formValues.commentary}
-                        onChange={(e) =>
-                          setFormValues((prev) => ({ ...prev, commentary: e.target.value }))
+                        onChange={(nextValue) =>
+                          setFormValues((prev) => ({ ...prev, commentary: nextValue }))
                         }
+                        minHeightClassName="min-h-[84px]"
                       />
                     </div>
                   </>
@@ -1006,15 +1017,15 @@ export function WritingRoomView() {
                   <label htmlFor={shortVersionInputId} className={styles.formLabel}>
                     The short version (executive summary)
                   </label>
-                  <textarea
+                  <RichNoteEditor
                     id={shortVersionInputId}
-                    rows={3}
-                    className={styles.textareaField}
+                    ariaLabel="The short version (executive summary)"
                     placeholder="A concise 2-sentence executive summary..."
                     value={formValues.shortVersion}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, shortVersion: e.target.value }))
+                    onChange={(nextValue) =>
+                      setFormValues((prev) => ({ ...prev, shortVersion: nextValue }))
                     }
+                    minHeightClassName="min-h-[84px]"
                   />
                 </div>
 

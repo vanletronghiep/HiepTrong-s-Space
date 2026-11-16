@@ -1,4 +1,8 @@
 import {
+  eventDraftEditorValuesSchema,
+  type EventDraftEditorValues,
+} from '@/contracts/event-draft';
+import {
   listDraftStorageKeys,
   readDraftStorageRaw,
   removeDraftStorageRaw,
@@ -144,5 +148,74 @@ export function listSavedEditDraftRecordIds(formId: string): string[] {
     }
   }
   return ids;
+}
+
+export interface BrowserEventDraftEntry {
+  storageKey: string;
+  importKey: string;
+  recordId: string | null;
+  recordUpdatedAt: string | null;
+  savedAt: string;
+  values: EventDraftEditorValues;
+}
+
+export function listBrowserEventDraftEntries(): BrowserEventDraftEntry[] {
+  const eventPrefix = `${DRAFT_PREFIX}event.`;
+  const res = listDraftStorageKeys(eventPrefix);
+  if (!res.ok) return [];
+
+  const entries: BrowserEventDraftEntry[] = [];
+  for (const storageKey of res.keys) {
+    const readRes = readDraftStorageRaw(storageKey);
+    if (!readRes.ok || readRes.raw === null) continue;
+    try {
+      const parsed = JSON.parse(readRes.raw) as Partial<EditorDraftPayload<unknown>> | null;
+      if (
+        !parsed ||
+        typeof parsed !== 'object' ||
+        parsed.version !== EDITOR_DRAFT_VERSION ||
+        parsed.formId !== 'event' ||
+        typeof parsed.savedAt !== 'string' ||
+        Number.isNaN(Date.parse(parsed.savedAt)) ||
+        (parsed.recordId !== null &&
+          (typeof parsed.recordId !== 'string' || parsed.recordId.trim().length === 0)) ||
+        !('values' in parsed) ||
+        !parsed.values ||
+        typeof parsed.values !== 'object'
+      ) {
+        continue;
+      }
+
+      const valuesResult = eventDraftEditorValuesSchema.safeParse(parsed.values);
+      if (!valuesResult.success) continue;
+
+      const recordId = parsed.recordId;
+      const importKey =
+        recordId === null
+          ? 'browser:event:new'
+          : `browser:event:edit:${recordId}:${parsed.savedAt}`;
+      const recordUpdatedAt =
+        typeof parsed.recordUpdatedAt === 'string' && !Number.isNaN(Date.parse(parsed.recordUpdatedAt))
+          ? parsed.recordUpdatedAt
+          : null;
+
+      entries.push({
+        storageKey,
+        importKey,
+        recordId,
+        recordUpdatedAt,
+        savedAt: parsed.savedAt,
+        values: valuesResult.data,
+      });
+    } catch {
+      // Ignore unreadable browser draft payloads during discovery
+    }
+  }
+
+  return entries.sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
+}
+
+export function removeBrowserDraftKey(storageKey: string): ClearEditorDraftResult {
+  return removeDraftStorageRaw(storageKey);
 }
 

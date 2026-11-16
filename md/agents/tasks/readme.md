@@ -40,6 +40,7 @@ As defined in [`PROJECT_DESCRIPTION.md#4-shared-data-concepts--domain-rules`](..
 
 #### A. Header & View Mode Switching
 - **Header Title & Controls:** Displays `Daily Task Management` (`h1`), a `SegmentedControl` for switching between `Day`, `Week`, and `Month` modes, and the `Observatory` action button (which opens the placeholder `Statistics` drawer; see [`OD-01`](../../../PROJECT_DESCRIPTION.md#od-01)).
+- **Task Topbar Shortcuts:** Daily provides a `Tasks Hub` pill immediately before its date readout; Tasks Hub provides a `Daily` pill before Universe. Both use `TransitionLink`, match the adjacent Universe control sizing and lavender theme, and appear only on their respective task routes. Below `480px`, shortcuts and Universe use accessible icon-only controls to keep the topbar on one row. There is no standalone shortcut or reserved gap above the Daily dashboard.
 - **Topbar Date Readout & Mode Stage (`DailyBoard.tsx`):** When on `/tasks/daily`, `WorkspaceShell` ([`src/ui/WorkspaceShell.tsx`](../../../src/ui/WorkspaceShell.tsx)) displays the current weekday and date in `Asia/Ho_Chi_Minh`. `DailyBoard.tsx` (`DailyModeStage`) syncs persisted view mode via `useSyncExternalStore` without post-mount day-flash or hydration mismatch and switches modes inside `<AnimatePresence mode="wait" initial={false}>` using a single compositor opacity/subtle-Y transition (`0.17s` in / `0.09s` out; `0s` when reduced motion is active) without overlapping exiting panels or `ResizeObserver` `height` animation.
 
 #### B. Observatory / Daily Dashboard (`DailyDashboard.tsx`)
@@ -132,7 +133,7 @@ Three glass summary cards sit above the main stage:
 By confirmed design decision, `/tasks/daily` uses the **Celestial Luxury V2** dark observatory aesthetic (`--daily-*` tokens in [`src/design/tokens.css`](../../../src/design/tokens.css)), whereas `/tasks/hub` retains the light-lavender Workspace theme (`--ws-*` tokens):
 
 - **Background Sky (`DailySky.tsx`):**
-  - Renders a fixed radial/linear twilight gradient (`#0D0C1D` → `#1B1638`, `contain: layout style paint`), static SVG starfield and nebula layers (`114` static `<circle>` stars + `4` static `<polygon>` sparkles inside static `svg.stars`, static `g.clouds` without per-frame `<g>` animation, `constellation-sprinkles.svg`, `nebula-clouds.svg`), `8` standalone `16x16` HTML `.twinkle` `<span>` overlays deferred via a `180ms` timer until `useIsTransitioning()` (Cosmic Launch / `popstate` overlay) clears (and kept static `data-animated="false"` when reduced motion is active), periodic diagonal shooting stars, a rotating geometric `Astrolabe` SVG behind the upper-right sky, and a subtle `ZodiacCorner` watermark in the lower-right corner.
+  - Renders a fixed radial/linear twilight gradient (`#0D0C1D` → `#1B1638`, `contain: layout style paint`), static SVG starfield and nebula layers (`114` static `<circle>` stars + `4` static `<polygon>` sparkles inside static `svg.stars`, static `g.clouds` without per-frame `<g>` animation, `constellation-sprinkles.svg`, `nebula-clouds.svg`), `8` standalone `16x16` HTML `.twinkle` `<span>` overlays deferred via a `180ms` timer until `useIsTransitioning()` (Cosmic Launch / `popstate` overlay) clears (and kept static `data-animated="false"` when reduced motion is active), periodic diagonal shooting stars, an `Astrolabe` wheel cropped at the upper-left and a subtle `ZodiacCorner` watermark at the lower-right, both loading `/visuals/daily-v2/zodiac-wheel.svg` without adding motion.
 - **Frosted Glass Panels (`daily-foundation.module.css`):**
   - Dashboard cards and day boards use translucent dark glass (`background: var(--daily-card)`, `backdrop-filter: blur(16px)`, `1px solid var(--daily-card-line)`) with warm golden inner highlights.
 - **Scoped Task Card Visuals (`TaskCard.tsx` + `daily-task-card.module.css`):**
@@ -142,7 +143,7 @@ By confirmed design decision, `/tasks/daily` uses the **Celestial Luxury V2** da
   - When `context === 'hub'`, zero Celestial V2 classes or watermarks are applied; the card renders as a clean daylight surface (`--ws-surface`).
 
 ### 3.2 Celestial V2 SVG Asset Placement Guide
-All 11 vector assets designed for the Celestial V2 upgrade are archived in [`sources/img/daily-v2-reference/assets/`](../../../sources/img/daily-v2-reference/assets/), with 10 deployed as static files in [`public/visuals/daily-v2/`](../../../public/visuals/daily-v2/) and 1 (`zodiac-wheel.svg`) rendered inline in `DailySky.tsx`:
+All 11 vector assets designed for the Celestial V2 upgrade are archived in [`sources/img/daily-v2-reference/assets/`](../../../sources/img/daily-v2-reference/assets/), with all 11 deployed as static files in [`public/visuals/daily-v2/`](../../../public/visuals/daily-v2/). Both wheel decorations load the runtime copy of `zodiac-wheel.svg`; replacing its reference copy alone does not synchronize the runtime file:
 
 | Asset Filename | Runtime Location | Component / CSS Consumer | Visual Placement |
 | :--- | :--- | :--- | :--- |
@@ -156,7 +157,7 @@ All 11 vector assets designed for the Celestial V2 upgrade are archived in [`sou
 | `orbiting-moon.svg` | [`/visuals/daily-v2/orbiting-moon.svg`](../../../public/visuals/daily-v2/orbiting-moon.svg) | `DayTaskList.tsx` (`DayEmpty`) | Empty-state illustration for `Yesterday` board |
 | `ringed-planet.svg` | [`/visuals/daily-v2/ringed-planet.svg`](../../../public/visuals/daily-v2/ringed-planet.svg) | `daily-task-card.module.css`, `DayTaskList.tsx` | Watermark on urgent Daily cards (`opacity: 0.12`) and `Tomorrow` empty state |
 | `spiral-galaxy.svg` | [`/visuals/daily-v2/spiral-galaxy.svg`](../../../public/visuals/daily-v2/spiral-galaxy.svg) | `daily-task-card.module.css` | Watermark on normal Daily cards (`opacity: 0.10`) |
-| `zodiac-wheel.svg` | Inline in [`DailySky.tsx`](../../../src/features/tasks/DailySky.tsx) (`Astrolabe`, `ZodiacCorner`) | `DailySky.tsx` | Rotating upper-right astrolabe and lower-right corner watermark |
+| `zodiac-wheel.svg` | [`/visuals/daily-v2/zodiac-wheel.svg`](../../../public/visuals/daily-v2/zodiac-wheel.svg) | `DailySky.tsx` (`Astrolabe`, `ZodiacCorner`) | Cropped upper-left wheel and lower-right corner watermark; runtime copy preserves the replacement reference artwork |
 
 ---
 

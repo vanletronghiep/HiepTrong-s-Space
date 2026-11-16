@@ -47,6 +47,7 @@ import { MonthView } from './MonthView';
 import { OverdueList } from './OverdueList';
 import { TaskCard } from './TaskCard';
 import { TaskForm } from './TaskForm';
+import { TaskInspector } from './TaskInspector';
 import { ScheduleDateDialog, TransferDialog } from './TransferDialog';
 import { WeekView } from './WeekView';
 
@@ -150,6 +151,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
     defaultScheduledDate: todayStr,
   });
 
+  const [inspectedTaskId, setInspectedTaskId] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<TaskDto | null>(null);
   const [scheduleTarget, setScheduleTarget] = useState<TaskDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskDto | null>(null);
@@ -170,6 +172,10 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
   const deleteTask = useDeleteTask();
 
   const allTasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
+  const inspectedTask = useMemo(
+    () => allTasks.find((task) => task.id === inspectedTaskId) ?? null,
+    [allTasks, inspectedTaskId],
+  );
   const todayTasks = useMemo(
     () => allTasks.filter((task) => task.scheduledDate === todayStr),
     [allTasks, todayStr],
@@ -239,6 +245,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
     deleteTask.mutate(id, {
       onSuccess: () => {
         setDeleteTarget(null);
+        setInspectedTaskId((prev) => (prev === id ? null : prev));
         pushToast('Task deleted.', 'info', { durationMs: 1000 });
       },
       onError: (err) => {
@@ -319,7 +326,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
         </h1>
         <div className={foundation.titleActions}>
           {viewMode === 'week' ? (
-            <div className="inline-flex items-center gap-1 mr-1">
+            <div className={`${foundation.dateNav} ${foundation.dateNavWeek}`}>
               <IconButton
                 size="sm"
                 aria-label="Previous week"
@@ -330,7 +337,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
               <button
                 type="button"
                 onClick={() => setWeekAnchorDate(todayStr)}
-                className="px-2.5 h-8 rounded-pill text-[length:var(--fs-small)] font-medium text-ws-text hover:bg-ws-accent-soft tabular-nums cursor-pointer"
+                className={`${foundation.dateNavLabel} px-2.5 min-h-8 rounded-pill text-[length:var(--fs-small)] font-medium text-ws-text hover:bg-ws-accent-soft tabular-nums cursor-pointer`}
               >
                 {weekLabel}
               </button>
@@ -345,7 +352,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
           ) : null}
 
           {viewMode === 'month' ? (
-            <div className="inline-flex items-center gap-1 mr-1">
+            <div className={`${foundation.dateNav} ${foundation.dateNavMonth}`}>
               <IconButton
                 size="sm"
                 aria-label="Previous month"
@@ -356,7 +363,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
               <button
                 type="button"
                 onClick={() => setMonthAnchorDate(todayStr)}
-                className="px-2.5 h-8 rounded-pill text-[length:var(--fs-small)] font-medium text-ws-text hover:bg-ws-accent-soft cursor-pointer"
+                className={`${foundation.dateNavLabel} px-2.5 min-h-8 rounded-pill text-[length:var(--fs-small)] font-medium text-ws-text hover:bg-ws-accent-soft cursor-pointer`}
               >
                 {monthLabel}
               </button>
@@ -485,6 +492,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
                                   context="daily"
                                   carousel
                                   isNew={recentlyCreatedId === task.id}
+                                  onInspect={(target) => setInspectedTaskId(target.id)}
                                   onToggleComplete={handleToggleComplete}
                                   onEdit={(target) =>
                                     setFormState({
@@ -517,6 +525,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
                 now={now}
                 timeZone={timeZone}
                 recentlyCreatedId={recentlyCreatedId}
+                onInspect={(target) => setInspectedTaskId(target.id)}
                 onToggleComplete={handleToggleComplete}
                 onEdit={(target) =>
                   setFormState({
@@ -540,6 +549,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
                 now={now}
                 timeZone={timeZone}
                 recentlyCreatedId={recentlyCreatedId}
+                onInspect={(target) => setInspectedTaskId(target.id)}
                 onToggleComplete={handleToggleComplete}
                 onEdit={(target) =>
                   setFormState({
@@ -561,6 +571,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
             now={now}
             timeZone={timeZone}
             recentlyCreatedId={recentlyCreatedId}
+            onInspect={(target) => setInspectedTaskId(target.id)}
             onToggleComplete={handleToggleComplete}
             onEdit={(target) =>
               setFormState({
@@ -577,6 +588,29 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
           />
         </LayoutGroup>
       )}
+
+      {/* Shared Task Inspector Modal (mounted before child dialogs for focus/Escape layering) */}
+      <TaskInspector
+        portal
+        task={inspectedTask}
+        open={inspectedTask !== null}
+        onClose={() => setInspectedTaskId(null)}
+        now={now}
+        timeZone={timeZone}
+        onToggleComplete={handleToggleComplete}
+        onEdit={(target) =>
+          setFormState({
+            open: true,
+            mode: 'edit',
+            task: target,
+            defaultScheduledDate: target.scheduledDate,
+          })
+        }
+        onScheduleDate={handleScheduleDate}
+        onOpenPickDate={(target) => setScheduleTarget(target)}
+        onOpenTransfer={(target) => setTransferTarget(target)}
+        onRequestDelete={(target) => setDeleteTarget(target)}
+      />
 
       {/* Shared Add / Edit Drawer */}
       <TaskForm

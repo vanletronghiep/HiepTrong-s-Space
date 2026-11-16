@@ -26,6 +26,9 @@
   --cosmos-border: color-mix(in srgb, var(--cosmos-lavender) 25%, transparent);
   --cosmos-star: var(--cosmos-star-pale);
   --cosmos-accent: var(--cosmos-lavender);
+  --zodiac-rose-gold: #ebc7bf;
+  --zodiac-rose-gold-highlight: #f3ddd8;
+  --zodiac-rose-gold-deep: #e0b1a6;
   --shadow-cosmos: var(--shadow-popover);
 
   /* ─── Workspace theme (all working pages, popover, drawers, dialogs) ─── */

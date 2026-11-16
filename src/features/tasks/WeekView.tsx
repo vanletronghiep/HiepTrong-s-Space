@@ -21,6 +21,7 @@ export interface WeekViewProps {
   now: Date;
   timeZone?: string;
   recentlyCreatedId: string | null;
+  onInspect?: (task: TaskDto) => void;
   onToggleComplete: (task: TaskDto) => void;
   onEdit: (task: TaskDto) => void;
   onScheduleDate: (task: TaskDto, scheduledDate: string | null) => void;
@@ -132,6 +133,7 @@ export function WeekView({
   now,
   timeZone = DEFAULT_APP_TIMEZONE,
   recentlyCreatedId,
+  onInspect,
   onToggleComplete,
   onEdit,
   onScheduleDate,
@@ -264,6 +266,7 @@ export function WeekView({
                     context="daily"
                     dense
                     isNew={recentlyCreatedId === task.id}
+                    onInspect={onInspect}
                     onToggleComplete={onToggleComplete}
                     onEdit={onEdit}
                     onScheduleDate={onScheduleDate}

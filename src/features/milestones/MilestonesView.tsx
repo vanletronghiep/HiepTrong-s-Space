@@ -29,11 +29,15 @@ import { cn } from '@/ui/cn';
 import { ConfirmDialog } from '@/ui/Dialog';
 import { EmptyState } from '@/ui/EmptyState';
 import { FeatureThemeProvider, useFeatureTheme } from '@/ui/FeatureTheme';
+import { DatePickerField } from '@/ui/DatePickerField';
+import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
 import {
   LargeEditorDialog,
   LargeEditorTwoColumn,
   type DraftSaveOutcome,
 } from '@/ui/LargeEditorDialog';
+import { RichNoteEditor } from '@/ui/RichNoteEditor';
+import { SelectField } from '@/ui/SelectField';
 import { Skeleton } from '@/ui/Skeleton';
 import { useItemAnchor } from '@/ui/use-item-anchor';
 import {
@@ -114,7 +118,6 @@ export function MilestonesView() {
 
   const savingRef = useRef(false);
   const editorTitleInputRef = useRef<HTMLInputElement>(null);
-  const editorMeaningInputRef = useRef<HTMLTextAreaElement>(null);
   const editorTimeframeInputRef = useRef<HTMLInputElement>(null);
 
   const [statusFilter, setStatusFilter] = useState<'all' | MilestoneStatus>('all');
@@ -257,7 +260,7 @@ export function MilestonesView() {
     }
     if (!formValues.meaning.trim()) {
       setEditorError('Describe why this ambition is meaningful.');
-      editorMeaningInputRef.current?.focus();
+      document.getElementById('milestone-editor-meaning')?.focus();
       return;
     }
     if (!formValues.timeframe.trim()) {
@@ -696,13 +699,18 @@ export function MilestonesView() {
                 </div>
 
                 {milestone.meaning ? (
-                  <p className={styles.cardMeaning}>&ldquo;{milestone.meaning}&rdquo;</p>
+                  <div className={styles.cardMeaning}>
+                    <FormattedNoteContent value={milestone.meaning} />
+                  </div>
                 ) : null}
 
                 {milestone.reflection ? (
                   <div className={styles.reflectionBox}>
                     <span className={styles.reflectionLabel}>Progress reflection</span>
-                    <p className={styles.reflectionText}>{milestone.reflection}</p>
+                    <FormattedNoteContent
+                      value={milestone.reflection}
+                      className={styles.reflectionText}
+                    />
                   </div>
                 ) : null}
 
@@ -763,20 +771,20 @@ export function MilestonesView() {
                     >
                       Status
                     </label>
-                    <select
+                    <SelectField<MilestoneStatus>
                       id={`milestone-status-${milestone.id}`}
-                      aria-label={`Update status for ${milestone.title}`}
+                      ariaLabel={`Update status for ${milestone.title}`}
+                      size="sm"
                       value={milestone.status}
                       disabled={pendingStatusId === milestone.id}
-                      onChange={(e) =>
-                        handleQuickStatusChange(milestone, e.target.value as MilestoneStatus)
-                      }
-                      className={styles.statusSelect}
-                    >
-                      <option value="planned">Planned</option>
-                      <option value="in_progress">In progress</option>
-                      <option value="achieved">Achieved</option>
-                    </select>
+                      onChange={(nextStatus) => handleQuickStatusChange(milestone, nextStatus)}
+                      options={[
+                        { value: 'planned', label: 'Planned' },
+                        { value: 'in_progress', label: 'In progress' },
+                        { value: 'achieved', label: 'Achieved' },
+                      ]}
+                      triggerClassName={styles.statusSelect}
+                    />
                   </div>
 
                   <div className={styles.cardActionButtons}>
@@ -918,21 +926,17 @@ export function MilestonesView() {
                   >
                     Meaning &amp; significance
                   </label>
-                  <textarea
-                    ref={editorMeaningInputRef}
+                  <RichNoteEditor
                     id="milestone-editor-meaning"
-                    rows={3}
+                    ariaLabel="Meaning & significance"
                     value={formValues.meaning}
-                    onChange={(e) => {
-                      setFormValues((prev) => ({ ...prev, meaning: e.target.value }));
+                    onChange={(nextValue) => {
+                      setFormValues((prev) => ({ ...prev, meaning: nextValue }));
                       if (editorError) setEditorError('');
                     }}
                     placeholder="Why is this meaningful to you and your long-term journey?"
-                    className={cn(
-                      styles.editorControl,
-                      styles.editorControlTextarea,
-                      'max-w-[66ch]',
-                    )}
+                    className="max-w-[66ch]"
+                    minHeightClassName="min-h-[84px]"
                   />
                 </div>
 
@@ -943,19 +947,16 @@ export function MilestonesView() {
                   >
                     Progress reflection
                   </label>
-                  <textarea
+                  <RichNoteEditor
                     id="milestone-editor-reflection"
-                    rows={4}
+                    ariaLabel="Progress reflection"
                     value={formValues.reflection}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, reflection: e.target.value }))
+                    onChange={(nextValue) =>
+                      setFormValues((prev) => ({ ...prev, reflection: nextValue }))
                     }
                     placeholder="Where do things stand right now?"
-                    className={cn(
-                      styles.editorControl,
-                      styles.editorControlTextarea,
-                      'max-w-[66ch]',
-                    )}
+                    className="max-w-[66ch]"
+                    minHeightClassName="min-h-[96px]"
                   />
                 </div>
 
@@ -1042,14 +1043,14 @@ export function MilestonesView() {
                   >
                     Target date
                   </label>
-                  <input
+                  <DatePickerField
                     id="milestone-editor-target-date"
-                    type="date"
+                    mode="iso"
+                    ariaLabel="Target date"
                     value={formValues.targetDate}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, targetDate: e.target.value }))
+                    onChange={(nextDate) =>
+                      setFormValues((prev) => ({ ...prev, targetDate: nextDate }))
                     }
-                    className={cn(styles.editorControl, styles.editorControlInput, 'tabular-nums')}
                   />
                 </div>
 
@@ -1060,22 +1061,23 @@ export function MilestonesView() {
                   >
                     Category
                   </label>
-                  <select
+                  <SelectField<MilestoneCategory>
                     id="milestone-editor-category"
+                    ariaLabel="Category"
                     value={formValues.category}
-                    onChange={(e) =>
+                    onChange={(nextCategory) =>
                       setFormValues((prev) => ({
                         ...prev,
-                        category: e.target.value as MilestoneCategory,
+                        category: nextCategory,
                       }))
                     }
-                    className={cn(styles.editorControl, styles.editorControlInput)}
-                  >
-                    <option value="personal">Personal</option>
-                    <option value="academic">Academic</option>
-                    <option value="career">Career</option>
-                    <option value="project">Project</option>
-                  </select>
+                    options={[
+                      { value: 'personal', label: 'Personal' },
+                      { value: 'academic', label: 'Academic' },
+                      { value: 'career', label: 'Career' },
+                      { value: 'project', label: 'Project' },
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -1085,21 +1087,22 @@ export function MilestonesView() {
                   >
                     Status
                   </label>
-                  <select
+                  <SelectField<MilestoneStatus>
                     id="milestone-editor-status"
+                    ariaLabel="Status"
                     value={formValues.status}
-                    onChange={(e) =>
+                    onChange={(nextStatus) =>
                       setFormValues((prev) => ({
                         ...prev,
-                        status: e.target.value as MilestoneStatus,
+                        status: nextStatus,
                       }))
                     }
-                    className={cn(styles.editorControl, styles.editorControlInput)}
-                  >
-                    <option value="planned">Planned</option>
-                    <option value="in_progress">In progress</option>
-                    <option value="achieved">Achieved</option>
-                  </select>
+                    options={[
+                      { value: 'planned', label: 'Planned' },
+                      { value: 'in_progress', label: 'In progress' },
+                      { value: 'achieved', label: 'Achieved' },
+                    ]}
+                  />
                 </div>
               </>
             }

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
+import { useState } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TaskDto } from '@/contracts';
@@ -7,6 +8,8 @@ import { LayoutGroup } from 'motion/react';
 import { OverdueList } from '@/features/tasks/OverdueList';
 import { TaskCard } from '@/features/tasks/TaskCard';
 import { TaskForm } from '@/features/tasks/TaskForm';
+import { TaskInspector } from '@/features/tasks/TaskInspector';
+import { ScheduleDateDialog, TransferDialog } from '@/features/tasks/TransferDialog';
 
 afterEach(() => {
   cleanup();
@@ -107,54 +110,121 @@ describe('TaskCard component states', () => {
     expect(screen.getByRole('button', { name: /Transfer/i })).toBeInTheDocument();
   });
 
-  it('opens Hub details through the keyboard and restores focus after Escape without completing the task', async () => {
+  it('opens TaskInspector via card click or keyboard and restores focus after Escape without completing the task', async () => {
     const onToggle = vi.fn();
     const onScheduleDate = vi.fn();
     const now = new Date('2026-10-30T10:00:00.000Z');
     const task = makeTaskDto({
       title: 'Keyboard expandable task',
-      description: 'Detailed notes for keyboard expansion test',
+      description: 'Detailed **notes** for keyboard expansion test',
       scheduledDate: null,
     });
 
-    render(
-      <TaskCard
-        task={task}
-        now={now}
-        context="hub"
-        onToggleComplete={onToggle}
-        onEdit={noop}
-        onScheduleDate={onScheduleDate}
-        onOpenPickDate={noop}
-        onOpenTransfer={noop}
-        onRequestDelete={noop}
-      />,
-    );
+    function HubCardWithInspector() {
+      const [inspected, setInspected] = useState<TaskDto | null>(null);
+      return (
+        <>
+          <TaskCard
+            task={task}
+            now={now}
+            context="hub"
+            onInspect={setInspected}
+            onToggleComplete={onToggle}
+            onEdit={noop}
+            onScheduleDate={onScheduleDate}
+            onOpenPickDate={noop}
+            onOpenTransfer={noop}
+            onRequestDelete={noop}
+          />
+          <TaskInspector
+            portal
+            task={inspected}
+            open={inspected !== null}
+            onClose={() => setInspected(null)}
+            now={now}
+            onToggleComplete={onToggle}
+            onEdit={noop}
+            onScheduleDate={onScheduleDate}
+            onOpenPickDate={noop}
+            onOpenTransfer={noop}
+            onRequestDelete={noop}
+          />
+        </>
+      );
+    }
 
-    const disclosureBtn = screen.getByRole('button', { name: 'Keyboard expandable task' });
-    expect(disclosureBtn).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('button', { name: /Add to today/i })).not.toBeInTheDocument();
+    render(<HubCardWithInspector />);
 
-    // Activate disclosure button via keyboard (Enter / click on focused button)
-    disclosureBtn.focus();
-    fireEvent.keyDown(disclosureBtn, { key: 'Enter', code: 'Enter' });
-    fireEvent.click(disclosureBtn);
+    const inspectBtn = screen.getByRole('button', { name: 'Keyboard expandable task' });
+    expect(inspectBtn).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(screen.queryByRole('button', { name: /Schedule for today/i })).not.toBeInTheDocument();
+    // Hub card description strips bold markdown markers in preview
+    expect(screen.getByText('Detailed notes for keyboard expansion test')).toBeInTheDocument();
 
-    expect(disclosureBtn).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('button', { name: /Add to today/i })).toBeInTheDocument();
-    expect(onToggle).not.toHaveBeenCalled();
+    // Activate inspection trigger via keyboard focus + click
+    inspectBtn.focus();
+    fireEvent.click(inspectBtn);
 
     const dialog = screen.getByRole('dialog', { name: task.title });
-    expect(within(dialog).getByText(task.description)).toBeInTheDocument();
+    expect(within(dialog).getByText('notes').tagName).toBe('STRONG');
     expect(dialog.closest('article')).toBeNull();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Add to today' }));
+    expect(onToggle).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Schedule for today' }));
     expect(onScheduleDate).toHaveBeenCalledWith(task, '2026-10-30');
+
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: task.title })).not.toBeInTheDocument(),
     );
-    expect(disclosureBtn).toHaveFocus();
+    expect(inspectBtn).toHaveFocus();
     expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('aligns daily and overdue content in one left-aligned column without pl-8 and ignores action button clicks for inspection', () => {
+    const onInspect = vi.fn();
+    const onToggle = vi.fn();
+    const onOpenTransfer = vi.fn();
+    const onRequestDelete = vi.fn();
+    const now = new Date('2026-10-30T18:00:00.000Z');
+    const task = makeTaskDto({
+      title: 'Overdue reading',
+      description: 'Page 14 through 28',
+      deadlineAt: '2026-10-30T15:00:00.000Z',
+    });
+
+    const { container } = render(
+      <TaskCard
+        task={task}
+        now={now}
+        context="overdue"
+        onInspect={onInspect}
+        onToggleComplete={onToggle}
+        onEdit={noop}
+        onScheduleDate={noop}
+        onOpenPickDate={noop}
+        onOpenTransfer={onOpenTransfer}
+        onRequestDelete={onRequestDelete}
+      />,
+    );
+
+    expect(container.querySelector('.pl-8')).toBeNull();
+
+    // Checkbox, menu trigger, Transfer, and Delete must NOT open TaskInspector
+    fireEvent.click(screen.getByRole('checkbox', { name: /Complete Overdue reading/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Overdue reading' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Transfer' }));
+    const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
+    fireEvent.click(deleteButtons[deleteButtons.length - 1]!);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onOpenTransfer).toHaveBeenCalledTimes(1);
+    expect(onRequestDelete).toHaveBeenCalledTimes(1);
+    expect(onInspect).not.toHaveBeenCalled();
+
+    // Clicking the card description body opens TaskInspector
+    fireEvent.click(screen.getByText('Page 14 through 28'));
+    expect(onInspect).toHaveBeenCalledTimes(1);
+    expect(onInspect).toHaveBeenCalledWith(task);
   });
 
   it('generates distinct DOM IDs when the same task is rendered in daily carousel and overdue lane (C12)', () => {
@@ -242,6 +312,48 @@ describe('TaskForm validation', () => {
     fireEvent.change(title, { target: { value: 'Valid title' } });
     await waitFor(() => expect(screen.queryByText('Enter a task title.')).toBeNull());
     expect(document.getElementById('task-title-feedback')).toBe(feedback);
+  });
+
+  it('uses shared RichNoteEditor, DatePickerField, and TimeFieldControl across TaskForm, TransferDialog, and ScheduleDateDialog', () => {
+    const now = new Date('2026-10-30T03:00:00.000Z');
+    const task = makeTaskDto({ scheduledDate: '2026-10-30' });
+
+    const { container } = render(
+      <>
+        <TaskForm
+          open
+          mode="create"
+          defaultScheduledDate="2026-10-30"
+          now={now}
+          onClose={() => {}}
+          onCreate={vi.fn()}
+          onUpdate={vi.fn()}
+        />
+        <TransferDialog
+          open
+          task={task}
+          now={now}
+          onClose={() => {}}
+          onSubmitTransfer={vi.fn()}
+        />
+        <ScheduleDateDialog
+          open
+          task={task}
+          now={now}
+          onClose={() => {}}
+          onSelectDate={vi.fn()}
+        />
+      </>,
+    );
+
+    expect(container.querySelector('input[type="date"]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Bold' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bullet list' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Description' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Deadline date (DD/MM)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Deadline time (HH:mm)')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Open calendar' })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: 'Open 24-hour time picker' })).toHaveLength(2);
   });
 });
 

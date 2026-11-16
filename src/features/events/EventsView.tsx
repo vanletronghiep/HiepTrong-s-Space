@@ -29,13 +29,17 @@ import {
   X,
 } from 'lucide-react';
 import {
-  clearEditorDraft,
-  isEditorDraftStale,
-  listSavedEditDraftRecordIds,
-  loadEditorDraft,
-  saveEditorDraft,
-  type EditorDraftPayload,
+  listBrowserEventDraftEntries,
+  removeBrowserDraftKey,
+  type BrowserEventDraftEntry,
 } from '@/client/editor-drafts';
+import { ClientApiError } from '@/client/api-client';
+import {
+  useDeleteEventDraft,
+  useEventDrafts,
+  usePublishEventDraft,
+  useSaveEventDraft,
+} from '@/client/queries/event-drafts';
 import {
   useCreateEvent,
   useDeleteEvent,
@@ -43,6 +47,8 @@ import {
   useUpdateEvent,
 } from '@/client/queries/events';
 import type { EventCategory, EventItem } from '@/contracts/event';
+import type { EventDraftEditorValues, EventDraftRecord } from '@/contracts/event-draft';
+import { isValidScheduledDate } from '@/contracts/task';
 import {
   formatMonthTitle,
   getAgendaEventsForState,
@@ -58,6 +64,7 @@ import {
   formatRelativeEventTime,
   getUpcomingExams,
 } from '@/domain/event-domain';
+import { extractNotePlainText } from '@/domain/note-format';
 import {
   buildZonedInstant,
   DEFAULT_APP_TIMEZONE,
@@ -65,19 +72,31 @@ import {
   shiftScheduledDate,
 } from '@/domain/time';
 import { Button } from '@/ui/Button';
+import { Checkbox } from '@/ui/Checkbox';
 import { cn } from '@/ui/cn';
+import { DatePickerField } from '@/ui/DatePickerField';
 import { Dialog } from '@/ui/Dialog';
+import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
 import {
   LargeEditorDialog,
   LargeEditorTwoColumn,
   type DraftSaveOutcome,
 } from '@/ui/LargeEditorDialog';
+import { RichNoteEditor } from '@/ui/RichNoteEditor';
+import { SelectField, type SelectOption } from '@/ui/SelectField';
 import { Skeleton } from '@/ui/Skeleton';
+import { TimeFieldControl } from '@/ui/TimeFieldControl';
 import { useItemAnchor } from '@/ui/use-item-anchor';
-import { eventEditorPatch, eventEditorValues } from './event-editor';
+import {
+  eventEditorPatch,
+  eventEditorValues,
+  formatZonedTime24,
+  isEventDraftPublishable,
+  isValidEventTimeHm,
+} from './event-editor';
 import styles from './events.module.css';
 
-type EventEditorValues = ReturnType<typeof eventEditorValues>;
+type EventsTab = EventHorizon | 'drafts';
 
 const FALLBACK_TODAY = '2026-11-13';
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
@@ -90,27 +109,17 @@ const CATEGORY_LABELS: Record<'all' | EventCategory, string> = {
   deadline: 'Deadlines',
 };
 
-const VALID_CATEGORIES = new Set<EventCategory>(['exam', 'school', 'meeting', 'deadline']);
+const EVENT_CATEGORY_OPTIONS: readonly SelectOption<EventCategory>[] = [
+  { value: 'school', label: 'School' },
+  { value: 'exam', label: 'Exam' },
+  { value: 'meeting', label: 'Meeting' },
+  { value: 'deadline', label: 'Deadline' },
+];
 
-function isEventDraftValues(raw: unknown): raw is EventEditorValues {
-  if (typeof raw !== 'object' || raw === null) {
-    return false;
-  }
-  const value = raw as Record<string, unknown>;
-  return (
-    typeof value.title === 'string' &&
-    typeof value.category === 'string' &&
-    VALID_CATEGORIES.has(value.category as EventCategory) &&
-    typeof value.date === 'string' &&
-    typeof value.time === 'string' &&
-    typeof value.location === 'string' &&
-    typeof value.isOnline === 'boolean' &&
-    typeof value.isExam === 'boolean' &&
-    typeof value.notes === 'string'
-  );
-}
-
-function defaultEditorValues(selectedDate: string | null, fallbackDate: string): EventEditorValues {
+function defaultEditorValues(
+  selectedDate: string | null,
+  fallbackDate: string,
+): EventDraftEditorValues {
   return {
     title: '',
     category: 'school',
@@ -123,7 +132,7 @@ function defaultEditorValues(selectedDate: string | null, fallbackDate: string):
   };
 }
 
-function sameEditorValues(a: EventEditorValues, b: EventEditorValues): boolean {
+function sameEditorValues(a: EventDraftEditorValues, b: EventDraftEditorValues): boolean {
   return (
     a.title === b.title &&
     a.category === b.category &&
@@ -155,20 +164,25 @@ function formatShortDay(dateStr: string): string {
 }
 
 function formatZonedTime(iso: string): string {
-  return new Intl.DateTimeFormat('en-US', {
+  return formatZonedTime24(new Date(iso), DEFAULT_APP_TIMEZONE);
+}
+
+function formatZonedDetailDate(iso: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
     timeZone: DEFAULT_APP_TIMEZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
   }).format(new Date(iso));
 }
 
-function formatZonedFullDateTime(iso: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: DEFAULT_APP_TIMEZONE,
-    dateStyle: 'full',
-    timeStyle: 'short',
-  }).format(new Date(iso));
+function formatZonedTimeRange(startIso: string, endIso: string | null): string {
+  const start = formatZonedTime(startIso);
+  if (!endIso) {
+    return start;
+  }
+  return `${start} – ${formatZonedTime(endIso)}`;
 }
 
 function formatDraftTimestamp(iso: string): string {
@@ -176,13 +190,14 @@ function formatDraftTimestamp(iso: string): string {
   if (Number.isNaN(ms)) {
     return 'recently';
   }
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('en-GB', {
     timeZone: DEFAULT_APP_TIMEZONE,
-    month: 'short',
     day: 'numeric',
+    month: 'short',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    hourCycle: 'h23',
   }).format(new Date(ms));
 }
 
@@ -226,9 +241,18 @@ function CategoryBadge({ category, isExam }: { category: EventCategory; isExam?:
 
 export function EventsView() {
   const { data: events = [], isLoading, isError: loadFailed, refetch } = useEvents();
+  const {
+    data: drafts = [],
+    isLoading: draftsLoading,
+    isError: draftsLoadFailed,
+    refetch: refetchDrafts,
+  } = useEventDrafts();
   const createMutation = useCreateEvent();
   const updateMutation = useUpdateEvent();
   const deleteMutation = useDeleteEvent();
+  const saveDraftMutation = useSaveEventDraft();
+  const deleteDraftMutation = useDeleteEventDraft();
+  const publishDraftMutation = usePublishEventDraft();
 
   const savingRef = useRef(false);
   const editorTitleInputRef = useRef<HTMLInputElement>(null);
@@ -239,7 +263,7 @@ export function EventsView() {
   const [currentTime, setCurrentTime] = useState('');
   const [agendaNowMs, setAgendaNowMs] = useState(() => Date.parse(`${FALLBACK_TODAY}T00:00:00+07:00`));
 
-  const [horizon, setHorizon] = useState<EventHorizon>('upcoming');
+  const [horizon, setHorizon] = useState<EventsTab>('upcoming');
   const [activeCategory, setActiveCategory] = useState<'all' | EventCategory>('all');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => monthKeyFromDateStr(FALLBACK_TODAY));
@@ -248,6 +272,7 @@ export function EventsView() {
   const [savedEventOverride, setSavedEventOverride] = useState<EventItem | null>(null);
   const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [draftStatusMessage, setDraftStatusMessage] = useState('');
 
   const [isDesktop, setIsDesktop] = useState(true);
   useEffect(() => {
@@ -268,14 +293,15 @@ export function EventsView() {
     const updateClock = () => {
       const now = new Date();
       const zonedDate = formatScheduledDate(now, DEFAULT_APP_TIMEZONE);
-      const formatted = new Intl.DateTimeFormat('en-US', {
+      const formatted = new Intl.DateTimeFormat('en-GB', {
         timeZone: DEFAULT_APP_TIMEZONE,
         weekday: 'short',
-        month: 'short',
         day: 'numeric',
+        month: 'short',
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
+        hourCycle: 'h23',
       }).format(now);
       setTodayStr(zonedDate);
       setCurrentTime(formatted);
@@ -313,34 +339,30 @@ export function EventsView() {
     setSelectedEventId(target.id);
   }, [events]);
 
-  // Editor + explicit local draft state
+  // Editor + persisted server draft state + one-time browser draft import state
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<EventItem | null>(null);
-  const [initialFormValues, setInitialFormValues] = useState<EventEditorValues>(() =>
+  const [activeDraft, setActiveDraft] = useState<EventDraftRecord | null>(null);
+  const [loadedDraft, setLoadedDraft] = useState<EventDraftRecord | null>(null);
+  const [staleConflictPrompt, setStaleConflictPrompt] = useState(false);
+  const [initialFormValues, setInitialFormValues] = useState<EventDraftEditorValues>(() =>
     defaultEditorValues(null, FALLBACK_TODAY),
   );
-  const [formValues, setFormValues] = useState<EventEditorValues>(() =>
+  const [formValues, setFormValues] = useState<EventDraftEditorValues>(() =>
     defaultEditorValues(null, FALLBACK_TODAY),
   );
   const [editorError, setEditorError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loadedDraft, setLoadedDraft] = useState<EditorDraftPayload<EventEditorValues> | null>(
-    null,
-  );
-  const [draftSyncVersion, setDraftSyncVersion] = useState(0);
+  const [browserDrafts, setBrowserDrafts] = useState<BrowserEventDraftEntry[]>([]);
+  const [isImportingBrowserDrafts, setIsImportingBrowserDrafts] = useState(false);
 
-  const refreshOrphanedDrafts = useCallback(() => {
-    setDraftSyncVersion((v) => v + 1);
+  const refreshBrowserDrafts = useCallback(() => {
+    setBrowserDrafts(listBrowserEventDraftEntries());
   }, []);
 
-  const orphanedDraftIds = useMemo(() => {
-    void draftSyncVersion;
-    if (isLoading || loadFailed) {
-      return [];
-    }
-    const ids = listSavedEditDraftRecordIds('event');
-    return ids.filter((id) => !events.some((evt) => evt.id === id));
-  }, [draftSyncVersion, events, isLoading, loadFailed]);
+  useEffect(() => {
+    refreshBrowserDrafts();
+  }, [refreshBrowserDrafts]);
 
   const agendaNow = useMemo(() => new Date(agendaNowMs), [agendaNowMs]);
   const stats = useMemo(() => computeEventStats(events, agendaNow), [agendaNow, events]);
@@ -355,7 +377,7 @@ export function EventsView() {
     () =>
       getAgendaEventsForState({
         events,
-        horizon,
+        horizon: horizon === 'drafts' ? 'upcoming' : horizon,
         categoryFilter: activeCategory,
         selectedDate,
         now: agendaNow,
@@ -396,9 +418,10 @@ export function EventsView() {
 
   const isEditorDirty = editorOpen && !sameEditorValues(initialFormValues, formValues);
 
-  const handleSelectHorizon = (next: EventHorizon) => {
+  const handleSelectHorizon = (next: EventsTab) => {
     setHorizon(next);
-    if (next === 'upcoming' || next === 'past') {
+    setDraftStatusMessage('');
+    if (next === 'upcoming' || next === 'past' || next === 'drafts') {
       setSelectedDate(null);
     } else if (next === 'week') {
       setWeekAnchorDate(selectedDate ?? todayStr);
@@ -413,7 +436,7 @@ export function EventsView() {
     setSelectedDate(dateStr);
     setWeekAnchorDate(dateStr);
     setCalendarMonth(monthKeyFromDateStr(dateStr));
-    if (horizon === 'past') {
+    if (horizon === 'past' || horizon === 'drafts') {
       setHorizon('upcoming');
     }
   };
@@ -425,53 +448,97 @@ export function EventsView() {
 
   const openCreateEditor = () => {
     const base = defaultEditorValues(selectedDate, todayStr);
-    const existing = loadEditorDraft<EventEditorValues>('event', null, isEventDraftValues);
     setEditingRecord(null);
+    setActiveDraft(null);
+    setLoadedDraft(null);
+    setStaleConflictPrompt(false);
     setInitialFormValues(base);
     setFormValues(base);
     setEditorError('');
-    setLoadedDraft(existing.ok ? existing.draft : null);
     setEditorOpen(true);
   };
 
   const openEditEditor = (evt: EventItem) => {
     const base = eventEditorValues(evt);
-    const existing = loadEditorDraft<EventEditorValues>('event', evt.id, isEventDraftValues);
+    const existingDraft = drafts.find((draft) => draft.sourceEventId === evt.id) ?? null;
     setEditingRecord(evt);
+    setActiveDraft(null);
+    setLoadedDraft(existingDraft);
+    setStaleConflictPrompt(false);
     setInitialFormValues(base);
     setFormValues(base);
     setEditorError('');
-    setLoadedDraft(existing.ok ? existing.draft : null);
     setEditorOpen(true);
   };
 
-  const handleSaveDraft = (): DraftSaveOutcome => {
-    const result = saveEditorDraft({
-      formId: 'event',
-      recordId: editingRecord?.id ?? null,
-      recordUpdatedAt: editingRecord?.updatedAt ?? null,
-      values: formValues,
-    });
-    if (!result.ok) {
-      return { ok: false, error: result.error };
-    }
+  const openDraftEditor = (
+    draft: EventDraftRecord,
+    options?: { initialError?: string; staleConflict?: boolean },
+  ) => {
+    const sourceEvent = draft.sourceEventId
+      ? (events.find((evt) => evt.id === draft.sourceEventId) ?? null)
+      : null;
+    setEditingRecord(sourceEvent);
+    setActiveDraft(draft);
     setLoadedDraft(null);
-    setInitialFormValues(formValues);
-    refreshOrphanedDrafts();
-    return {
-      ok: true,
-      message: `Draft saved locally (${formatDraftTimestamp(result.draft.savedAt)}).`,
-    };
+    setStaleConflictPrompt(Boolean(options?.staleConflict));
+    setInitialFormValues(draft.values);
+    setFormValues(draft.values);
+    setEditorError(options?.initialError ?? '');
+    setEditorOpen(true);
   };
 
-  const handleEditorSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSaveDraft = async (): Promise<DraftSaveOutcome> => {
+    try {
+      const result = await saveDraftMutation.mutateAsync({
+        id: activeDraft?.id,
+        sourceEventId: activeDraft ? activeDraft.sourceEventId : (editingRecord?.id ?? null),
+        sourceUpdatedAt: activeDraft
+          ? activeDraft.sourceUpdatedAt
+          : (editingRecord?.updatedAt ?? null),
+        values: formValues,
+        importKey: activeDraft?.importKey ?? null,
+      });
+      setActiveDraft(result.item);
+      setLoadedDraft(null);
+      setStaleConflictPrompt(false);
+      setInitialFormValues(formValues);
+      return {
+        ok: true,
+        message: `Draft saved (${formatDraftTimestamp(result.item.updatedAt)}).`,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Could not save this draft right now. Your input is retained.',
+      };
+    }
+  };
+
+  const executeEditorSubmit = async (forceOverwrite = false) => {
     if (savingRef.current) {
       return;
     }
-    if (!formValues.title.trim() || !formValues.date) {
-      setEditorError('Enter an event title and date.');
+    const trimmedTitle = formValues.title.trim();
+    if (!trimmedTitle) {
+      setEditorError('Enter an event title.');
       editorTitleInputRef.current?.focus();
+      return;
+    }
+    if (trimmedTitle.length > 200) {
+      setEditorError('Title must be 200 characters or fewer.');
+      editorTitleInputRef.current?.focus();
+      return;
+    }
+    if (!isValidScheduledDate(formValues.date.trim())) {
+      setEditorError('Enter a valid date in YYYY-MM-DD format.');
+      return;
+    }
+    if (!isValidEventTimeHm(formValues.time)) {
+      setEditorError('Enter a valid 24-hour time in HH:mm format.');
       return;
     }
 
@@ -479,39 +546,62 @@ export function EventsView() {
     setIsSubmitting(true);
     setEditorError('');
     setActionError('');
+    setDraftStatusMessage('');
 
     try {
-      if (editingRecord) {
+      if (activeDraft) {
+        if (!sameEditorValues(activeDraft.values, formValues)) {
+          const savedDraft = await saveDraftMutation.mutateAsync({
+            id: activeDraft.id,
+            sourceEventId: activeDraft.sourceEventId,
+            sourceUpdatedAt: activeDraft.sourceUpdatedAt,
+            values: formValues,
+            importKey: activeDraft.importKey,
+          });
+          setActiveDraft(savedDraft.item);
+        }
+        const published = await publishDraftMutation.mutateAsync({
+          id: activeDraft.id,
+          forceOverwrite,
+        });
+        setSavedEventOverride(published.event);
+        setSelectedEventId(published.event.id);
+      } else if (editingRecord) {
         const patch = eventEditorPatch(editingRecord, formValues);
         const saved = await updateMutation.mutateAsync({
           id: editingRecord.id,
           patch,
         });
-        clearEditorDraft('event', editingRecord.id);
+        if (loadedDraft) {
+          await deleteDraftMutation.mutateAsync(loadedDraft.id).catch(() => {});
+        }
         setSavedEventOverride(saved);
         setSelectedEventId(saved.id);
       } else {
         const created = await createMutation.mutateAsync({
-          title: formValues.title.trim(),
+          title: trimmedTitle,
+          description: null,
           category: formValues.category,
-          startAt: buildZonedInstant(formValues.date, formValues.time || '09:00'),
+          startAt: buildZonedInstant(formValues.date.trim(), formValues.time.trim()),
           endAt: null,
           locationType: formValues.isOnline ? 'online' : 'in_person',
           location: formValues.location.trim() || null,
           url: null,
           isExam: formValues.isExam || formValues.category === 'exam',
           notes: formValues.notes.trim() || null,
-          description: formValues.notes.trim() || null,
         });
-        clearEditorDraft('event', null);
         setSavedEventOverride(created);
         setSelectedEventId(created.id);
       }
-      refreshOrphanedDrafts();
+      setActiveDraft(null);
       setLoadedDraft(null);
+      setStaleConflictPrompt(false);
       setEditorOpen(false);
       setEditingRecord(null);
     } catch (error) {
+      if (error instanceof ClientApiError && error.code === 'CONFLICT') {
+        setStaleConflictPrompt(true);
+      }
       setEditorError(
         error instanceof Error
           ? error.message
@@ -523,12 +613,16 @@ export function EventsView() {
     }
   };
 
+  const handleEditorSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    void executeEditorSubmit(false);
+  };
+
   const handleDeleteEvent = (evt: EventItem) => {
     setActionError('');
+    setDraftStatusMessage('');
     deleteMutation.mutate(evt.id, {
       onSuccess: () => {
-        clearEditorDraft('event', evt.id);
-        refreshOrphanedDrafts();
         if (savedEventOverride?.id === evt.id) {
           setSavedEventOverride(null);
         }
@@ -544,11 +638,101 @@ export function EventsView() {
     });
   };
 
-  const handleDiscardOrphanedDrafts = () => {
-    for (const orphanId of orphanedDraftIds) {
-      clearEditorDraft('event', orphanId);
+  const handleDeleteDraft = async (draft: EventDraftRecord) => {
+    setActionError('');
+    setDraftStatusMessage('');
+    try {
+      await deleteDraftMutation.mutateAsync(draft.id);
+      setDraftStatusMessage('Draft deleted.');
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Could not delete this draft right now. Retry when ready.',
+      );
     }
-    refreshOrphanedDrafts();
+  };
+
+  const handlePublishDraft = async (draft: EventDraftRecord) => {
+    setActionError('');
+    setDraftStatusMessage('');
+    if (!isEventDraftPublishable(draft.values)) {
+      openDraftEditor(draft, {
+        initialError:
+          'Complete title, date (YYYY-MM-DD), and 24-hour time (HH:mm) before adding to schedule.',
+      });
+      return;
+    }
+
+    try {
+      const published = await publishDraftMutation.mutateAsync({ id: draft.id });
+      setSavedEventOverride(published.event);
+      setSelectedEventId(published.event.id);
+      setHorizon(Date.parse(published.event.startAt) < agendaNowMs ? 'past' : 'upcoming');
+      setDraftStatusMessage(
+        published.mode === 'update' ? 'Changes applied to schedule.' : 'Event added to schedule.',
+      );
+    } catch (error) {
+      if (error instanceof ClientApiError && error.code === 'CONFLICT') {
+        openDraftEditor(draft, {
+          initialError: error.message,
+          staleConflict: true,
+        });
+        return;
+      }
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Could not publish this draft right now. Retry when ready.',
+      );
+    }
+  };
+
+  const handleImportBrowserDrafts = async () => {
+    if (isImportingBrowserDrafts || browserDrafts.length === 0) {
+      return;
+    }
+    setIsImportingBrowserDrafts(true);
+    setActionError('');
+    setDraftStatusMessage('');
+
+    let imported = 0;
+    let failed = 0;
+    let firstError = '';
+
+    for (const entry of browserDrafts) {
+      try {
+        await saveDraftMutation.mutateAsync({
+          sourceEventId: entry.recordId,
+          sourceUpdatedAt: entry.recordUpdatedAt,
+          values: entry.values,
+          importKey: entry.importKey,
+        });
+        removeBrowserDraftKey(entry.storageKey);
+        imported += 1;
+      } catch (error) {
+        failed += 1;
+        if (!firstError) {
+          firstError =
+            error instanceof Error ? error.message : 'Server could not store this draft.';
+        }
+      }
+    }
+
+    refreshBrowserDrafts();
+    setIsImportingBrowserDrafts(false);
+
+    if (failed > 0) {
+      setActionError(
+        imported > 0
+          ? `Imported ${imported} browser draft(s); ${failed} failed and were kept locally (${firstError}).`
+          : `Could not import browser drafts (${firstError}). Local copies were kept.`,
+      );
+    } else if (imported > 0) {
+      setDraftStatusMessage(
+        imported === 1 ? 'Imported 1 browser draft.' : `Imported ${imported} browser drafts.`,
+      );
+    }
   };
 
   const agendaEmptyTitle = selectedDate
@@ -749,7 +933,7 @@ export function EventsView() {
             {evt.title}
           </h2>
         ) : null}
-        {evt.description ? (
+        {evt.description && evt.description !== evt.notes ? (
           <p className="text-[length:var(--fs-ui)] text-ws-text-muted [overflow-wrap:anywhere]">
             {evt.description}
           </p>
@@ -757,9 +941,25 @@ export function EventsView() {
       </div>
 
       <dl className="space-y-2.5 border-y border-ws-border py-3.5 text-[length:var(--fs-small)]">
-        <div className="flex items-start gap-2 text-ws-text">
-          <CalendarIcon size={15} className="mt-0.5 shrink-0 text-ws-accent" aria-hidden="true" />
-          <dd className="tabular-nums">{formatZonedFullDateTime(evt.startAt)} (Saigon)</dd>
+        <div className={styles.detailScheduleList}>
+          <div className={styles.detailScheduleRow}>
+            <dt className="inline-flex items-center gap-1.5 text-ws-text-muted">
+              <CalendarIcon size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />
+              <span>Date</span>
+            </dt>
+            <dd className="font-medium text-ws-text tabular-nums text-right">
+              {formatZonedDetailDate(evt.startAt)}
+            </dd>
+          </div>
+          <div className={styles.detailScheduleRow}>
+            <dt className="inline-flex items-center gap-1.5 text-ws-text-muted">
+              <Clock size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />
+              <span>Time</span>
+            </dt>
+            <dd className="font-medium text-ws-text tabular-nums text-right">
+              {formatZonedTimeRange(evt.startAt, evt.endAt)} · Saigon
+            </dd>
+          </div>
         </div>
         {evt.location ? (
           <div className="flex items-start gap-2 text-ws-text-muted">
@@ -801,9 +1001,10 @@ export function EventsView() {
           <h3 className="text-[length:var(--fs-small)] font-medium text-ws-text">
             Notes &amp; instructions
           </h3>
-          <p className="whitespace-pre-wrap text-[length:var(--fs-small)] leading-relaxed text-ws-text-muted [overflow-wrap:anywhere]">
-            {evt.notes}
-          </p>
+          <FormattedNoteContent
+            value={evt.notes}
+            className="text-[length:var(--fs-small)] leading-relaxed text-ws-text-muted [overflow-wrap:anywhere]"
+          />
         </div>
       ) : null}
 
@@ -907,19 +1108,12 @@ export function EventsView() {
         </div>
       ) : null}
 
-      {orphanedDraftIds.length > 0 ? (
+      {draftStatusMessage ? (
         <div
           role="status"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-ws-border bg-ws-accent-soft px-4 py-3 text-[length:var(--fs-small)] text-ws-text"
+          className="rounded-card border border-ws-border bg-ws-accent-soft px-4 py-3 text-[length:var(--fs-small)] text-ws-text"
         >
-          <span>
-            {orphanedDraftIds.length === 1
-              ? '1 saved local edit draft refers to an event that is no longer in your schedule.'
-              : `${orphanedDraftIds.length} saved local edit drafts refer to events no longer in your schedule.`}
-          </span>
-          <Button variant="secondary" size="sm" onClick={handleDiscardOrphanedDrafts}>
-            Discard missing drafts
-          </Button>
+          {draftStatusMessage}
         </div>
       ) : null}
 
@@ -963,9 +1157,9 @@ export function EventsView() {
             <div
               role="tablist"
               aria-label="Agenda view"
-              className="inline-flex flex-nowrap whitespace-nowrap items-center gap-0.5 sm:gap-1 rounded-pill bg-ws-accent-soft p-1 border border-ws-border self-start max-w-full"
+              className="inline-flex flex-wrap items-center gap-0.5 sm:gap-1 rounded-pill bg-ws-accent-soft p-1 border border-ws-border self-start max-w-full"
             >
-              {(['upcoming', 'past', 'week'] as const).map((tab) => (
+              {(['upcoming', 'past', 'week', 'drafts'] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -973,40 +1167,60 @@ export function EventsView() {
                   aria-selected={horizon === tab}
                   onClick={() => handleSelectHorizon(tab)}
                   className={cn(
-                    'min-h-9 whitespace-nowrap rounded-pill px-2 min-[375px]:px-3 sm:px-3.5 py-1.5 text-[0.75rem] min-[375px]:text-[length:var(--fs-small)] font-medium cursor-pointer transition-colors duration-[var(--dur-fast)]',
+                    'min-h-9 whitespace-nowrap rounded-pill px-2.5 min-[375px]:px-3 sm:px-3.5 py-1.5 text-[0.75rem] min-[375px]:text-[length:var(--fs-small)] font-medium cursor-pointer transition-colors duration-[var(--dur-fast)]',
                     horizon === tab
                       ? 'bg-ws-surface text-ws-text shadow-card'
                       : 'text-ws-text-muted hover:text-ws-text',
                   )}
                 >
-                  {tab === 'upcoming' ? 'Upcoming' : tab === 'past' ? 'Past' : 'Week calendar'}
+                  {tab === 'upcoming' ? (
+                    'Upcoming'
+                  ) : tab === 'past' ? (
+                    'Past'
+                  ) : tab === 'week' ? (
+                    'Week calendar'
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span>Drafts</span>
+                      {drafts.length > 0 ? (
+                        <span
+                          aria-label={`${drafts.length} saved`}
+                          className="inline-flex min-w-5 items-center justify-center rounded-pill bg-ws-accent px-1.5 py-0.5 text-[0.7rem] font-semibold leading-none text-ws-surface tabular-nums"
+                        >
+                          {drafts.length}
+                        </span>
+                      ) : null}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
 
-            <div
-              role="tablist"
-              aria-label="Event category filter"
-              className="flex flex-wrap items-center gap-1.5"
-            >
-              {(['all', 'exam', 'school', 'meeting', 'deadline'] as const).map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeCategory === cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={cn(
-                    'min-h-9 rounded-pill border px-3 py-1 text-[length:var(--fs-small)] font-medium cursor-pointer transition-colors duration-[var(--dur-instant)]',
-                    activeCategory === cat
-                      ? 'bg-ws-accent text-ws-surface border-ws-accent'
-                      : 'bg-ws-surface text-ws-text-muted border-ws-border hover:text-ws-text',
-                  )}
-                >
-                  {CATEGORY_LABELS[cat]}
-                </button>
-              ))}
-            </div>
+            {horizon !== 'drafts' ? (
+              <div
+                role="tablist"
+                aria-label="Event category filter"
+                className="flex flex-wrap items-center gap-1.5"
+              >
+                {(['all', 'exam', 'school', 'meeting', 'deadline'] as const).map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeCategory === cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={cn(
+                      'min-h-9 rounded-pill border px-3 py-1 text-[length:var(--fs-small)] font-medium cursor-pointer transition-colors duration-[var(--dur-instant)]',
+                      activeCategory === cat
+                        ? 'bg-ws-accent text-ws-surface border-ws-accent'
+                        : 'bg-ws-surface text-ws-text-muted border-ws-border hover:text-ws-text',
+                    )}
+                  >
+                    {CATEGORY_LABELS[cat]}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           {selectedDate ? (
@@ -1020,7 +1234,192 @@ export function EventsView() {
             </div>
           ) : null}
 
-          {isLoading && events.length === 0 ? (
+          {horizon === 'drafts' ? (
+            <div className="space-y-4">
+              {browserDrafts.length > 0 ? (
+                <div className={styles.draftImportBanner} role="region" aria-label="Browser draft import">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <p className="text-[length:var(--fs-small)] font-medium text-ws-text">
+                        {browserDrafts.length === 1
+                          ? '1 event draft found in browser storage.'
+                          : `${browserDrafts.length} event drafts found in browser storage.`}
+                      </p>
+                      <p className="text-[length:var(--fs-micro)] text-ws-text-muted">
+                        Import them into saved server drafts. Any draft that fails to import stays stored locally.
+                      </p>
+                    </div>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={isImportingBrowserDrafts}
+                      onClick={() => void handleImportBrowserDrafts()}
+                    >
+                      {isImportingBrowserDrafts ? 'Importing…' : 'Import browser drafts'}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {draftsLoadFailed ? (
+                <div
+                  role="alert"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-item border border-tint-overdue-border bg-tint-overdue-bg px-4 py-3 text-[length:var(--fs-small)] text-text-overdue"
+                >
+                  <span>Could not load saved drafts right now.</span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    leftIcon={<RotateCcw size={14} aria-hidden="true" />}
+                    onClick={() => void refetchDrafts()}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : null}
+
+              {draftsLoading && drafts.length === 0 ? (
+                <div className="space-y-3" aria-label="Loading drafts">
+                  <Skeleton className="h-24 w-full rounded-item" />
+                  <Skeleton className="h-24 w-full rounded-item" />
+                </div>
+              ) : drafts.length === 0 ? (
+                <div className="py-10 px-4 text-center flex flex-col items-center gap-3">
+                  <Image
+                    src="/visuals/events/hermit-shell-haven.svg"
+                    alt=""
+                    aria-hidden="true"
+                    width={320}
+                    height={280}
+                    loading="eager"
+                    unoptimized
+                    className={styles.emptyShellArt}
+                  />
+                  <h2 className="font-display text-[1.5rem] text-ws-text">No saved drafts yet.</h2>
+                  <p className="max-w-md text-[length:var(--fs-ui)] text-ws-text-muted">
+                    Save an unfinished event or edit while drafting and it will stay waiting here without cluttering your calendar.
+                  </p>
+                  <Button variant="primary" size="sm" onClick={openCreateEditor}>
+                    New event
+                  </Button>
+                </div>
+              ) : (
+                <ul className="space-y-3" aria-label="Saved event drafts">
+                  {drafts.map((draft) => {
+                    const sourceEvent = draft.sourceEventId
+                      ? (events.find((evt) => evt.id === draft.sourceEventId) ?? null)
+                      : null;
+                    const isEditDraft = draft.sourceEventId !== null;
+                    const isMissingSource = isEditDraft && !isLoading && !loadFailed && !sourceEvent;
+                    const isStale = Boolean(
+                      isEditDraft &&
+                        sourceEvent &&
+                        draft.sourceUpdatedAt &&
+                        sourceEvent.updatedAt !== draft.sourceUpdatedAt,
+                    );
+                    const draftTitle = draft.values.title.trim() || 'Untitled event';
+                    const draftNotesPreview = draft.values.notes
+                      ? extractNotePlainText(draft.values.notes)
+                      : '';
+                    const publishable = isEventDraftPublishable(draft.values);
+
+                    return (
+                      <li key={draft.id} className={styles.draftCard}>
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <CategoryBadge
+                              category={draft.values.category}
+                              isExam={draft.values.isExam}
+                            />
+                            <span className="inline-flex items-center rounded-pill border border-ws-border bg-ws-surface px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-ws-text-muted">
+                              {isEditDraft ? 'Edit draft' : 'New event draft'}
+                            </span>
+                            {isStale ? (
+                              <span className="inline-flex items-center gap-1 rounded-pill border border-tint-due-soon-border bg-tint-due-soon-bg px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-text-due-soon">
+                                <AlertTriangle size={12} aria-hidden="true" />
+                                <span>Stale — source changed</span>
+                              </span>
+                            ) : null}
+                            {isMissingSource ? (
+                              <span className="inline-flex items-center gap-1 rounded-pill border border-tint-overdue-border bg-tint-overdue-bg px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-text-overdue">
+                                <AlertTriangle size={12} aria-hidden="true" />
+                                <span>Original event missing</span>
+                              </span>
+                            ) : null}
+                          </div>
+                          <span className="text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums">
+                            Saved {formatDraftTimestamp(draft.updatedAt)}
+                          </span>
+                        </div>
+
+                        <h3 className="font-display text-[1.3rem] leading-snug text-ws-text [overflow-wrap:anywhere]">
+                          {draftTitle}
+                        </h3>
+
+                        {sourceEvent ? (
+                          <p className="mt-1 text-[length:var(--fs-micro)] text-ws-text-muted">
+                            Editing: {sourceEvent.title}
+                          </p>
+                        ) : null}
+
+                        {draftNotesPreview ? (
+                          <p className="mt-1.5 text-[length:var(--fs-small)] text-ws-text-muted line-clamp-2 [overflow-wrap:anywhere]">
+                            {draftNotesPreview}
+                          </p>
+                        ) : null}
+
+                        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--fs-small)] text-ws-text-muted tabular-nums">
+                          <span>
+                            {draft.values.date || 'No date'} · {draft.values.time || 'No time'}
+                          </span>
+                          {draft.values.location.trim() ? (
+                            <span className="truncate">{draft.values.location.trim()}</span>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-ws-border">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-text-overdue hover:bg-tint-overdue-bg"
+                            onClick={() => void handleDeleteDraft(draft)}
+                          >
+                            Delete
+                          </Button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => openDraftEditor(draft)}
+                            >
+                              Resume
+                            </Button>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              disabled={publishDraftMutation.isPending}
+                              onClick={() => {
+                                if (publishable) {
+                                  void handlePublishDraft(draft);
+                                } else {
+                                  openDraftEditor(draft, {
+                                    initialError:
+                                      'Complete title, date (YYYY-MM-DD), and 24-hour time (HH:mm) before adding to schedule.',
+                                  });
+                                }
+                              }}
+                            >
+                              {isEditDraft ? 'Apply changes' : 'Add to schedule'}
+                            </Button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          ) : isLoading && events.length === 0 ? (
             <div className="space-y-3" aria-label="Loading events">
               <Skeleton className="h-24 w-full rounded-item" />
               <Skeleton className="h-24 w-full rounded-item" />
@@ -1159,10 +1558,20 @@ export function EventsView() {
               </div>
             </div>
           ) : (
-            <ul className="space-y-3" aria-label="Events agenda">
+            <ul
+              className={cn(
+                'space-y-3',
+                horizon === 'past' &&
+                  !selectedDate &&
+                  visibleAgendaEvents.length > 3 &&
+                  styles.pastEventsScroller,
+              )}
+              aria-label="Events agenda"
+            >
               {visibleAgendaEvents.map((evt) => {
                 const isSelected = selectedEventId === evt.id;
                 const eventDay = formatScheduledDate(evt.startAt, DEFAULT_APP_TIMEZONE);
+                const notesPreview = evt.notes ? extractNotePlainText(evt.notes) : '';
                 return (
                   <li key={evt.id}>
                     <button
@@ -1183,9 +1592,9 @@ export function EventsView() {
                         {evt.title}
                       </h3>
 
-                      {evt.notes ? (
+                      {notesPreview ? (
                         <p className="mt-1.5 text-[length:var(--fs-small)] text-ws-text-muted line-clamp-2 [overflow-wrap:anywhere]">
-                          {evt.notes}
+                          {notesPreview}
                         </p>
                       ) : null}
 
@@ -1285,203 +1694,249 @@ export function EventsView() {
           : null}
       </Dialog>
 
-      {/* Shared Centered Two-Column Event Editor + Explicit Local Drafts */}
-      <LargeEditorDialog
-        open={editorOpen}
-        onClose={() => {
-          setEditorOpen(false);
-          setEditingRecord(null);
-          setEditorError('');
-          setLoadedDraft(null);
-        }}
-        title={editingRecord ? 'Edit event' : 'New event'}
-        description="Dates and times use the Asia/Saigon schedule."
-        formId="event-large-editor-form"
-        isDirty={isEditorDirty}
-        isSubmitting={isSubmitting}
-        submitLabel={editingRecord ? 'Save changes' : 'Create event'}
-        submittingLabel={editingRecord ? 'Saving…' : 'Creating…'}
-        closeAriaLabel="Close event editor"
-        initialFocusRef={editorTitleInputRef}
-        errorMessage={editorError}
-        draftRecovery={
-          loadedDraft
-            ? {
-                savedAtLabel: formatDraftTimestamp(loadedDraft.savedAt),
-                stale: Boolean(
-                  editingRecord && isEditorDraftStale(loadedDraft, editingRecord.updatedAt),
-                ),
-                staleMessage:
-                  'This event changed on disk after your local draft was saved. Review changes carefully before saving.',
-                onResume: () => {
-                  setFormValues(loadedDraft.values);
-                  setLoadedDraft(null);
-                },
-                onDiscard: () => {
-                  clearEditorDraft('event', editingRecord?.id ?? null);
-                  setLoadedDraft(null);
-                  refreshOrphanedDrafts();
-                },
-              }
-            : null
-        }
-        onSaveDraft={handleSaveDraft}
-      >
-        <form id="event-large-editor-form" onSubmit={handleEditorSubmit}>
-          <LargeEditorTwoColumn
-            primary={
-              <>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="event-editor-title"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text"
-                  >
-                    Title
-                  </label>
-                  <input
-                    ref={editorTitleInputRef}
-                    id="event-editor-title"
-                    type="text"
-                    value={formValues.title}
-                    onChange={(e) => {
-                      setFormValues((prev) => ({ ...prev, title: e.target.value }));
-                      if (editorError) setEditorError('');
+      {/* Shared Centered Two-Column Event Editor + Persisted Server Drafts */}
+      {(() => {
+        const isEditingMode = Boolean(editingRecord || activeDraft?.sourceEventId);
+        const isActiveDraftMissingSource = Boolean(
+          activeDraft?.sourceEventId && !editingRecord && !isLoading && !loadFailed,
+        );
+        const isActiveDraftStale = Boolean(
+          activeDraft?.sourceEventId &&
+            editingRecord &&
+            activeDraft.sourceUpdatedAt &&
+            activeDraft.sourceUpdatedAt !== editingRecord.updatedAt,
+        );
+
+        return (
+          <LargeEditorDialog
+            open={editorOpen}
+            onClose={() => {
+              setEditorOpen(false);
+              setEditingRecord(null);
+              setActiveDraft(null);
+              setLoadedDraft(null);
+              setStaleConflictPrompt(false);
+              setEditorError('');
+            }}
+            title={
+              isEditingMode ? 'Edit event' : activeDraft ? 'Resume event draft' : 'New event'
+            }
+            description="Dates and times use the 24-hour Asia/Saigon schedule."
+            formId="event-large-editor-form"
+            isDirty={isEditorDirty}
+            isSubmitting={isSubmitting}
+            submitLabel={isEditingMode ? 'Apply changes' : 'Add to schedule'}
+            submittingLabel={isEditingMode ? 'Applying…' : 'Adding…'}
+            closeAriaLabel="Close event editor"
+            initialFocusRef={editorTitleInputRef}
+            errorMessage={editorError}
+            footerActions={
+              staleConflictPrompt && activeDraft ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  disabled={isSubmitting}
+                  onClick={() => void executeEditorSubmit(true)}
+                >
+                  Overwrite and apply
+                </Button>
+              ) : null
+            }
+            draftRecovery={
+              loadedDraft
+                ? {
+                    savedAtLabel: formatDraftTimestamp(loadedDraft.updatedAt),
+                    stale: Boolean(
+                      editingRecord &&
+                        loadedDraft.sourceUpdatedAt &&
+                        loadedDraft.sourceUpdatedAt !== editingRecord.updatedAt,
+                    ),
+                    staleMessage:
+                      'This event changed on disk after your draft was saved. Review changes carefully before applying.',
+                    onResume: () => {
+                      setActiveDraft(loadedDraft);
+                      setFormValues(loadedDraft.values);
+                      setInitialFormValues(loadedDraft.values);
+                      setLoadedDraft(null);
+                    },
+                    onDiscard: () => {
+                      const idToDelete = loadedDraft.id;
+                      setLoadedDraft(null);
+                      void deleteDraftMutation.mutateAsync(idToDelete).catch(() => {});
+                    },
+                  }
+                : null
+            }
+            onSaveDraft={handleSaveDraft}
+          >
+            <form id="event-large-editor-form" onSubmit={handleEditorSubmit} className="space-y-4">
+              {isActiveDraftStale && !staleConflictPrompt ? (
+                <div
+                  role="status"
+                  className="rounded-item border border-tint-due-soon-border bg-tint-due-soon-bg px-3.5 py-2.5 text-[length:var(--fs-small)] text-text-due-soon"
+                >
+                  This event changed on the server after this draft was saved. Review your changes before applying.
+                </div>
+              ) : null}
+
+              {isActiveDraftMissingSource ? (
+                <div
+                  role="status"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-item border border-tint-overdue-border bg-tint-overdue-bg px-3.5 py-2.5 text-[length:var(--fs-small)] text-text-overdue"
+                >
+                  <span>The original event for this edit draft was deleted.</span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      if (!activeDraft) return;
+                      const oldId = activeDraft.id;
+                      void saveDraftMutation
+                        .mutateAsync({
+                          sourceEventId: null,
+                          sourceUpdatedAt: null,
+                          values: formValues,
+                        })
+                        .then(async (saved) => {
+                          await deleteDraftMutation.mutateAsync(oldId).catch(() => {});
+                          setActiveDraft(saved.item);
+                          setEditingRecord(null);
+                          setEditorError('');
+                        })
+                        .catch((err) => {
+                          setEditorError(
+                            err instanceof Error ? err.message : 'Could not convert draft.',
+                          );
+                        });
                     }}
-                    placeholder="e.g. Calculus I Midterm or Lab Critique"
-                    className="w-full h-11 rounded-item border border-ws-border bg-ws-surface px-3.5 text-[length:var(--fs-ui)] text-ws-text"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="event-editor-notes"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text"
                   >
-                    Notes &amp; instructions
-                  </label>
-                  <textarea
-                    id="event-editor-notes"
-                    rows={7}
-                    value={formValues.notes}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, notes: e.target.value }))
-                    }
-                    placeholder="Preparation steps, room details, materials, or talking points…"
-                    className="w-full max-w-[66ch] rounded-item border border-ws-border bg-ws-surface p-3.5 text-[length:var(--fs-ui)] leading-relaxed text-ws-text"
-                  />
+                    Save as new draft
+                  </Button>
                 </div>
-              </>
-            }
-            metadata={
-              <>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="event-editor-category"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text"
-                  >
-                    Category
-                  </label>
-                  <select
-                    id="event-editor-category"
-                    value={formValues.category}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({
-                        ...prev,
-                        category: e.target.value as EventCategory,
-                      }))
-                    }
-                    className="w-full h-11 rounded-item border border-ws-border bg-ws-surface px-3 text-[length:var(--fs-ui)] text-ws-text"
-                  >
-                    <option value="school">School</option>
-                    <option value="exam">Exam</option>
-                    <option value="meeting">Meeting</option>
-                    <option value="deadline">Deadline</option>
-                  </select>
-                </div>
+              ) : null}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="event-editor-date"
-                      className="text-[length:var(--fs-small)] font-medium text-ws-text"
-                    >
-                      Date
-                    </label>
-                    <input
-                      id="event-editor-date"
-                      type="date"
-                      value={formValues.date}
-                      onChange={(e) =>
-                        setFormValues((prev) => ({ ...prev, date: e.target.value }))
-                      }
-                      className="w-full h-11 rounded-item border border-ws-border bg-ws-surface px-2.5 text-[length:var(--fs-small)] text-ws-text tabular-nums"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="event-editor-time"
-                      className="text-[length:var(--fs-small)] font-medium text-ws-text"
-                    >
-                      Time
-                    </label>
-                    <input
-                      id="event-editor-time"
-                      type="time"
-                      value={formValues.time}
-                      onChange={(e) =>
-                        setFormValues((prev) => ({ ...prev, time: e.target.value }))
-                      }
-                      className="w-full h-11 rounded-item border border-ws-border bg-ws-surface px-2.5 text-[length:var(--fs-small)] text-ws-text tabular-nums"
-                    />
-                  </div>
-                </div>
+              <LargeEditorTwoColumn
+                primary={
+                  <>
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="event-editor-title"
+                        className="text-[length:var(--fs-small)] font-medium text-ws-text"
+                      >
+                        Title
+                      </label>
+                      <input
+                        ref={editorTitleInputRef}
+                        id="event-editor-title"
+                        type="text"
+                        value={formValues.title}
+                        onChange={(e) => {
+                          setFormValues((prev) => ({ ...prev, title: e.target.value }));
+                          if (editorError) setEditorError('');
+                        }}
+                        placeholder="e.g. Calculus I Midterm or Lab Critique"
+                        className="w-full h-11 rounded-item border border-ws-border bg-ws-surface px-3.5 text-[length:var(--fs-ui)] text-ws-text"
+                      />
+                    </div>
 
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="event-editor-location"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text"
-                  >
-                    Location
-                  </label>
-                  <input
-                    id="event-editor-location"
-                    type="text"
-                    value={formValues.location}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, location: e.target.value }))
-                    }
-                    placeholder="Room, hall, or meeting link"
-                    className="w-full h-11 rounded-item border border-ws-border bg-ws-surface px-3 text-[length:var(--fs-ui)] text-ws-text"
-                  />
-                </div>
+                    <div className="space-y-1.5">
+                      <label
+                        id="event-editor-notes-label"
+                        htmlFor="event-editor-notes"
+                        className="text-[length:var(--fs-small)] font-medium text-ws-text"
+                      >
+                        Notes &amp; instructions
+                      </label>
+                      <RichNoteEditor
+                        id="event-editor-notes"
+                        ariaLabelledBy="event-editor-notes-label"
+                        value={formValues.notes}
+                        onChange={(notes) => setFormValues((prev) => ({ ...prev, notes }))}
+                        placeholder="Preparation steps, room details, materials, or talking points…"
+                      />
+                    </div>
+                  </>
+                }
+                metadata={
+                  <>
+                    <SelectField<EventCategory>
+                      id="event-editor-category"
+                      label="Category"
+                      value={formValues.category}
+                      onChange={(category) => setFormValues((prev) => ({ ...prev, category }))}
+                      options={EVENT_CATEGORY_OPTIONS}
+                    />
 
-                <div className="space-y-2.5 pt-1">
-                  <label className="flex items-center gap-2 text-[length:var(--fs-small)] text-ws-text cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formValues.isOnline}
-                      onChange={(e) =>
-                        setFormValues((prev) => ({ ...prev, isOnline: e.target.checked }))
-                      }
-                    />
-                    <span>Online meeting</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-[length:var(--fs-small)] text-ws-text cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formValues.isExam}
-                      onChange={(e) =>
-                        setFormValues((prev) => ({ ...prev, isExam: e.target.checked }))
-                      }
-                    />
-                    <span>Mark as examination</span>
-                  </label>
-                </div>
-              </>
-            }
-          />
-        </form>
-      </LargeEditorDialog>
+                    <div className="grid grid-cols-2 gap-3">
+                      <DatePickerField
+                        id="event-editor-date"
+                        label="Date"
+                        mode="iso"
+                        value={formValues.date}
+                        onChange={(date) => {
+                          setFormValues((prev) => ({ ...prev, date }));
+                          if (editorError) setEditorError('');
+                        }}
+                        error={Boolean(editorError && !isValidScheduledDate(formValues.date.trim()))}
+                      />
+                      <TimeFieldControl
+                        id="event-editor-time"
+                        label="Time"
+                        value={formValues.time}
+                        onChange={(time) => {
+                          setFormValues((prev) => ({ ...prev, time }));
+                          if (editorError) setEditorError('');
+                        }}
+                        placeholder="HH:mm"
+                        error={Boolean(editorError && !isValidEventTimeHm(formValues.time))}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="event-editor-location"
+                        className="text-[length:var(--fs-small)] font-medium text-ws-text"
+                      >
+                        Location
+                      </label>
+                      <input
+                        id="event-editor-location"
+                        type="text"
+                        value={formValues.location}
+                        onChange={(e) =>
+                          setFormValues((prev) => ({ ...prev, location: e.target.value }))
+                        }
+                        placeholder="Room, hall, or meeting link"
+                        className="w-full h-11 rounded-item border border-ws-border bg-ws-surface px-3 text-[length:var(--fs-ui)] text-ws-text"
+                      />
+                    </div>
+
+                    <div className="space-y-1 pt-1">
+                      <Checkbox
+                        id="event-editor-online"
+                        checked={formValues.isOnline}
+                        onCheckedChange={(isOnline) =>
+                          setFormValues((prev) => ({ ...prev, isOnline }))
+                        }
+                        label="Online meeting"
+                      />
+                      <Checkbox
+                        id="event-editor-exam"
+                        checked={formValues.isExam}
+                        onCheckedChange={(isExam) => setFormValues((prev) => ({ ...prev, isExam }))}
+                        label="Mark as examination"
+                      />
+                    </div>
+                  </>
+                }
+              />
+            </form>
+          </LargeEditorDialog>
+        );
+      })()}
     </div>
   );
 }

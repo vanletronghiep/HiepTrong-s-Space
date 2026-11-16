@@ -110,3 +110,85 @@ This is the detailed description, also the enhancement for each page.
 
 ## REQUIREMENTS
 - Applying all the assets in the `sources\assets` with respect to feature page, put it in suitable position.
+
+# HTS v2.0
+- This is the version 2 of the website, with many adjustments.
+- The lastest version is an awesome version that quite satisfied me. You have to maintain, do not modify anything that affect the current structure, only focus on what I telling you to do, don't create conflicts.
+## MODIFICATION
+- This is the modification part, which describe unwanted (not bugs) section.
+### Collection end scrolling
+- Where: My Collection - Feature Collection page
+- Current status: When user scroll until the last feature box (Personal Achievement), if user continue to scrolling down, it will show the footer.
+- Revised version: I want that this feature collection page doesn't display the footer, when user scrolling to the end of the features - that is the end. Don't pull user to the footer (delete the footer section).
+- Sources:
+    - End state should behave: `sources\img\img23.png`
+### Collection scrollback - begin feature
+**Where:** My Collection – Feature Collection (Horizontal Scroll)
+**Important Notes**: This is the responsive problem, some device with smaller screen will behave like what I described below. For example: My laptop standard 14inch has this error. However, the "additional backward scrolling should initially have no effect" is still applying globally not only responsive.
+**Requested behavior:**
+
+- **Scroll-back limit:** When scrolling backward, the first feature card must stop at the position shown in `sources\img\img24.png`. Do not allow the excessive empty space on the left shown in the current version.
+- **Scroll resistance:** Once this limit is reached, additional backward scrolling should initially have no effect. The user must scroll backward a little further before the transition back to the homepage begins.
+- **Purpose:** Prevent users from accidentally returning to the homepage when scrolling backward quickly to find previous feature cards.
+- **Smoothness:** Keep the scrolling and transition smooth, without abrupt jumps or noticeable stuttering.
+
+### Smooth transition - swapping display
+- **Where:** My Collection – Feature Collection (View Mode Switching).
+- **Requested behavior:** Switching between Horizontal and Vertical modes must be ultra-smooth, with seamless layout transitions, no abrupt jumps, flickering, or noticeable stuttering.
+- **Constraint:** Preserve the current design, functionality, and scroll behavior of both modes.
+
+### Daily Task Managment
+#### Remove - Eradicate
+- Eradicate 2 yellow assets as the image described, positin bottom of the page. Sources: sources\img\img14.png, sources\img\img25.png
+- Eradicate (means not only delete on specific region but also deactivate it every has this image) the sources\img\daily-v2-reference\assets\eclipse-broken-orbit.svg, sources\img\daily-v2-reference\assets\spiral-galaxy.svg
+- Remove the svg vector in the COSMIC FORCAST. Only remove it from the box, not totally eradicate it.
+- Because there is some components, boxes still using those svg, hence, you have to merge the previous svg with the new svg you created (I suggest reconstruct the folder directory for every related, merging the previous assets in sources\img\daily-v2-reference to the sources\assets\daily-task-management and sources\assets\tasks-hub), therefore there is more choices for boxes, components which are using svg for decoration (such as daily task box, overdue box)
+#### Changing date
+- When changing date (Week/Month mode) using the arrow < and >. The arrow will not be fixed, it changes with respect to the string length. I don't want it, because user have to move the pointer every time the length is different. Hence, make the arrow fixed (not too far from the date, but no overlap text).
+#### Task Detail
+- For now, each task in the Daily Task Management doesn't allow user to see Task Description, I suggest when user clicking the task, it shows a 75% centralized dashboard that show everything user wrote in that task.
+#### Misaligned
+- **Where:** Daily Task Management – Task Cards.
+- **Reference:** `sources/img/img26.png`
+- **Issue:** Task titles, descriptions, and metadata are visually misaligned, with inconsistent indentation and spacing.
+- **Required fix:** Align all text elements to a consistent left edge, establish proper vertical spacing and hierarchy, and ensure long content truncates gracefully without disrupting the layout.
+- **Constraint:** Preserve the existing card design, dimensions, colors, and functionality. Only adjust text alignment, spacing, and positioning.
+### Task Hub
+- The same misaligned problem with the Daily Task Management – Task Cards. This happens to the title of each task box. Also the number of Task, as you can see there is a misaligned with the Due Soon and Number 3. **Source**: sources\img\img27.png
+<!-- - Increase the width to 120%. -->
+- The height now is too high, I want you to only display maximum 2 description lines, if the description longer - give ... Smaller the height but every box must have the same size.
+- The dot before the time left is unecessary
+- Always display the Completed Task. The button showing "completed Task" is unecessary because people have to scroll back then scroll down to see. I suggest always display the completed task, it should behave like a dropdown menu (but not design like that - the text behave like the completed task showing button), only display the completed task box once user click.
+- Also when removing the Show Completed button, that position will be empty, I think shifting the Add Task button to that position is a nice choice.
+- The search bar having duplicated X, only keep the right one, the left colored one doesn't match the theme. **Source**: 
+- Re-format the task date: It should display hour:min /dot day of week (abbreviation Mon, Tue, ...). /dot date (don't include year)
+- When the task title is longer than its expected size, don't increase the title part, I think only one line should be displayed, if the length is longer - using ..., user will click to see the task details.
+- Right now, except Completed Task, there is 3 category: Later, Due Soon, Overdue. This is so anoying, only display Overdue, On-going.
+#### Task Box Details – UI/UX Issues
+
+**Where:** Daily Task Management – Task Details Popup
+
+**Reference:** `sources/img/img30.png`
+
+**Issues & Expected Behavior:**
+
+1. **Unnatural Title Wrapping:** The title breaks awkwardly in the middle of words. Prefer natural word-boundary wrapping, only splitting excessively long words when necessary to prevent overflow.
+2. **Inconsistent Left Alignment:** The Normal, Active, Date, and Overdue metadata are slightly shifted to the right. Align them consistently with the main content.
+3. **Excessive Vertical Spacing:** The gap between the description and metadata is unnecessarily large. Adjust spacing for a more compact, balanced layout.
+4. **Weak Metadata Hierarchy:** Priority, status, deadline, and overdue information feel disconnected. Improve their visual grouping and spacing.
+5. **Unclear Action Hierarchy:** The date-transfer buttons and task-management buttons lack clear visual separation. Improve their grouping without changing functionality.
+6. **Potentially Confusing Actions:** The distinction between "Add to today/tomorrow" and "Transfer..." is unclear. Review their purposes and ensure users can distinguish them.
+
+**Constraints:** Preserve the existing visual theme, content, and functionality. Focus on alignment, spacing, readability, and visual hierarchy without unnecessary redesign.
+### Events
+- Currently, when I exit the edit mode, there will be a warning panel, however there exists these problems:
+    - First the UI error, the 3 button is not aligned, they should be aligned. **Source**:
+    - The second is, I don't like the saving draft mechanism like this, I want a button, when user click to that "Draft" button, it shows user on the main dashboard the events in draft version, user can see, edit or delete those events.
+- As the past events increasingly, showing all of them is not a good choice, use the scrolling mechanism with ultra smooth scrolling transition philosophy like the Daily Task Management.
+- The time format must be 24h
+- The assets is overlapped, shift it furthur to the left. Source: sources\img\img28.png
+- In the event description (source: sources\img\img29.png) - you should split time to a seperate line, the day of week (Sun, Mon,... - abbreviation version) instead of all in one line like that.
+### OVERALL
+- Every notes/description text box must support: Bold - strong text and support bullet points (as usual editor, user using - + space -> bullet point, enter for next bullet point)
+- The default checkbox, calendar, choosing time, category options right now is so boring, you have to base on the theme of each pages, create a corresponding soft color, beautiful that match the theme, satisfies the core idea of the page also following ui-ux-pro-max skill.
+

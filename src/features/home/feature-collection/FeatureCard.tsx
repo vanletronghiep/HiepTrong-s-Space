@@ -1,11 +1,11 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { FeatureEntry } from '@/features/registry';
 import { TransitionLink } from '@/features/transitions/TransitionLink';
 import { cn } from '@/ui/cn';
-import { FeatureThumbnail } from './FeatureThumbnail';
+import { FeatureThumbnail, type ZodiacThumbnailControl } from './FeatureThumbnail';
 import styles from './feature-collection.module.css';
 
 const FEATURE_ACCENT_VARS: Record<string, string> = {
@@ -35,6 +35,8 @@ export function getFeatureAccentVar(feature: FeatureEntry): string {
 
 export interface FeatureCardProps {
   feature: FeatureEntry;
+  revealComplete?: boolean;
+  zodiacControl?: ZodiacThumbnailControl;
   className?: string;
 }
 
@@ -42,15 +44,83 @@ export interface FeatureCardProps {
  * Shared Feature Collection card (identical across Horizontal and Vertical layouts)
  * per agent_readme.md §9.9 and ui_readme.md §11.3.
  */
-export function FeatureCard({ feature, className }: FeatureCardProps) {
+export function FeatureCard({
+  feature,
+  revealComplete = true,
+  zodiacControl,
+  className,
+}: FeatureCardProps) {
+  const hasZodiac = Boolean(feature.thumbnail.zodiacSign);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocusVisible, setIsFocusVisible] = useState(false);
+  const lastPointerTypeRef = useRef<string | null>(null);
+
+  const handlePointerEnter = (event: PointerEvent<HTMLAnchorElement>) => {
+    if (!hasZodiac) return;
+    lastPointerTypeRef.current = event.pointerType || null;
+    if (event.pointerType === 'touch' || event.pointerType === 'pen') return;
+    setIsHovered(true);
+  };
+
+  const handlePointerLeave = () => {
+    if (!hasZodiac) return;
+    setIsHovered(false);
+  };
+
+  const handlePointerCancel = () => {
+    if (!hasZodiac) return;
+    setIsHovered(false);
+  };
+
+  const handleMouseEnter = () => {
+    if (!hasZodiac) return;
+    if (lastPointerTypeRef.current === 'touch' || lastPointerTypeRef.current === 'pen') return;
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (!hasZodiac) return;
+    setIsHovered(false);
+  };
+
+  const handleFocus = (event: FocusEvent<HTMLAnchorElement>) => {
+    if (!hasZodiac) return;
+    let focusVisible = false;
+    try {
+      focusVisible = event.currentTarget.matches(':focus-visible');
+    } catch {
+      focusVisible = false;
+    }
+    setIsFocusVisible(focusVisible);
+  };
+
+  const handleBlur = () => {
+    if (!hasZodiac) return;
+    setIsFocusVisible(false);
+  };
+
+  const isActive = hasZodiac && (isHovered || isFocusVisible);
+
   return (
     <TransitionLink
       href={feature.href}
       data-feature-id={feature.id}
       style={{ '--card-accent': getFeatureAccentVar(feature) } as CSSProperties}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+      onPointerCancel={handlePointerCancel}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
       className={cn(styles.featureCard, className)}
     >
-      <FeatureThumbnail thumbnail={feature.thumbnail} />
+      <FeatureThumbnail
+        thumbnail={feature.thumbnail}
+        active={isActive}
+        illuminationEnabled={revealComplete}
+        zodiacControl={zodiacControl}
+      />
 
       <div className="mt-4 flex items-center justify-between gap-2">
         <span className={styles.categoryPill}>{feature.label}</span>

@@ -1,0 +1,127 @@
+.root {
+  position: relative;
+  display: grid;
+  grid-template-columns: 42% 54%;
+  column-gap: 4%;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  container-type: inline-size;
+  pointer-events: none;
+  user-select: none;
+}
+
+.editorialColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  max-height: 100%;
+  gap: clamp(4px, 3cqw, 16px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.wordmarkSlot {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.symbolSlot {
+  width: 76%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  color: var(--zodiac-rose-gold);
+  pointer-events: none;
+  user-select: none;
+}
+
+.illustrationColumn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.emblemSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  pointer-events: none;
+  user-select: none;
+  overflow: visible;
+}
+
+.wordmarkSvg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: clamp(18px, 8.2cqw, 45px);
+  pointer-events: none;
+  user-select: none;
+  overflow: visible;
+}
+
+.symbolSvg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: clamp(44px, 24cqw, 128px);
+  color: var(--zodiac-rose-gold);
+  pointer-events: none;
+  user-select: none;
+  overflow: visible;
+}
+
+.staticImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.staticWordmarkImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: clamp(18px, 8.2cqw, 45px);
+  object-fit: contain;
+  object-position: center center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.staticImageDim {
+  opacity: 0.35;
+}
+
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .staticImageDim {
+    opacity: 1;
+    filter: none;
+  }
+}

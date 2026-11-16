@@ -59,6 +59,16 @@ describe('UniverseMenu frameless search and keyboard flow', () => {
     expect(pushMock).toHaveBeenCalledWith('/events');
   });
 
+  it('keeps Tasks Hub available in the Universe menu', () => {
+    const onClose = vi.fn();
+    render(<UniverseMenu open onClose={onClose} />);
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Tasks Hub' } });
+    expect(screen.getByRole('option', { name: /Tasks Hub/i })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
+    expect(pushMock).toHaveBeenCalledWith('/tasks/hub');
+  });
+
   it('includes Notifications inbox destination without altering FEATURE_REGISTRY', () => {
     const onClose = vi.fn();
     render(<UniverseMenu open onClose={onClose} />);

@@ -11,7 +11,21 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+const POPUP_LAYER_SELECTOR =
+  '[data-overlay-popup="true"], [data-react-aria-top-layer], [role="listbox"]';
+
 const focusStack: RefObject<HTMLElement | null>[] = [];
+const escapeHandledByPopupEvents = new WeakSet<KeyboardEvent>();
+
+function hasOpenOverlayPopup(container: HTMLElement | null): boolean {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+  if (document.querySelector(POPUP_LAYER_SELECTOR)) {
+    return true;
+  }
+  return Boolean(container?.querySelector('[role="dialog"]:not([aria-modal="true"])'));
+}
 
 export function useFocusTrap(options: {
   open: boolean;
@@ -37,6 +51,7 @@ export function useFocusTrap(options: {
 
     const focusTimer = window.setTimeout(() => {
       if (!isTopmost()) return;
+      if (hasOpenOverlayPopup(containerRef.current)) return;
       if (initialFocusRef?.current) {
         initialFocusRef.current.focus({ preventScroll: true });
         return;
@@ -53,16 +68,37 @@ export function useFocusTrap(options: {
       }
     }, 10);
 
+    // Record popup ownership during capture phase before React Aria unmounts its popup.
+    const handleKeyDownCapture = (event: KeyboardEvent) => {
+      if (!isTopmost() || event.key !== 'Escape') {
+        return;
+      }
+      if (hasOpenOverlayPopup(containerRef.current)) {
+        escapeHandledByPopupEvents.add(event);
+      }
+    };
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopmost()) return;
       if (event.key === 'Escape') {
-        if (containerRef.current?.querySelector('[role="dialog"]:not([aria-modal="true"])')) return;
+        if (
+          event.defaultPrevented ||
+          escapeHandledByPopupEvents.has(event) ||
+          hasOpenOverlayPopup(containerRef.current)
+        ) {
+          return;
+        }
         event.stopPropagation();
         closeRef.current();
         return;
       }
 
       if (event.key !== 'Tab') {
+        return;
+      }
+
+      const activeEl = document.activeElement;
+      if (activeEl instanceof Element && activeEl.closest(POPUP_LAYER_SELECTOR)) {
         return;
       }
 
@@ -95,9 +131,11 @@ export function useFocusTrap(options: {
       }
     };
 
+    document.addEventListener('keydown', handleKeyDownCapture, true);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       window.clearTimeout(focusTimer);
+      document.removeEventListener('keydown', handleKeyDownCapture, true);
       document.removeEventListener('keydown', handleKeyDown);
       const restore = isTopmost();
       const index = focusStack.lastIndexOf(containerRef);

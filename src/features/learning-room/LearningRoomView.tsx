@@ -10,6 +10,8 @@ import { Button } from '@/ui/Button';
 import { cn } from '@/ui/cn';
 import { Dialog } from '@/ui/Dialog';
 import { EmptyState } from '@/ui/EmptyState';
+import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
+import { RichNoteEditor } from '@/ui/RichNoteEditor';
 import { Skeleton } from '@/ui/Skeleton';
 import styles from './learning-room.module.css';
 
@@ -687,7 +689,10 @@ export function LearningRoomView() {
                     <div>
                       <h4 className={styles.historyTitle}>{s.title}</h4>
                       {s.reflectionNotes ? (
-                        <p className={styles.historyNotes}>{s.reflectionNotes}</p>
+                        <FormattedNoteContent
+                          value={s.reflectionNotes}
+                          className={styles.historyNotes}
+                        />
                       ) : null}
                       <div className={styles.historyMeta}>
                         <span>{s.targetSubject}</span>
@@ -779,12 +784,13 @@ export function LearningRoomView() {
               <label htmlFor={reflectionTextareaId} className={styles.fieldLabel}>
                 Key insights or notes from this session:
               </label>
-              <textarea
+              <RichNoteEditor
                 id={reflectionTextareaId}
-                className={styles.textarea}
+                ariaLabel="Key insights or notes from this session:"
                 placeholder="What did you learn? Which problems were solved?"
                 value={reflectionNotes}
-                onChange={(e) => setReflectionNotes(e.target.value)}
+                onChange={setReflectionNotes}
+                minHeightClassName="min-h-[96px]"
               />
             </div>
 

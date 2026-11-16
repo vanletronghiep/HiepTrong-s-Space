@@ -24,13 +24,17 @@ import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
 import { cn } from '@/ui/cn';
 import { ConfirmDialog } from '@/ui/Dialog';
+import { DatePickerField } from '@/ui/DatePickerField';
 import { EmptyState } from '@/ui/EmptyState';
 import { FeatureThemeProvider, useFeatureTheme } from '@/ui/FeatureTheme';
+import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
 import {
   LargeEditorDialog,
   LargeEditorTwoColumn,
   type DraftSaveOutcome,
 } from '@/ui/LargeEditorDialog';
+import { RichNoteEditor } from '@/ui/RichNoteEditor';
+import { SelectField } from '@/ui/SelectField';
 import { Skeleton } from '@/ui/Skeleton';
 import { useItemAnchor } from '@/ui/use-item-anchor';
 import {
@@ -675,7 +679,10 @@ export function AchievementsView() {
                     ) : null}
 
                     {item.description ? (
-                      <p className={styles.cardDesc}>{item.description}</p>
+                      <FormattedNoteContent
+                        value={item.description}
+                        className={styles.cardDesc}
+                      />
                     ) : null}
                   </div>
 
@@ -683,7 +690,7 @@ export function AchievementsView() {
                     {item.lessonsLearned ? (
                       <div className={styles.lessonsBox}>
                         <strong>Lesson learned: </strong>
-                        <span>{item.lessonsLearned}</span>
+                        <FormattedNoteContent value={item.lessonsLearned} className="inline" />
                       </div>
                     ) : null}
 
@@ -852,19 +859,16 @@ export function AchievementsView() {
                   >
                     Description &amp; contest scope
                   </label>
-                  <textarea
+                  <RichNoteEditor
                     id="achievement-editor-desc"
-                    rows={4}
+                    ariaLabel="Description & contest scope"
                     value={formValues.description}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, description: e.target.value }))
+                    onChange={(nextValue) =>
+                      setFormValues((prev) => ({ ...prev, description: nextValue }))
                     }
                     placeholder="What was the challenge, scope, or project?"
-                    className={cn(
-                      styles.editorControl,
-                      styles.editorControlTextarea,
-                      'max-w-[66ch]',
-                    )}
+                    className="max-w-[66ch]"
+                    minHeightClassName="min-h-[96px]"
                   />
                 </div>
 
@@ -875,19 +879,16 @@ export function AchievementsView() {
                   >
                     Key lesson learned
                   </label>
-                  <textarea
+                  <RichNoteEditor
                     id="achievement-editor-lessons"
-                    rows={4}
+                    ariaLabel="Key lesson learned"
                     value={formValues.lessonsLearned}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, lessonsLearned: e.target.value }))
+                    onChange={(nextValue) =>
+                      setFormValues((prev) => ({ ...prev, lessonsLearned: nextValue }))
                     }
                     placeholder="What insight or discipline stayed with you afterward?"
-                    className={cn(
-                      styles.editorControl,
-                      styles.editorControlTextarea,
-                      'max-w-[66ch]',
-                    )}
+                    className="max-w-[66ch]"
+                    minHeightClassName="min-h-[96px]"
                   />
                 </div>
               </>
@@ -901,23 +902,24 @@ export function AchievementsView() {
                   >
                     Era
                   </label>
-                  <select
+                  <SelectField<AchievementEra>
                     id="achievement-editor-era"
+                    ariaLabel="Era"
                     value={formValues.era}
-                    onChange={(e) =>
+                    onChange={(nextEra) =>
                       setFormValues((prev) => ({
                         ...prev,
-                        era: e.target.value as AchievementEra,
+                        era: nextEra,
                       }))
                     }
-                    className={cn(styles.editorControl, styles.editorControlInput)}
-                  >
-                    <option value="university">University</option>
-                    <option value="high_school">High school</option>
-                    <option value="secondary">Secondary</option>
-                    <option value="elementary">Elementary</option>
-                    <option value="future_contest">Upcoming contest</option>
-                  </select>
+                    options={[
+                      { value: 'university', label: 'University' },
+                      { value: 'high_school', label: 'High school' },
+                      { value: 'secondary', label: 'Secondary' },
+                      { value: 'elementary', label: 'Elementary' },
+                      { value: 'future_contest', label: 'Upcoming contest' },
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -999,18 +1001,14 @@ export function AchievementsView() {
                       >
                         Scheduled contest date
                       </label>
-                      <input
+                      <DatePickerField
                         id="achievement-editor-future-date"
-                        type="date"
+                        mode="iso"
+                        ariaLabel="Scheduled contest date"
                         value={formValues.futureDate}
-                        onChange={(e) =>
-                          setFormValues((prev) => ({ ...prev, futureDate: e.target.value }))
+                        onChange={(nextDate) =>
+                          setFormValues((prev) => ({ ...prev, futureDate: nextDate }))
                         }
-                        className={cn(
-                          styles.editorControl,
-                          styles.editorControlInput,
-                          'tabular-nums',
-                        )}
                       />
                     </div>
 

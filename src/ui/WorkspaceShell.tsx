@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Command } from 'lucide-react';
+import { CalendarDays, Command, LayoutGrid } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { BellButton } from '@/features/notifications/BellButton';
 import { DailyHeaderDate } from '@/features/tasks/DailyDashboard';
@@ -36,6 +36,8 @@ export interface WorkspaceShellProps {
 export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
   const pathname = usePathname();
   const daily = pathname === '/tasks/daily';
+  const tasksHub = pathname === '/tasks/hub';
+  const taskNavigation = daily || tasksHub;
   const themes: Record<string, FeatureThemeName> = {
     '/tasks/hub': 'tasks-hub',
     '/notifications': 'notification',
@@ -160,6 +162,21 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
           </TransitionLink>
 
           <div className="flex items-center gap-2">
+            {taskNavigation && (
+              <TransitionLink
+                href={daily ? '/tasks/hub' : '/tasks/daily'}
+                data-task-shortcut
+                title={daily ? 'Go to Tasks Hub' : 'Go to Daily Task Management'}
+                className="inline-flex items-center justify-center gap-2 min-h-[36px] px-3.5 rounded-pill bg-ws-accent-soft text-ws-text border border-ws-border text-[length:var(--fs-small)] font-medium whitespace-nowrap hover:bg-[color-mix(in_srgb,var(--ws-accent)_35%,var(--ws-surface))] transition-colors duration-[var(--dur-fast)] motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-ws-focus focus-visible:outline-offset-2 max-[479px]:size-9 max-[479px]:p-0"
+              >
+                {daily ? (
+                  <LayoutGrid size={14} strokeWidth={1.5} aria-hidden="true" />
+                ) : (
+                  <CalendarDays size={14} strokeWidth={1.5} aria-hidden="true" />
+                )}
+                <span className="max-[479px]:sr-only">{daily ? 'Tasks Hub' : 'Daily'}</span>
+              </TransitionLink>
+            )}
             {daily && <DailyHeaderDate />}
             <button
               type="button"
@@ -167,14 +184,17 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
               aria-label="Open universe menu"
               aria-haspopup="dialog"
               aria-expanded={universeOpen}
-              className="inline-flex items-center gap-2 min-h-[36px] px-3.5 rounded-pill bg-ws-accent-soft text-ws-text border border-ws-border text-[length:var(--fs-small)] font-medium whitespace-nowrap cursor-pointer hover:bg-[color-mix(in_srgb,var(--ws-accent)_35%,var(--ws-surface))] transition-colors duration-[var(--dur-fast)]"
+              className={cn(
+                'inline-flex items-center gap-2 min-h-[36px] px-3.5 rounded-pill bg-ws-accent-soft text-ws-text border border-ws-border text-[length:var(--fs-small)] font-medium whitespace-nowrap cursor-pointer hover:bg-[color-mix(in_srgb,var(--ws-accent)_35%,var(--ws-surface))] transition-colors duration-[var(--dur-fast)]',
+                taskNavigation && 'max-[479px]:size-9 max-[479px]:justify-center max-[479px]:p-0',
+              )}
             >
               {daily ? (
                 <OrbitPlanetIcon width={16} height={16} className="shrink-0" />
               ) : (
                 <Command size={14} strokeWidth={1.5} className="shrink-0" />
               )}
-              <span>Universe</span>
+              <span className={taskNavigation ? 'max-[479px]:sr-only' : undefined}>Universe</span>
               <span
                 aria-hidden="true"
                 className="hidden md:inline-block ml-0.5 text-[length:var(--fs-micro)] text-ws-text-muted"

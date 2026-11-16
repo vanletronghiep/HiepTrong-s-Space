@@ -5,6 +5,7 @@ import { Bell } from 'lucide-react';
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -13,7 +14,6 @@ import {
 import { BellButton } from '@/features/notifications/BellButton';
 import { StarIcon } from '@/ui/StarIcon';
 import { FeatureCollection } from './feature-collection/FeatureCollection';
-import { HomeFooter } from './HomeFooter';
 import {
   clamp,
   computeCollectionRevealState,
@@ -44,13 +44,18 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const target = useRef<HTMLDivElement>(null);
   const introCol = useRef<HTMLDivElement>(null);
+  const earthCreditsRef = useRef<HTMLDivElement>(null);
+  const earthCreditsTriggerRef = useRef<HTMLButtonElement>(null);
   const collectionSurface = useRef<HTMLDivElement>(null);
   const collectionRevealSpacer = useRef<HTMLDivElement>(null);
   const stars = useRef<StarfieldEngine | null>(null);
+  const earthCreditsPanelId = useId();
 
   const [revealEnabled, setRevealEnabled] = useState(true);
   const [revealComplete, setRevealComplete] = useState(false);
   const [scrollStartOffset, setScrollStartOffset] = useState<number | undefined>(undefined);
+  const [earthCreditsOpen, setEarthCreditsOpen] = useState(false);
+  const [earthStageLocked, setEarthStageLocked] = useState(false);
 
   const revealEnabledRef = useRef(true);
   const revealStateRef = useRef<CollectionRevealState>('hidden');
@@ -58,6 +63,8 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
   const scrollStartOffsetRef = useRef<number | undefined>(undefined);
   const revealProgressRef = useRef('0.0000');
   const earthLockedRef = useRef(false);
+  const earthStageLockedRef = useRef(false);
+  const resetReturnGuardRef = useRef<(() => void) | null>(null);
   const starsPausedRef = useRef(false);
   const reducedMotionRef = useRef(false);
   const actionsRef = useRef<{
@@ -88,9 +95,47 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
     actionsRef.current?.jumpToCollection(true);
   }, []);
 
+  const handleRegisterReturnGuardReset = useCallback((reset: (() => void) | null) => {
+    resetReturnGuardRef.current = reset;
+  }, []);
+
   const handleReturnHome = useCallback(() => {
+    resetReturnGuardRef.current?.();
     actionsRef.current?.returnHome();
   }, []);
+
+  useEffect(() => {
+    if (!earthCreditsOpen || earthStageLocked || preview) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        setEarthCreditsOpen(false);
+        earthCreditsTriggerRef.current?.focus({ preventScroll: true });
+      }
+    };
+
+    const handleOutsidePress = (event: Event) => {
+      const eventTarget = event.target;
+      if (eventTarget instanceof Node && earthCreditsRef.current?.contains(eventTarget)) {
+        return;
+      }
+      setEarthCreditsOpen(false);
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('pointerdown', handleOutsidePress);
+    document.addEventListener('click', handleOutsidePress);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('pointerdown', handleOutsidePress);
+      document.removeEventListener('click', handleOutsidePress);
+    };
+  }, [earthCreditsOpen, earthStageLocked, preview]);
 
   useIsomorphicLayoutEffect(() => {
     const surfaceEl = collectionSurface.current;
@@ -457,7 +502,21 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
       if (inPartialReveal && document.activeElement === hit) {
         hit.blur();
       }
-      earthLockedRef.current = inPartialReveal || earthCovered;
+      const nextEarthLocked = inPartialReveal || earthCovered;
+      if (!preview && earthStageLockedRef.current !== nextEarthLocked) {
+        earthStageLockedRef.current = nextEarthLocked;
+        setEarthStageLocked(nextEarthLocked);
+        if (nextEarthLocked) {
+          setEarthCreditsOpen(false);
+          if (
+            document.activeElement instanceof HTMLElement &&
+            earthCreditsRef.current?.contains(document.activeElement)
+          ) {
+            document.activeElement.blur();
+          }
+        }
+      }
+      earthLockedRef.current = nextEarthLocked;
       if (earthLockedRef.current && drag) {
         drag = undefined;
         delete hit.dataset.dragging;
@@ -801,6 +860,67 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
             </div>
           )}
 
+          {preview ? null : (
+            <div
+              ref={earthCreditsRef}
+              data-earth-credits
+              data-earth-credits-locked={earthStageLocked ? 'true' : 'false'}
+              inert={earthStageLocked}
+              aria-hidden={earthStageLocked ? 'true' : undefined}
+              className={styles.earthCredits}
+            >
+              <button
+                ref={earthCreditsTriggerRef}
+                type="button"
+                data-earth-credits-trigger
+                aria-expanded={earthCreditsOpen && !earthStageLocked}
+                aria-controls={earthCreditsPanelId}
+                disabled={earthStageLocked}
+                tabIndex={earthStageLocked ? -1 : undefined}
+                onClick={() => {
+                  if (!earthStageLocked) {
+                    setEarthCreditsOpen((prev) => !prev);
+                  }
+                }}
+                className={styles.earthCreditsTrigger}
+              >
+                Earth credits
+              </button>
+              <div
+                id={earthCreditsPanelId}
+                role="region"
+                aria-label="Earth imagery credits"
+                data-overlay-popup={earthCreditsOpen && !earthStageLocked ? 'true' : undefined}
+                hidden={!earthCreditsOpen || earthStageLocked}
+                className={styles.earthCreditsPanel}
+              >
+                <p className={styles.earthCreditsHeading}>Earth imagery credits</p>
+                <p className={styles.earthCreditsBody}>
+                  Earth textures by{' '}
+                  <a
+                    href="https://www.solarsystemscope.com/textures/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.earthCreditsLink}
+                  >
+                    Solar System Scope (INOVE)
+                  </a>
+                  , based on NASA imagery. Licensed under{' '}
+                  <a
+                    href="https://creativecommons.org/licenses/by/4.0/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.earthCreditsLink}
+                  >
+                    CC BY 4.0
+                  </a>
+                  . Resized, converted and optimized. Globe lighting and rendering adapted for Hiep
+                  Trong Space.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className={styles.navScrim} aria-hidden="true" />
 
           <h1 className={styles.wordmark}>
@@ -855,8 +975,8 @@ export function HomeJourney({ preview = false }: { preview?: boolean }) {
               revealState={revealComplete ? 'revealed' : 'hidden'}
               revealComplete={revealComplete}
               scrollStartOffset={scrollStartOffset}
+              onRegisterReturnGuardReset={handleRegisterReturnGuardReset}
             />
-            <HomeFooter />
           </div>
           <div
             ref={collectionRevealSpacer}

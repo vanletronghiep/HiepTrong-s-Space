@@ -82,17 +82,6 @@
   opacity: 0.58;
   background: url('/visuals/daily-v2/ringed-planet.svg') center top / contain no-repeat;
 }
-.galaxy {
-  position: absolute;
-  inset: -44px auto auto 51%;
-  width: clamp(190px, 25vw, 370px);
-  aspect-ratio: 2;
-  transform: translateX(-50%) rotate(-6deg);
-  opacity: 0.76;
-  background:
-    url('/visuals/daily-v2/spiral-galaxy.svg') center / contain no-repeat,
-    radial-gradient(ellipse, var(--daily-planet), transparent 67%);
-}
 .nebulaBank {
   position: absolute;
   inset: auto 0 0;
@@ -220,6 +209,28 @@
 .titleActions > div {
   max-width: 100%;
 }
+.dateNav {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, var(--date-nav-label-w, 152px)) auto;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  margin-right: 4px;
+}
+.dateNavWeek {
+  --date-nav-label-w: 252px;
+}
+.dateNavMonth {
+  --date-nav-label-w: 152px;
+}
+.dateNavLabel {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .dashboard {
   display: grid;
@@ -277,7 +288,7 @@
 }
 .forecast {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) clamp(20px, 4vw, 64px);
+  grid-template-columns: 48px minmax(0, 1fr);
   align-items: center;
   column-gap: 10px;
 }
@@ -292,11 +303,6 @@
   outline-offset: -5px;
   background: radial-gradient(var(--ws-surface) 20%, var(--daily-pill));
   color: var(--daily-violet);
-}
-.forecastPlanet {
-  width: 100%;
-  color: var(--daily-violet);
-  opacity: 0.52;
 }
 .forecast p {
   font-size: var(--fs-ui);
@@ -486,9 +492,6 @@
   .forecast {
     grid-template-columns: 38px minmax(0, 1fr);
   }
-  .forecastPlanet {
-    display: none;
-  }
   .dashboard {
     gap: 10px;
   }
@@ -503,11 +506,6 @@
     background-position: center top 23px;
     background-size: 130px auto;
   }
-  .galaxy {
-    left: 64%;
-    top: -14px;
-    opacity: 0.38;
-  }
   .nebulaBank {
     opacity: 0.55;
   }
@@ -517,6 +515,24 @@
   .sky .constellationRight,
   .sky .constellationMid {
     display: none;
+  }
+}
+@media (max-width: 520px) {
+  .titleActions {
+    width: 100%;
+  }
+  .dateNav {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    flex-basis: 100%;
+    width: 100%;
+    margin-right: 0;
+  }
+  .dateNavLabel {
+    white-space: normal;
+    line-height: 1.25;
+    padding-block: 4px;
+    min-height: 32px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

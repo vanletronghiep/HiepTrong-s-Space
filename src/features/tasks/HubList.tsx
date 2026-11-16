@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { differenceInMilliseconds, parseISO } from 'date-fns';
-import { Plus, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import {
   useCompleteTask,
@@ -17,6 +17,7 @@ import {
 import { useMinuteTicker } from '@/client/use-minute-ticker';
 import type { CreateTaskInput, Priority, TaskDto, UpdateTaskInput } from '@/contracts';
 import { formatDayColumnHeader } from '@/domain/date-input';
+import { extractNotePlainText } from '@/domain/note-format';
 import { compareTasks } from '@/domain/task-sort';
 import { deriveTaskState } from '@/domain/task-status';
 import { DEFAULT_APP_TIMEZONE } from '@/domain/time';
@@ -33,6 +34,7 @@ import { WorkspacePageHeader } from '@/ui/WorkspaceShell';
 import { TaskCard } from './TaskCard';
 import noteStyles from './task-note.module.css';
 import { TaskForm } from './TaskForm';
+import { TaskInspector } from './TaskInspector';
 import { ScheduleDateDialog, TransferDialog } from './TransferDialog';
 
 type PriorityFilter = 'all' | Priority;
@@ -68,7 +70,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
   const [searchText, setSearchText] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [sortMode, setSortMode] = useState<HubSortMode>('deadline');
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [completedExpanded, setCompletedExpanded] = useState(false);
 
   const [formState, setFormState] = useState<{
     open: boolean;
@@ -80,6 +82,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
     task: null,
   });
 
+  const [inspectedTaskId, setInspectedTaskId] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<TaskDto | null>(null);
   const [scheduleTarget, setScheduleTarget] = useState<TaskDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskDto | null>(null);
@@ -95,6 +98,10 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
   const deleteTask = useDeleteTask();
 
   const allTasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
+  const inspectedTask = useMemo(
+    () => allTasks.find((t) => t.id === inspectedTaskId) ?? null,
+    [allTasks, inspectedTaskId],
+  );
 
   // Handle ?task=<id> highlight & auto-reveal completed group if target is completed (§9.4)
   useEffect(() => {
@@ -106,7 +113,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
       return;
     }
     if (target.status === 'completed') {
-      setShowCompleted(true);
+      setCompletedExpanded(true);
     }
     setHighlightedTaskId(target.id);
     const timer = window.setTimeout(() => {
@@ -123,8 +130,11 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
       }
       if (needle) {
         const matchesTitle = task.title.toLocaleLowerCase().includes(needle);
-        const matchesDesc = task.description.toLocaleLowerCase().includes(needle);
-        if (!matchesTitle && !matchesDesc) {
+        const matchesRawDesc = task.description.toLocaleLowerCase().includes(needle);
+        const matchesPlainDesc = extractNotePlainText(task.description)
+          .toLocaleLowerCase()
+          .includes(needle);
+        if (!matchesTitle && !matchesRawDesc && !matchesPlainDesc) {
           return false;
         }
       }
@@ -139,10 +149,9 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
     return sortByDeadlineThenPriority(items);
   };
 
-  const { overdueTasks, dueSoonTasks, laterTasks, completedTasks } = useMemo(() => {
+  const { overdueTasks, ongoingTasks, completedTasks } = useMemo(() => {
     const overdue: TaskDto[] = [];
-    const dueSoon: TaskDto[] = [];
-    const later: TaskDto[] = [];
+    const ongoing: TaskDto[] = [];
     const completed: TaskDto[] = [];
 
     for (const task of filteredTasks) {
@@ -153,17 +162,14 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
       const derived = deriveTaskState(task, now);
       if (derived.isOverdue) {
         overdue.push(task);
-      } else if (derived.isDueSoon) {
-        dueSoon.push(task);
       } else {
-        later.push(task);
+        ongoing.push(task);
       }
     }
 
     return {
       overdueTasks: sortGroup(overdue),
-      dueSoonTasks: sortGroup(dueSoon),
-      laterTasks: sortGroup(later),
+      ongoingTasks: sortGroup(ongoing),
       completedTasks: [...completed].sort((a, b) => {
         if (a.completedAt && b.completedAt) {
           return differenceInMilliseconds(parseISO(b.completedAt), parseISO(a.completedAt));
@@ -174,7 +180,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredTasks, now, sortMode]);
 
-  const activeTotal = overdueTasks.length + dueSoonTasks.length + laterTasks.length;
+  const activeTotal = overdueTasks.length + ongoingTasks.length;
   const hasFilters = searchText.trim().length > 0 || priorityFilter !== 'all';
 
   const handleToggleComplete = (task: TaskDto) => {
@@ -233,32 +239,54 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
 
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
-    deleteTask.mutate(deleteTarget.id, {
+    const deletedId = deleteTarget.id;
+    deleteTask.mutate(deletedId, {
       onSuccess: () => {
         setDeleteTarget(null);
+        setInspectedTaskId((prev) => (prev === deletedId ? null : prev));
         pushToast('Task deleted.', 'info', { durationMs: 1000 });
       },
       onError: (err) => pushToast(err.message, 'error'),
     });
   };
 
+  const renderTaskCard = (task: TaskDto) => (
+    <TaskCard
+      key={task.id}
+      task={task}
+      now={now}
+      timeZone={timeZone}
+      context="hub"
+      isNew={recentlyCreatedId === task.id}
+      isHighlighted={highlightedTaskId === task.id}
+      onInspect={(target) => setInspectedTaskId(target.id)}
+      onToggleComplete={handleToggleComplete}
+      onEdit={(target) =>
+        setFormState({
+          open: true,
+          mode: 'edit',
+          task: target,
+        })
+      }
+      onScheduleDate={handleScheduleDate}
+      onOpenPickDate={(target) => setScheduleTarget(target)}
+      onOpenTransfer={(target) => setTransferTarget(target)}
+      onRequestDelete={(target) => setDeleteTarget(target)}
+    />
+  );
+
   const renderGroup = (options: {
     id: string;
     title: string;
     badgeTone: BadgeTone;
     items: readonly TaskDto[];
-    muted?: boolean;
   }) => {
     if (options.items.length === 0) {
       return null;
     }
 
     return (
-      <section
-        key={options.id}
-        aria-labelledby={`hub-group-${options.id}`}
-        className={options.muted ? 'pt-6 border-t border-ws-border opacity-90' : 'space-y-3'}
-      >
+      <section key={options.id} aria-labelledby={`hub-group-${options.id}`} className="space-y-3">
         <div className="flex items-center gap-2.5 mb-3">
           <h2
             id={`hub-group-${options.id}`}
@@ -273,29 +301,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
 
         <div className={noteStyles.grid}>
           <AnimatePresence initial={false}>
-            {options.items.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                now={now}
-                timeZone={timeZone}
-                context="hub"
-                isNew={recentlyCreatedId === task.id}
-                isHighlighted={highlightedTaskId === task.id}
-                onToggleComplete={handleToggleComplete}
-                onEdit={(target) =>
-                  setFormState({
-                    open: true,
-                    mode: 'edit',
-                    task: target,
-                  })
-                }
-                onScheduleDate={handleScheduleDate}
-                onOpenPickDate={(target) => setScheduleTarget(target)}
-                onOpenTransfer={(target) => setTransferTarget(target)}
-                onRequestDelete={(target) => setDeleteTarget(target)}
-              />
-            ))}
+            {options.items.map((task) => renderTaskCard(task))}
           </AnimatePresence>
         </div>
       </section>
@@ -309,27 +315,11 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
       <WorkspacePageHeader
         title="Tasks hub"
         description="Every task across your universe, grouped by urgency and kept in sync with Daily tasks."
-        actions={
-          <Button
-            variant="primary"
-            pill
-            leftIcon={<Plus size={16} strokeWidth={1.75} />}
-            onClick={() =>
-              setFormState({
-                open: true,
-                mode: 'create',
-                task: null,
-              })
-            }
-          >
-            Add task
-          </Button>
-        }
       />
 
       {/* Search & filter controls */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between pb-6 mb-2 border-b border-ws-border">
-        <div className="relative flex-1 max-w-[380px]">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center pb-6 mb-2 border-b border-ws-border">
+        <div className="relative flex-1 min-w-0 lg:max-w-[380px]">
           <Search
             size={16}
             strokeWidth={1.5}
@@ -342,7 +332,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
             placeholder="Search tasks…"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="w-full h-10 rounded-pill bg-ws-surface border border-ws-border pl-10 pr-9 text-[length:var(--fs-ui)] text-ws-text placeholder:text-ws-text-muted"
+            className="w-full h-10 rounded-pill bg-ws-surface border border-ws-border pl-10 pr-9 text-[length:var(--fs-ui)] text-ws-text placeholder:text-ws-text-muted [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
           />
           {searchText ? (
             <button
@@ -356,7 +346,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1">
           <SegmentedControl
             aria-label="Filter by priority"
             options={PRIORITY_FILTER_OPTIONS}
@@ -371,9 +361,21 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
             {sortMode === 'deadline' ? 'Sorted by deadline' : 'Sorted by priority'}
           </Chip>
 
-          <Chip active={showCompleted} onClick={() => setShowCompleted((v) => !v)}>
-            Show completed ({allTasks.filter((t) => t.status === 'completed').length})
-          </Chip>
+          <Button
+            variant="primary"
+            pill
+            className="ml-auto"
+            leftIcon={<Plus size={16} strokeWidth={1.75} />}
+            onClick={() =>
+              setFormState({
+                open: true,
+                mode: 'create',
+                task: null,
+              })
+            }
+          >
+            Add task
+          </Button>
         </div>
       </div>
 
@@ -445,31 +447,85 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
                 items: overdueTasks,
               })}
               {renderGroup({
-                id: 'due-soon',
-                title: 'Due soon',
-                badgeTone: 'due-soon',
-                items: dueSoonTasks,
-              })}
-              {renderGroup({
-                id: 'later',
-                title: 'Later',
+                id: 'ongoing',
+                title: 'On-going',
                 badgeTone: 'count',
-                items: laterTasks,
+                items: ongoingTasks,
               })}
             </>
           )}
 
-          {showCompleted
-            ? renderGroup({
-                id: 'completed',
-                title: 'Completed',
-                badgeTone: 'completed',
-                items: completedTasks,
-                muted: true,
-              })
-            : null}
+          <section
+            aria-labelledby="hub-group-completed"
+            className="pt-6 border-t border-ws-border opacity-90"
+          >
+            <button
+              type="button"
+              aria-expanded={completedExpanded}
+              aria-controls="hub-group-completed-panel"
+              onClick={() => setCompletedExpanded((prev) => !prev)}
+              className="flex items-center gap-2.5 text-left bg-transparent border-0 p-0 cursor-pointer rounded-sm"
+            >
+              {completedExpanded ? (
+                <ChevronDown size={18} strokeWidth={1.75} className="text-ws-text-muted shrink-0" />
+              ) : (
+                <ChevronRight
+                  size={18}
+                  strokeWidth={1.75}
+                  className="text-ws-text-muted shrink-0"
+                />
+              )}
+              <h2
+                id="hub-group-completed"
+                className="font-display text-[length:var(--fs-h2)] leading-[var(--lh-heading)] font-medium text-ws-text"
+              >
+                Completed
+              </h2>
+              <Badge tone="completed" className="tabular-nums">
+                {completedTasks.length}
+              </Badge>
+            </button>
+
+            {completedExpanded ? (
+              <div id="hub-group-completed-panel" className="mt-3">
+                {completedTasks.length === 0 ? (
+                  <p className="text-[length:var(--fs-ui)] text-ws-text-muted">
+                    No completed tasks yet.
+                  </p>
+                ) : (
+                  <div className={noteStyles.grid}>
+                    <AnimatePresence initial={false}>
+                      {completedTasks.map((task) => renderTaskCard(task))}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </section>
         </div>
       )}
+
+      {/* Shared Task Inspector Modal (mounted before child dialogs for focus/Escape layering) */}
+      <TaskInspector
+        portal
+        task={inspectedTask}
+        open={inspectedTask !== null}
+        onClose={() => setInspectedTaskId(null)}
+        now={now}
+        timeZone={timeZone}
+        onToggleComplete={handleToggleComplete}
+        onEdit={(target) =>
+          setFormState({
+            open: true,
+            mode: 'edit',
+            task: target,
+          })
+        }
+        onScheduleDate={handleScheduleDate}
+        onOpenPickDate={(target) => setScheduleTarget(target)}
+        onOpenTransfer={(target) => setTransferTarget(target)}
+        onRequestDelete={(target) => setDeleteTarget(target)}
+      />
 
       {/* Shared TaskForm Drawer (no scheduledDate when created in Hub!) */}
       <TaskForm

@@ -42,4 +42,23 @@ describe('FEATURE_REGISTRY and route coverage', () => {
       expect(existsSync(pagePath), `Missing route file for ${feature.href}`).toBe(true);
     }
   });
+
+  it('maps the 12 Feature Collection cards to all 12 zodiac signs while keeping Tasks Hub unmapped', () => {
+    const mapped = FEATURE_REGISTRY.map((f) => [f.id, f.thumbnail.zodiacSign]);
+    expect(mapped).toEqual([
+      ['daily-tasks', 'aries'],
+      ['tasks-hub', undefined],
+      ['events', 'taurus'],
+      ['ai-engineering', 'gemini'],
+      ['blogs', 'cancer'],
+      ['apcs', 'leo'],
+      ['flashcards', 'virgo'],
+      ['entertainment', 'libra'],
+      ['tracking', 'scorpio'],
+      ['projects', 'sagittarius'],
+      ['milestones', 'capricorn'],
+      ['learning-room', 'aquarius'],
+      ['achievements', 'pisces'],
+    ]);
+  });
 });
