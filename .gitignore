@@ -177,3 +177,7 @@ ehthumbs.db
 Desktop.ini
 *.lnk
 $RECYCLE.BIN/
+
+# Local-only workspace (reference media, review evidence, scratch)
+.local/
+.next-preview/

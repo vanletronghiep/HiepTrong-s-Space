@@ -48,7 +48,7 @@ const server = http.createServer(async (request, response) => {
       }
       file = path.join(root, '.next/static/media', face[1]);
     } else if (route === '/sources/img/img0.png') {
-      file = path.join(root, 'sources/img/img0.png');
+      file = path.join(root, '.local/sources/img/img0.png');
     } else if (route === '/public/earth/ATTRIBUTION.md') {
       file = path.join(root, 'public/earth/ATTRIBUTION.md');
     } else if (route === '/vendor/three.module.js' || route === '/vendor/three.core.js') {
@@ -66,7 +66,7 @@ const server = http.createServer(async (request, response) => {
       const permittedRoots = [
         path.join(root, 'public/brand') + path.sep,
         path.join(root, 'public/earth') + path.sep,
-        path.join(root, 'review/phase01') + path.sep,
+        path.join(root, '.local/review/phase01') + path.sep,
       ];
       if (
         !permittedRoots.some((prefix) => file.startsWith(prefix)) &&

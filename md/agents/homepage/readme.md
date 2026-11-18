@@ -2,7 +2,7 @@
 
 `md/agents/homepage/readme.md` is the canonical engineering and design specification for the **Homepage / Landing Journey** epic (`/`).
 
-- **Related System Reference:** [`../../../PROJECT_DESCRIPTION.md`](../../../PROJECT_DESCRIPTION.md)
+- **Related System Reference:** [`../../../docs/engineering/PROJECT_DESCRIPTION.md`](../../../docs/engineering/PROJECT_DESCRIPTION.md)
 - **Related Shared UI/UX Baseline:** [`../shared/uiux.md`](../shared/uiux.md)
 - **Implementation History & Audit Reports:** [`reports.md`](reports.md)
 - **Earth Texture License Attribution:** [`../../../public/earth/ATTRIBUTION.md`](../../../public/earth/ATTRIBUTION.md)
@@ -137,7 +137,7 @@ Scrolling down the intro runway drives continuous normalized progress (`heroEart
 ## 6. Open Decisions and Supporting References
 
 ### 6.1 Open Decisions & Audit Status Touching Homepage
-- **Guardrail Test Stale `Wordmark.tsx` Exception Path ([`OD-04`](../../../PROJECT_DESCRIPTION.md#od-04)):** [`tests/design/craft-and-architecture-guardrails.test.ts`](../../../tests/design/craft-and-architecture-guardrails.test.ts) (line 23) still lists `src/features/home/Wordmark.tsx` as the uppercase exception file path even though `Wordmark.tsx` was replaced by `/brand/wordmark.svg` in `HomeJourney.tsx`.
+- **Guardrail Test Stale `Wordmark.tsx` Exception Path ([`OD-04`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-04)):** [`tests/design/craft-and-architecture-guardrails.test.ts`](../../../tests/design/craft-and-architecture-guardrails.test.ts) (line 23) still lists `src/features/home/Wordmark.tsx` as the uppercase exception file path even though `Wordmark.tsx` was replaced by `/brand/wordmark.svg` in `HomeJourney.tsx`.
 - **Audit Findings ([`docs/audit/BUG_INVENTORY.md`](../../../docs/audit/BUG_INVENTORY.md)):**
   - `C13` (*Resolved*): `Starfield.tsx` subscribes to `window.matchMedia('(prefers-reduced-motion: reduce)')` `'change'` events and updates `StarfieldEngine.setReducedMotion` dynamically (verified in `tests/features/home/starfield-and-home.test.tsx`).
   - `S05` (*Suspected / mitigated*): Async Three.js texture loads in `earth-scene.ts` check `signal.aborted` and dispose loaded textures + `renderer` if aborted before completion.
@@ -145,8 +145,8 @@ Scrolling down the intro runway drives continuous normalized progress (`heroEart
 ### 6.2 Supporting References & Local Media Inventory
 - **Texture Attribution (Committed):** [`../../../public/earth/ATTRIBUTION.md`](../../../public/earth/ATTRIBUTION.md)
 - **Phase 01 Review Evidence (Local `review/` directory, preserved read-only):**
-  - [`../../../review/phase01/README.md`](../../../review/phase01/README.md) — Stage 1 static review packet and verification metrics.
-  - [`../../../review/phase01/MOTION.md`](../../../review/phase01/MOTION.md) — Stage 2 motion choreography curves and review harness notes.
+  - [`../../../.local/review/phase01/README.md`](../../../.local/review/phase01/README.md) — Stage 1 static review packet and verification metrics.
+  - [`../../../.local/review/phase01/MOTION.md`](../../../.local/review/phase01/MOTION.md) — Stage 2 motion choreography curves and review harness notes.
 - **Local Reference Media (`sources/`, gitignored):**
   - HTML prototype: `sources/html/sample0.html` (opening wordmark + Earth horizon reference).
   - Images: `sources/img/img0.png`, `img1.png`, `img2.jpg`, `img3.jpg`, `img4.jpg`, `img5.png`, `img6.png`, `img7.png`, `img8.png`, `img9.png`.

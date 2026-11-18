@@ -3,7 +3,7 @@
  * generator for all 12 Zodiac signs (`aries` through `pisces`).
  *
  * - Verifies & preserves byte-identical `public/visuals/zodiac/{sign}.svg` and
- *   `public/visuals/zodiac/{sign}-symbol.svg` against `sources/img/zodiac/svg/`.
+ *   `public/visuals/zodiac/{sign}-symbol.svg` against `.local/sources/img/zodiac/svg/`.
  * - Generates `public/visuals/zodiac/{sign}-enhancement.json` for the 11 rollout signs
  *   (`aquarius-enhancement.json` keeps its hand-refined Aquarius jug/water/frame atlas,
  *   while syncing its `wordmark` cleanly from `generate-wordmarks.mjs`).
@@ -966,7 +966,7 @@ function buildSignEnhancement(sign, svgText, svgSha, wordmarkData) {
 
 function main() {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-  const sourceDir = path.join(root, 'sources/img/zodiac/svg');
+  const sourceDir = path.join(root, '.local/sources/img/zodiac/svg');
   const outDir = path.join(root, 'public/visuals/zodiac');
   const font = parseTtfFont(DEFAULT_FONT_PATH);
 
@@ -1029,7 +1029,7 @@ function main() {
       enhancementUrl: `/visuals/zodiac/${sign}-enhancement.json`,
       sourceSha256: illSha,
       byteLength: illBytes.byteLength,
-      symbolSourcePath: `sources/img/zodiac/svg/${num}_${sign}.svg`,
+      symbolSourcePath: `.local/sources/img/zodiac/svg/${num}_${sign}.svg`,
       symbolPublicPath: `/visuals/zodiac/${sign}-symbol.svg`,
       symbolSha256: symSha,
       symbolBytes: symBytes.byteLength,

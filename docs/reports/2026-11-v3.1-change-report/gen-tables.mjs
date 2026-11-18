@@ -2,7 +2,7 @@
 import { execSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
-const dir = 'md/v3.1-change-report';
+const dir = 'docs/reports/2026-11-v3.1-change-report';
 const sh = (c) => execSync(c, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 const tex = (s) => s.replace(/([_&#%$])/g, '\\$1').replace(/\//g, '/\\allowbreak{}');
 
@@ -14,7 +14,7 @@ const modified = sh('git diff --numstat')
 const untracked = sh('git ls-files --others --exclude-standard')
   .trim()
   .split('\n')
-  .filter((f) => f && !['desc.md', 'exp.md'].includes(f) && !f.startsWith('md/v3.1-change-report/'));
+  .filter((f) => f && !['desc.md', 'exp.md'].includes(f) && !f.startsWith('docs/reports/2026-11-v3.1-change-report/'));
 
 let a = '\\begin{longtable}{p{0.72\\textwidth}rr}\n\\toprule File & Added & Removed \\\\\n\\midrule\\endhead\n';
 for (const [add, del, f] of modified) a += `\\texttt{${tex(f)}} & ${add} & ${del} \\\\\n`;

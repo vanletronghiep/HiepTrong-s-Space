@@ -33,7 +33,7 @@ function assertValidLut(route: ZodiacRoutePath, label: string) {
 
 describe('Aquarius canonical asset, manifest & authored traversal atlas integrity', () => {
   const root = process.cwd();
-  const sourceSvgPath = path.join(root, 'sources/img/zodiac/svg/aquarius.svg');
+  const sourceSvgPath = path.join(root, '.local/sources/img/zodiac/svg/aquarius.svg');
   const publicSvgPath = path.join(root, 'public/visuals/zodiac/aquarius.svg');
   const manifestPath = path.join(root, 'public/visuals/zodiac/manifest.json');
   const enhancementPath = path.join(root, 'public/visuals/zodiac/aquarius-enhancement.json');

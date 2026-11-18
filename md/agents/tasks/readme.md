@@ -4,10 +4,10 @@
 
 `md/agents/tasks/readme.md` is the canonical engineering and design specification for the **Tasks epic**, covering **Daily Task Management** (`/tasks/daily`), **Tasks Hub** (`/tasks/hub`), and the **Notification Center** (`NotificationPopover` + reminder evaluation engine).
 
-- **Related System Reference (Shared Data & Domain Rules):** [`../../../PROJECT_DESCRIPTION.md`](../../../PROJECT_DESCRIPTION.md)
+- **Related System Reference (Shared Data & Domain Rules):** [`../../../docs/engineering/PROJECT_DESCRIPTION.md`](../../../docs/engineering/PROJECT_DESCRIPTION.md)
 - **Related Shared UI/UX Baseline:** [`../shared/uiux.md`](../shared/uiux.md)
 - **Implementation History & Audit Reports:** [`reports.md`](reports.md)
-- **Local V2 Asset Reference Index:** [`../../../sources/img/daily-v2-reference/README.md`](../../../sources/img/daily-v2-reference/README.md)
+- **Local V2 Asset Reference Index:** [`../../../.local/sources/img/daily-v2-reference/README.md`](../../../.local/sources/img/daily-v2-reference/README.md)
 
 ---
 
@@ -21,7 +21,7 @@ The Tasks epic provides a cohesive, two-surface personal task operating system b
 3. **Notification Center (Topbar Bell):** An automated reminder system that evaluates approaching deadlines (`24h` and `1/4` remaining time window), overdue transitions, and task completions in `Asia/Ho_Chi_Minh` (`UTC+07:00`).
 
 ### 1.2 Shared Record & State Relationships
-As defined in [`PROJECT_DESCRIPTION.md#4-shared-data-concepts--domain-rules`](../../../PROJECT_DESCRIPTION.md#4-shared-data-concepts--domain-rules):
+As defined in [`PROJECT_DESCRIPTION.md#4-shared-data-concepts--domain-rules`](../../../docs/engineering/PROJECT_DESCRIPTION.md#4-shared-data-concepts--domain-rules):
 - **Single Source of Truth:** Creating or editing a task in `/tasks/daily` or `/tasks/hub` mutates the exact same `tasks` row ([`src/services/storage/local/schema.ts`](../../../src/services/storage/local/schema.ts)) and invalidates the shared TanStack Query caches (`['tasks']`, `['notifications']`).
 - **Scheduling vs. Backlog (`scheduledDate`):**
   - `scheduledDate: 'YYYY-MM-DD'` assigns the task to that calendar day in `/tasks/daily`.
@@ -39,17 +39,17 @@ As defined in [`PROJECT_DESCRIPTION.md#4-shared-data-concepts--domain-rules`](..
 ### 2.1 Daily Task Management (`/tasks/daily`) Flows
 
 #### A. Header & View Mode Switching
-- **Header Title & Controls:** Displays `Daily Task Management` (`h1`), a `SegmentedControl` for switching between `Day`, `Week`, and `Month` modes, and the `Observatory` action button (which opens the placeholder `Statistics` drawer; see [`OD-01`](../../../PROJECT_DESCRIPTION.md#od-01)).
+- **Header Title & Controls:** Displays `Daily Task Management` (`h1`), a `SegmentedControl` for switching between `Day`, `Week`, and `Month` modes, and the `Observatory` action button (which opens the placeholder `Statistics` drawer; see [`OD-01`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-01)).
 - **Task Topbar Shortcuts:** Daily provides a `Tasks Hub` pill immediately before its date readout; Tasks Hub provides a `Daily` pill before Universe. Both use `TransitionLink`, match the adjacent Universe control sizing and lavender theme, and appear only on their respective task routes. Below `480px`, shortcuts and Universe use accessible icon-only controls to keep the topbar on one row. There is no standalone shortcut or reserved gap above the Daily dashboard.
 - **Topbar Date Readout & Mode Stage (`DailyBoard.tsx`):** When on `/tasks/daily`, `WorkspaceShell` ([`src/ui/WorkspaceShell.tsx`](../../../src/ui/WorkspaceShell.tsx)) displays the current weekday and date in `Asia/Ho_Chi_Minh`. `DailyBoard.tsx` (`DailyModeStage`) syncs persisted view mode via `useSyncExternalStore` without post-mount day-flash or hydration mismatch and switches modes inside `<AnimatePresence mode="wait" initial={false}>` using a single compositor opacity/subtle-Y transition (`0.17s` in / `0.09s` out; `0s` when reduced motion is active) without overlapping exiting panels or `ResizeObserver` `height` animation.
 
 #### B. Observatory / Daily Dashboard (`DailyDashboard.tsx`)
 Three glass summary cards sit above the main stage:
-1. **`Cosmic forecast`:** Displays a calm editorial message (`Steady skies — focus on your brightest task first.`; see [`OD-02`](../../../PROJECT_DESCRIPTION.md#od-02)) with celestial star accents.
+1. **`Cosmic forecast`:** Displays a calm editorial message (`Steady skies — focus on your brightest task first.`; see [`OD-02`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-02)) with celestial star accents.
 2. **`Progress`:** Displays today's animated completion percentage (`0%`–`100%` in display serif numerals), a summary subtitle (`{done} of {total} tasks done today`), and a horizontal progress bar with a glowing leading dot.
 3. **`Day arc`:** Tracks the progression of the 24-hour day in `Asia/Ho_Chi_Minh` (`UTC+07:00`) along a golden horizon arc (`day-arc-decoration.svg`):
    - **Confirmed Target Requirement:** Display a real-time `HH:mm:ss` clock in `Asia/Ho_Chi_Minh` and a live countdown to `00:00` of the next day.
-   - **Observed Implementation (Epic 06 + [`OD-03`](../../../PROJECT_DESCRIPTION.md#od-03)):** [`getDailyClock`](../../../src/features/tasks/daily-dashboard-time.ts) calculates `time`, `timeSeconds`, `countdown`, and `progress`, while `DayArc` in [`DailyDashboard.tsx`](../../../src/features/tasks/DailyDashboard.tsx) renders `HH:mm` without countdown text, schedules ticks on minute boundaries (`MINUTE_MS - (now.getTime() % MINUTE_MS) + 50`, paused on `document.hidden`), positions `.arcMarkerTrack` via `transform: translate3d(...)`, and updates `.arcElapsed` `clip-path` in discrete minute steps with zero idle CSS transitions.
+   - **Observed Implementation (Epic 06 + [`OD-03`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-03)):** [`getDailyClock`](../../../src/features/tasks/daily-dashboard-time.ts) calculates `time`, `timeSeconds`, `countdown`, and `progress`, while `DayArc` in [`DailyDashboard.tsx`](../../../src/features/tasks/DailyDashboard.tsx) renders `HH:mm` without countdown text, schedules ticks on minute boundaries (`MINUTE_MS - (now.getTime() % MINUTE_MS) + 50`, paused on `document.hidden`), positions `.arcMarkerTrack` via `transform: translate3d(...)`, and updates `.arcElapsed` `clip-path` in discrete minute steps with zero idle CSS transitions.
 
 #### C. Day Mode — Active-Board Carousel (`DayCarousel.tsx` & `DayTaskList.tsx`)
 1. **3-Day Stage (`Yesterday`, `Today`, `Tomorrow`):**
@@ -123,7 +123,7 @@ Three glass summary cards sit above the main stage:
 3. **Full Sakura Notification Center (`/notifications`, `NotificationsHubView.tsx` — Observed Epic 04 implementation):**
    - Dedicated full-page Sakura destination (`data-feature-theme="notification"`, reachable via `NotificationPopover` `Expand` or `UniverseMenu`) that opens without auto-marking notifications as read, displaying a sticky unread/category summary folio and chronological date-grouped sections in `Asia/Ho_Chi_Minh` (`Today`, `Yesterday`, or `EEEE, MMM d` / `EEEE, MMM d, yyyy` via `groupNotificationsByDate` in [`src/domain/notification-filter.ts`](../../../src/domain/notification-filter.ts)).
    - Provides deferred keyword search (`"Search notifications…"` + `Clear search`), read-status filter (`All`, `Unread`, `Read`), category filter chips (`All types`, `Due soon`, `Overdue`, `Completed`, `General`, `System`), an explicit `Mark full inbox read` button (`aria-describedby` linked to `"Affects full inbox, not only filtered results."`), individual `density="comfortable"` items, and distinct global (`All caught up.`) vs. filtered (`No matching notifications` + `Reset filters`) empty states.
-   - **Verified Epic 04 checks:** `npm run check` passes (`53` test files / `208` tests, including `notification-filter.test.ts` `3`, `notification-popover.test.tsx` `2`, `notifications-hub.test.tsx` `3` covering cache sync and HTTP 500 optimistic rollback), `npm run build` generates `37/37` static pages (`47` app routes total; `○ /notifications` `4.91 kB` / `219 kB` First Load JS), and live Chromium `156.0.8078.4` Playwright verification on `next start` (`127.0.0.1:3149`) passes with zero horizontal overflow (`1440`/`1024`/`768`/`375`/`320`/`1280` at 200% zoom/`640` CSS width), `0` DB mutations, `consoleErrors: []`, `pageErrors: []`, and WCAG AA contrast (`markAllScopeNote` `6.59:1` / `5.91:1` over gradient, `popoverExpandLink` `7.38:1`; see [`review/redesign/epic-04-notifications.md`](../../../review/redesign/epic-04-notifications.md)).
+   - **Verified Epic 04 checks:** `npm run check` passes (`53` test files / `208` tests, including `notification-filter.test.ts` `3`, `notification-popover.test.tsx` `2`, `notifications-hub.test.tsx` `3` covering cache sync and HTTP 500 optimistic rollback), `npm run build` generates `37/37` static pages (`47` app routes total; `○ /notifications` `4.91 kB` / `219 kB` First Load JS), and live Chromium `156.0.8078.4` Playwright verification on `next start` (`127.0.0.1:3149`) passes with zero horizontal overflow (`1440`/`1024`/`768`/`375`/`320`/`1280` at 200% zoom/`640` CSS width), `0` DB mutations, `consoleErrors: []`, `pageErrors: []`, and WCAG AA contrast (`markAllScopeNote` `6.59:1` / `5.91:1` over gradient, `popoverExpandLink` `7.38:1`; see [`review/redesign/epic-04-notifications.md`](../../../.local/review/redesign/epic-04-notifications.md)).
 
 ---
 
@@ -143,7 +143,7 @@ By confirmed design decision, `/tasks/daily` uses the **Celestial Luxury V2** da
   - When `context === 'hub'`, zero Celestial V2 classes or watermarks are applied; the card renders as a clean daylight surface (`--ws-surface`).
 
 ### 3.2 Celestial V2 SVG Asset Placement Guide
-All 11 vector assets designed for the Celestial V2 upgrade are archived in [`sources/img/daily-v2-reference/assets/`](../../../sources/img/daily-v2-reference/assets/), with all 11 deployed as static files in [`public/visuals/daily-v2/`](../../../public/visuals/daily-v2/). Both wheel decorations load the runtime copy of `zodiac-wheel.svg`; replacing its reference copy alone does not synchronize the runtime file:
+All 11 vector assets designed for the Celestial V2 upgrade are archived in [`.local/sources/img/daily-v2-reference/assets/`](../../../.local/sources/img/daily-v2-reference/assets/), with all 11 deployed as static files in [`public/visuals/daily-v2/`](../../../public/visuals/daily-v2/). Both wheel decorations load the runtime copy of `zodiac-wheel.svg`; replacing its reference copy alone does not synchronize the runtime file:
 
 | Asset Filename | Runtime Location | Component / CSS Consumer | Visual Placement |
 | :--- | :--- | :--- | :--- |
@@ -188,11 +188,11 @@ Because the 7 November 2026 reconstruction strictly forbade modifying applicatio
 
 | Area | Confirmed Requirement / Target Contract | Observed Implementation in `src/` | Tracking Reference |
 | :--- | :--- | :--- | :--- |
-| **Day Arc Clock & Countdown** | Real-time `HH:mm:ss` clock in `Asia/Ho_Chi_Minh` (`UTC+07:00`) + live countdown to `00:00` of the next day. | `getDailyClock` in [`daily-dashboard-time.ts`](../../../src/features/tasks/daily-dashboard-time.ts) computes `time`, `timeSeconds`, `countdown`, and `progress`, while `DayArc` in [`DailyDashboard.tsx`](../../../src/features/tasks/DailyDashboard.tsx) aligns ticks to minute boundaries (`MINUTE_MS - (now.getTime() % MINUTE_MS) + 50`), renders `HH:mm` without countdown text, and moves `.arcMarkerTrack` with `translate3d` (zero idle CSS transitions; see [`review/redesign/epic-06-daily-hub.md`](../../../review/redesign/epic-06-daily-hub.md)). | [`OD-03`](../../../PROJECT_DESCRIPTION.md#od-03) |
-| **Dashboard Eyebrow Casing** | Sentence case across all labels (`Cosmic forecast`, `Progress`, `Day arc`); all-caps reserved solely for the homepage wordmark. | DOM strings in `DailyDashboard.tsx` are sentence case, but `.eyebrow` in [`daily-foundation.module.css`](../../../src/features/tasks/daily-foundation.module.css) (line 138) applies `font-variant-caps: all-small-caps;`. | [`OD-04`](../../../PROJECT_DESCRIPTION.md#od-04) |
-| **Header `Observatory` Button** | Clear separation between the 3-column Observatory dashboard strip and future completion analytics. | Header button in [`DailyBoard.tsx`](../../../src/features/tasks/DailyBoard.tsx) is labeled `Observatory` and opens a `Drawer` titled `Statistics` showing `Blank page — waiting for future features.`. | [`OD-01`](../../../PROJECT_DESCRIPTION.md#od-01) |
+| **Day Arc Clock & Countdown** | Real-time `HH:mm:ss` clock in `Asia/Ho_Chi_Minh` (`UTC+07:00`) + live countdown to `00:00` of the next day. | `getDailyClock` in [`daily-dashboard-time.ts`](../../../src/features/tasks/daily-dashboard-time.ts) computes `time`, `timeSeconds`, `countdown`, and `progress`, while `DayArc` in [`DailyDashboard.tsx`](../../../src/features/tasks/DailyDashboard.tsx) aligns ticks to minute boundaries (`MINUTE_MS - (now.getTime() % MINUTE_MS) + 50`), renders `HH:mm` without countdown text, and moves `.arcMarkerTrack` with `translate3d` (zero idle CSS transitions; see [`review/redesign/epic-06-daily-hub.md`](../../../.local/review/redesign/epic-06-daily-hub.md)). | [`OD-03`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-03) |
+| **Dashboard Eyebrow Casing** | Sentence case across all labels (`Cosmic forecast`, `Progress`, `Day arc`); all-caps reserved solely for the homepage wordmark. | DOM strings in `DailyDashboard.tsx` are sentence case, but `.eyebrow` in [`daily-foundation.module.css`](../../../src/features/tasks/daily-foundation.module.css) (line 138) applies `font-variant-caps: all-small-caps;`. | [`OD-04`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-04) |
+| **Header `Observatory` Button** | Clear separation between the 3-column Observatory dashboard strip and future completion analytics. | Header button in [`DailyBoard.tsx`](../../../src/features/tasks/DailyBoard.tsx) is labeled `Observatory` and opens a `Drawer` titled `Statistics` showing `Blank page — waiting for future features.`. | [`OD-01`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-01) |
 | **Month View Priority Indicators** | Compact priority breakdown inside each date cell. | [`MonthView.tsx`](../../../src/features/tasks/MonthView.tsx) renders text labels (`1 urgent` on desktop, `1U` on mobile) without `<PriorityPlanet />` icons (`WeekView.tsx` renders both `<PriorityPlanet />` icons and text). | — |
-| **Service & API Audit Defects (`C01`–`C12`, `C14`)** | Full reminder evaluation on task creation, clean `scheduledDate: null` unscheduling via `PATCH`, media file cleanup on task deletion, etc. | Logged with exact line numbers in [`docs/audit/BUG_INVENTORY.md`](../../../docs/audit/BUG_INVENTORY.md) (`C01` `createTask` skips `evaluateTaskNotifications`; `C04` `deleteTask` leaves orphan media files on disk; `C05` `PATCH` coerces `scheduledDate: null` via `?? existing.scheduledDate`; `C10` `drizzle.config.ts` DB filename mismatch). | [`OD-05`](../../../PROJECT_DESCRIPTION.md#od-05), [`docs/audit/BUG_INVENTORY.md`](../../../docs/audit/BUG_INVENTORY.md) |
+| **Service & API Audit Defects (`C01`–`C12`, `C14`)** | Full reminder evaluation on task creation, clean `scheduledDate: null` unscheduling via `PATCH`, media file cleanup on task deletion, etc. | Logged with exact line numbers in [`docs/audit/BUG_INVENTORY.md`](../../../docs/audit/BUG_INVENTORY.md) (`C01` `createTask` skips `evaluateTaskNotifications`; `C04` `deleteTask` leaves orphan media files on disk; `C05` `PATCH` coerces `scheduledDate: null` via `?? existing.scheduledDate`; `C10` `drizzle.config.ts` DB filename mismatch). | [`OD-05`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-05), [`docs/audit/BUG_INVENTORY.md`](../../../docs/audit/BUG_INVENTORY.md) |
 
 ---
 
@@ -210,14 +210,14 @@ Because the 7 November 2026 reconstruction strictly forbade modifying applicatio
 ## 6. Open Decisions and Supporting References
 
 ### 6.1 Open Decisions Touching Tasks Epic
-All open decisions are maintained centrally in [`PROJECT_DESCRIPTION.md#8-open-decisions-register`](../../../PROJECT_DESCRIPTION.md#8-open-decisions-register):
-- [`OD-01`](../../../PROJECT_DESCRIPTION.md#od-01): Daily Header `Observatory` Button vs. `Statistics` Drawer & Future Analytics Scope
-- [`OD-02`](../../../PROJECT_DESCRIPTION.md#od-02): Dynamic vs. Curated `Cosmic forecast` Copy in Daily Task Management
-- [`OD-03`](../../../PROJECT_DESCRIPTION.md#od-03): Day Arc Real-Time `HH:mm:ss` Clock & Midnight Countdown Implementation Alignment
-- [`OD-04`](../../../PROJECT_DESCRIPTION.md#od-04): Sentence-Case Rule vs. CSS `all-small-caps` on `.eyebrow` Labels
-- [`OD-05`](../../../PROJECT_DESCRIPTION.md#od-05): Remediation Priority & Behavioral Contracts for Confirmed Audit Defects (`C01`–`C14`)
+All open decisions are maintained centrally in [`PROJECT_DESCRIPTION.md#8-open-decisions-register`](../../../docs/engineering/PROJECT_DESCRIPTION.md#8-open-decisions-register):
+- [`OD-01`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-01): Daily Header `Observatory` Button vs. `Statistics` Drawer & Future Analytics Scope
+- [`OD-02`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-02): Dynamic vs. Curated `Cosmic forecast` Copy in Daily Task Management
+- [`OD-03`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-03): Day Arc Real-Time `HH:mm:ss` Clock & Midnight Countdown Implementation Alignment
+- [`OD-04`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-04): Sentence-Case Rule vs. CSS `all-small-caps` on `.eyebrow` Labels
+- [`OD-05`](../../../docs/engineering/PROJECT_DESCRIPTION.md#od-05): Remediation Priority & Behavioral Contracts for Confirmed Audit Defects (`C01`–`C14`)
 
 ### 6.2 Supporting References
-- **Local V2 Asset Reference Index:** [`../../../sources/img/daily-v2-reference/README.md`](../../../sources/img/daily-v2-reference/README.md)
+- **Local V2 Asset Reference Index:** [`../../../.local/sources/img/daily-v2-reference/README.md`](../../../.local/sources/img/daily-v2-reference/README.md)
 - **Owner Vision & Notes (Read-Only):** [`../../../md/user/user_desc.md`](../../../md/user/user_desc.md), [`../../../md/user/user_notes.md`](../../../md/user/user_notes.md)
 - **Forensic Audit Reports (Read-Only):** [`../../../docs/audit/ARCHITECTURE_AUDIT.md`](../../../docs/audit/ARCHITECTURE_AUDIT.md), [`../../../docs/audit/BUG_INVENTORY.md`](../../../docs/audit/BUG_INVENTORY.md), [`../../../docs/audit/TECHNICAL_DEBT.md`](../../../docs/audit/TECHNICAL_DEBT.md), [`../../../docs/audit/STABILIZATION_PLAN.md`](../../../docs/audit/STABILIZATION_PLAN.md)

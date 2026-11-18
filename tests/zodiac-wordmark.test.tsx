@@ -333,7 +333,7 @@ describe('Zodiac vector wordmark data, tight kerning, schedule & synchronized il
       'utf8',
     );
     const aquariusSymbolSource = fs.readFileSync(
-      path.join(ROOT, 'sources/img/zodiac/svg/11_aquarius.svg'),
+      path.join(ROOT, '.local/sources/img/zodiac/svg/11_aquarius.svg'),
       'utf8',
     );
     expect(aquariusSymbolPublic).toBe(aquariusSymbolSource);

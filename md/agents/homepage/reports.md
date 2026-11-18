@@ -8,8 +8,8 @@
 
 - **Scope:** Built the Three.js night-side Earth scene, custom Fresnel atmosphere shader, `/brand/wordmark.svg` hero composition, and 4-phase scroll choreography (`0.00` → `1.00`), verified first in the standalone `review/phase01/` harness and then integrated into `src/features/home/`.
 - **Evidence Preserved:**
-  - [`../../../review/phase01/README.md`](../../../review/phase01/README.md) (Stage 1 static composition metrics across `1920x1080`, `1440x900`, `768x1024`, `390x844`).
-  - [`../../../review/phase01/MOTION.md`](../../../review/phase01/MOTION.md) (Stage 2 scroll timeline and reduced-motion verification).
+  - [`../../../.local/review/phase01/README.md`](../../../.local/review/phase01/README.md) (Stage 1 static composition metrics across `1920x1080`, `1440x900`, `768x1024`, `390x844`).
+  - [`../../../.local/review/phase01/MOTION.md`](../../../.local/review/phase01/MOTION.md) (Stage 2 scroll timeline and reduced-motion verification).
   - [`../../../public/earth/ATTRIBUTION.md`](../../../public/earth/ATTRIBUTION.md) (NASA Visible Earth & Solar System Scope CC BY 4.0 attribution).
 
 ---
