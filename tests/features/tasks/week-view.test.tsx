@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { TaskDto } from '@/contracts';
-import { WeekView } from '@/features/tasks/WeekView';
+import { WeekView } from '@/features/tasks/daily/WeekView';
 
 afterEach(cleanup);
 

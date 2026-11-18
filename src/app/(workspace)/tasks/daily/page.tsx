@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getFeatureById } from '@/features/registry';
-import { DailyBoard } from '@/features/tasks/DailyBoard';
+import { DailyBoard } from '@/features/tasks/daily/DailyBoard';
 
 const feature = getFeatureById('daily-tasks');
 

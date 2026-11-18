@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TaskDto } from '@/contracts';
-import { MonthView } from '@/features/tasks/MonthView';
+import { MonthView } from '@/features/tasks/daily/MonthView';
 
 afterEach(cleanup);
 

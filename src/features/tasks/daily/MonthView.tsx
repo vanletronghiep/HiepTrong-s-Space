@@ -14,7 +14,7 @@ import { StarIcon } from '@/ui/StarIcon';
 import { cn } from '@/ui/cn';
 import { DailyRingedPlanet } from './DailySky';
 import { FinishedCounter } from './FinishedCounter';
-import { TaskCard } from './TaskCard';
+import { TaskCard } from '../shared/TaskCard';
 import styles from './month-view.module.css';
 
 const WEEKDAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;

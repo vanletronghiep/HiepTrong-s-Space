@@ -30,12 +30,12 @@ import { EmptyState } from '@/ui/EmptyState';
 import { SegmentedControl, type SegmentedOption } from '@/ui/SegmentedControl';
 import { Skeleton } from '@/ui/Skeleton';
 import { useToast } from '@/ui/Toast';
-import masthead from './task-masthead.module.css';
-import { TaskCard } from './TaskCard';
-import noteStyles from './task-note.module.css';
-import { TaskForm } from './TaskForm';
-import { TaskInspector } from './TaskInspector';
-import { ScheduleDateDialog, TransferDialog } from './TransferDialog';
+import masthead from '../shared/task-masthead.module.css';
+import { TaskCard } from '../shared/TaskCard';
+import noteStyles from '../shared/task-note.module.css';
+import { TaskForm } from '../shared/TaskForm';
+import { TaskInspector } from '../shared/TaskInspector';
+import { ScheduleDateDialog, TransferDialog } from '../shared/TransferDialog';
 
 type PriorityFilter = 'all' | Priority;
 type HubSortMode = 'deadline' | 'priority';

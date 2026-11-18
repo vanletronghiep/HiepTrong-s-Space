@@ -12,7 +12,7 @@ import { Drawer } from '@/ui/Drawer';
 import { DailyRingedPlanet } from './DailySky';
 import { DayEmpty } from './DayTaskList';
 import { FinishedCounter } from './FinishedCounter';
-import { TaskCard } from './TaskCard';
+import { TaskCard } from '../shared/TaskCard';
 import styles from './week-view.module.css';
 
 export interface WeekViewProps {

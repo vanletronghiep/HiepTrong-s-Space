@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { DayTaskList } from '@/features/tasks/DayTaskList';
+import { DayTaskList } from '@/features/tasks/daily/DayTaskList';
 
 afterEach(() => {
   cleanup();

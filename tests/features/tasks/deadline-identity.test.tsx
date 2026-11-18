@@ -8,8 +8,8 @@ import {
   extractZonedDateAndTime,
   resolveDateInput,
 } from '@/domain/date-input';
-import { TaskForm } from '@/features/tasks/TaskForm';
-import { ScheduleDateDialog, TransferDialog } from '@/features/tasks/TransferDialog';
+import { TaskForm } from '@/features/tasks/shared/TaskForm';
+import { ScheduleDateDialog, TransferDialog } from '@/features/tasks/shared/TransferDialog';
 
 afterEach(() => {
   cleanup();

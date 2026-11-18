@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { getFeatureById } from '@/features/registry';
-import { HubList } from '@/features/tasks/HubList';
+import { HubList } from '@/features/tasks/hub/HubList';
 import { Skeleton } from '@/ui/Skeleton';
 
 const feature = getFeatureById('tasks-hub');

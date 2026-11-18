@@ -3,9 +3,9 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { TaskDto } from '@/contracts';
-import { DayCarousel } from '@/features/tasks/DayCarousel';
-import { TaskCard } from '@/features/tasks/TaskCard';
-import { TaskForm } from '@/features/tasks/TaskForm';
+import { DayCarousel } from '@/features/tasks/daily/DayCarousel';
+import { TaskCard } from '@/features/tasks/shared/TaskCard';
+import { TaskForm } from '@/features/tasks/shared/TaskForm';
 
 vi.mock('motion/react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('motion/react')>()),

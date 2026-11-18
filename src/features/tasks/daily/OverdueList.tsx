@@ -9,8 +9,8 @@ import { DEFAULT_APP_TIMEZONE } from '@/domain/time';
 import { MOTION_EASE } from '@/design/motion';
 import { Badge } from '@/ui/Badge';
 import { EmptyState } from '@/ui/EmptyState';
-import { TaskCard } from './TaskCard';
-import styles from './daily-task-card.module.css';
+import { TaskCard } from '../shared/TaskCard';
+import styles from '../shared/daily-task-card.module.css';
 
 export interface OverdueListProps {
   tasks: readonly TaskDto[];

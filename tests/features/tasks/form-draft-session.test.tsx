@@ -3,13 +3,13 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TaskDto } from '@/contracts';
-import { TaskForm, type TaskFormProps } from '@/features/tasks/TaskForm';
+import { TaskForm, type TaskFormProps } from '@/features/tasks/shared/TaskForm';
 import {
   ScheduleDateDialog,
   TransferDialog,
   type ScheduleDateDialogProps,
   type TransferDialogProps,
-} from '@/features/tasks/TransferDialog';
+} from '@/features/tasks/shared/TransferDialog';
 
 afterEach(() => {
   cleanup();

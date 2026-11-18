@@ -5,11 +5,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TaskDto } from '@/contracts';
 import { LayoutGroup } from 'motion/react';
-import { OverdueList } from '@/features/tasks/OverdueList';
-import { TaskCard } from '@/features/tasks/TaskCard';
-import { TaskForm } from '@/features/tasks/TaskForm';
-import { TaskInspector } from '@/features/tasks/TaskInspector';
-import { ScheduleDateDialog, TransferDialog } from '@/features/tasks/TransferDialog';
+import { OverdueList } from '@/features/tasks/daily/OverdueList';
+import { TaskCard } from '@/features/tasks/shared/TaskCard';
+import { TaskForm } from '@/features/tasks/shared/TaskForm';
+import { TaskInspector } from '@/features/tasks/shared/TaskInspector';
+import { ScheduleDateDialog, TransferDialog } from '@/features/tasks/shared/TransferDialog';
 
 afterEach(() => {
   cleanup();

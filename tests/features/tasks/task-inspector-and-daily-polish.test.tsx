@@ -6,11 +6,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TaskDto } from '@/contracts';
-import { DailyBoard } from '@/features/tasks/DailyBoard';
-import { DailyDashboard } from '@/features/tasks/DailyDashboard';
-import { DailySky } from '@/features/tasks/DailySky';
-import { TaskInspector } from '@/features/tasks/TaskInspector';
-import { ScheduleDateDialog } from '@/features/tasks/TransferDialog';
+import { DailyBoard } from '@/features/tasks/daily/DailyBoard';
+import { DailyDashboard } from '@/features/tasks/daily/DailyDashboard';
+import { DailySky } from '@/features/tasks/daily/DailySky';
+import { TaskInspector } from '@/features/tasks/shared/TaskInspector';
+import { ScheduleDateDialog } from '@/features/tasks/shared/TransferDialog';
 import { TransitionProvider } from '@/features/transitions/TransitionProvider';
 import { ToastProvider } from '@/ui/Toast';
 
@@ -353,7 +353,7 @@ describe('DailyBoard visual asset retirement, stable Week/Month navigation, and 
     expect(publishedFiles).not.toContain('spiral-galaxy.svg');
 
     const cardCss = await fs.readFile(
-      path.resolve(process.cwd(), 'src/features/tasks/daily-task-card.module.css'),
+      path.resolve(process.cwd(), 'src/features/tasks/shared/daily-task-card.module.css'),
       'utf8',
     );
     expect(cardCss).toContain('/visuals/daily-v2/night-bloom-corner.svg');
@@ -362,7 +362,7 @@ describe('DailyBoard visual asset retirement, stable Week/Month navigation, and 
     expect(cardCss).not.toContain('eclipse-broken-orbit.svg');
 
     const noteCss = await fs.readFile(
-      path.resolve(process.cwd(), 'src/features/tasks/task-note.module.css'),
+      path.resolve(process.cwd(), 'src/features/tasks/shared/task-note.module.css'),
       'utf8',
     );
     // v3.1 §5.3: Hub cards no longer reserve a fixed 240px body.

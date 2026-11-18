@@ -4,8 +4,8 @@ import { createElement } from 'react';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildZonedInstant, DEFAULT_APP_TIMEZONE } from '@/domain/time';
-import { DailyDashboard } from '@/features/tasks/DailyDashboard';
-import { getDailyClock } from '@/features/tasks/daily-dashboard-time';
+import { DailyDashboard } from '@/features/tasks/daily/DailyDashboard';
+import { getDailyClock } from '@/features/tasks/daily/daily-dashboard-time';
 
 afterEach(() => {
   cleanup();

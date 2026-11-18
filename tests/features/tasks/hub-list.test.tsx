@@ -5,8 +5,8 @@ import path from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TaskDto } from '@/contracts';
-import { HubList } from '@/features/tasks/HubList';
-import { TaskCard } from '@/features/tasks/TaskCard';
+import { HubList } from '@/features/tasks/hub/HubList';
+import { TaskCard } from '@/features/tasks/shared/TaskCard';
 import { TransitionProvider } from '@/features/transitions/TransitionProvider';
 import { ToastProvider } from '@/ui/Toast';
 

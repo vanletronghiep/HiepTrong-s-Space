@@ -35,11 +35,11 @@ vi.mock('@/features/transitions/TransitionProvider', () => ({
   }),
 }));
 
-vi.mock('@/features/tasks/DailyDashboard', () => ({
+vi.mock('@/features/tasks/daily/DailyDashboard', () => ({
   DailyHeaderDate: () => <span>Daily date</span>,
 }));
 
-vi.mock('@/features/tasks/DailySky', () => ({
+vi.mock('@/features/tasks/daily/DailySky', () => ({
   DailySky: () => <div data-testid="daily-sky" />,
   OrbitPlanetIcon: () => <svg aria-hidden="true" />,
 }));

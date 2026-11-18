@@ -44,12 +44,12 @@ import foundation from './daily-foundation.module.css';
 import { FinishedCounter } from './FinishedCounter';
 import { MonthView } from './MonthView';
 import { OverdueList } from './OverdueList';
-import { TaskCard } from './TaskCard';
-import { TaskForm } from './TaskForm';
-import { TaskInspector } from './TaskInspector';
-import { ScheduleDateDialog, TransferDialog } from './TransferDialog';
+import { TaskCard } from '../shared/TaskCard';
+import { TaskForm } from '../shared/TaskForm';
+import { TaskInspector } from '../shared/TaskInspector';
+import { ScheduleDateDialog, TransferDialog } from '../shared/TransferDialog';
 import { WeekView } from './WeekView';
-import masthead from './task-masthead.module.css';
+import masthead from '../shared/task-masthead.module.css';
 
 const VIEW_OPTIONS: readonly SegmentedOption<DailyViewMode>[] = [
   { value: 'day', label: 'Day' },

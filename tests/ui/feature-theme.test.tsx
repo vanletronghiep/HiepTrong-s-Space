@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import { FeatureThemeProvider } from '@/ui/FeatureTheme';
 import { Dialog } from '@/ui/Dialog';
-import { taskNoteTone } from '@/features/tasks/task-note-tone';
+import { taskNoteTone } from '@/features/tasks/shared/task-note-tone';
 
 afterEach(cleanup);
 

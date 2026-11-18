@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { TaskMenu } from '@/features/tasks/TaskMenu';
+import { TaskMenu } from '@/features/tasks/shared/TaskMenu';
 import type { TaskDto } from '@/contracts';
 
 afterEach(() => {
