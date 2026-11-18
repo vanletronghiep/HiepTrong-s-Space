@@ -313,7 +313,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
     <div className="flex flex-col flex-1">
       <PageReady ready={!tasksQuery.isLoading} />
 
-      <header data-feature-heading className={masthead.masthead}>
+      <header data-feature-heading className={`${masthead.masthead} ${masthead.hubArt}`}>
         <div className={masthead.mastheadText}>
           <h1 className={masthead.title}>
             Tasks <span className={masthead.titleEmphasis}>hub</span>
@@ -326,7 +326,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
       </header>
 
       {/* Search & filter controls */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center pb-6 mb-2 border-b border-ws-border">
+      <div className={`flex flex-col gap-3 lg:flex-row lg:items-center pb-8 mb-2 ${masthead.hubRule}`}>
         <div className="relative flex-1 min-w-0 lg:max-w-[380px]">
           <Search
             size={16}

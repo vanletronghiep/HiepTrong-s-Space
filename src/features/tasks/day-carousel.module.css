@@ -76,7 +76,7 @@
   z-index: -1;
   border-radius: inherit;
   background:
-    url('/visuals/daily-v2/constellation-sprinkles.svg') center top / 100% auto no-repeat,
+    url('/visuals/daily-v2/meteor-rain-edge.svg') right 3% top 6% / clamp(72px, 9%, 120px) auto no-repeat,
     url('/visuals/daily-v2/nebula-clouds.svg') center bottom / 125% auto no-repeat;
   opacity: 0.62;
   pointer-events: none;

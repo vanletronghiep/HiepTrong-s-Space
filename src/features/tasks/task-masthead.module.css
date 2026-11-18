@@ -47,3 +47,32 @@
     margin-bottom: var(--space-5);
   }
 }
+
+/* Tasks hub art: hourglass beside the heading, coordinate rule under the controls. */
+.hubArt::after {
+  content: '';
+  flex: none;
+  width: clamp(120px, 16vw, 200px);
+  aspect-ratio: 8 / 5;
+  background: url('/visuals/tasks-hub/starlight-hourglass.svg') center / contain no-repeat;
+  pointer-events: none;
+}
+
+.hubRule {
+  position: relative;
+}
+
+.hubRule::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -4px;
+  height: 36px;
+  background: url('/visuals/tasks-hub/celestial-coordinate-rule.svg') center / min(100%, 720px) auto no-repeat;
+  pointer-events: none;
+}
+
+@media (max-width: 700px) {
+  .hubArt::after {
+    display: none;
+  }
+}

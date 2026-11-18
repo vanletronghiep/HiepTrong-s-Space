@@ -343,10 +343,10 @@
   padding: 12px 19px 7px;
 }
 .arc::before {
-  background-image: url('/visuals/daily-v2/day-arc-decoration.svg');
-  background-position: center bottom -24px;
-  background-size: 102% 120px;
-  opacity: 0.9;
+  background-image: url('/visuals/daily-v2/celestial-coordinate-rule.svg');
+  background-position: center bottom -14px;
+  background-size: min(100%, 720px) auto;
+  opacity: 0.45;
 }
 .arc::after {
   background-image: url('/visuals/daily-v2/moon-phase-divider.svg');

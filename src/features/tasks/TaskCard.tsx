@@ -25,6 +25,12 @@ import { TaskMenu } from './TaskMenu';
 import dailyStyles from './daily-task-card.module.css';
 import brief from './task-brief.module.css';
 
+const PRIORITY_LABELS: Record<TaskDto['priority'], string> = {
+  urgent: 'Urgent',
+  normal: 'Normal',
+  optional: 'Optional',
+};
+
 export interface TaskCardProps {
   ref?: Ref<HTMLElement>;
   task: TaskDto;
@@ -238,12 +244,22 @@ export function TaskCard({
           ? 'shadow-none'
           : 'shadow-task hover:shadow-task-hover hover:border-[color-mix(in_srgb,var(--ws-accent)_45%,var(--ws-border))]',
         context === 'hub' && noteStyles.note,
+        context === 'hub' && derived.isOverdue && noteStyles.noteOverdue,
         isNew && 'animate-task-new-glow',
         isHighlighted && 'animate-task-highlight-glow',
       )}
     >
       {context === 'hub' ? (
         <>
+          <span
+            className={cn(
+              noteStyles.tape,
+              noteStyles[`tape-${task.priority}`],
+              isCompleted && noteStyles.tapeDone,
+            )}
+          >
+            {PRIORITY_LABELS[task.priority]}
+          </span>
           <div className={cn(noteStyles.noteHeader, brief.header)}>
             {checkboxNode}
             <h3
@@ -268,7 +284,6 @@ export function TaskCard({
 
           <div className={noteStyles.metadata}>
             <div className="flex flex-wrap items-center gap-1.5">
-              <PriorityBadge priority={task.priority} />
               {task.pinned ? (
                 <span
                   aria-label="Pinned to top of day"

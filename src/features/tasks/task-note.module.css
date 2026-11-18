@@ -1,31 +1,109 @@
+/*
+ * Tasks hub paper note: one sheet with a folded top-right corner and a washi-tape priority
+ * tab. Visual only; the card anatomy (header, two-line description slot, metadata) is unchanged.
+ */
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   align-items: stretch;
+  /* Drop shadows follow the clipped (folded) silhouette; a clip-path would cut box-shadow. */
+  filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--ws-text) 9%, transparent))
+    drop-shadow(0 6px 10px color-mix(in srgb, var(--ws-text) 7%, transparent));
 }
 .note {
+  --note-fold: 26px;
   padding: 0;
   gap: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--note-body);
-  border-color: color-mix(in srgb, var(--note-header) 85%, var(--note-ink));
+  background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--note-header) 42%, var(--note-body)) 0,
+      var(--note-body) 56px
+    ),
+    var(--note-body);
+  border-color: color-mix(in srgb, var(--note-header) 70%, var(--note-body));
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--note-fold)) 0,
+    100% var(--note-fold),
+    100% 100%,
+    0 100%
+  );
+}
+.note::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--note-fold);
+  height: var(--note-fold);
+  border-bottom-left-radius: 8px;
+  pointer-events: none;
+  background: linear-gradient(
+    225deg,
+    transparent 50%,
+    color-mix(in srgb, var(--note-header) 92%, var(--note-ink)) 50%
+  );
+  box-shadow: -2px 2px 4px color-mix(in srgb, var(--note-ink) 14%, transparent);
+}
+.noteOverdue::after {
+  background: linear-gradient(
+    225deg,
+    transparent 50%,
+    color-mix(in srgb, var(--status-overdue) 55%, var(--note-header)) 50%
+  );
+}
+.tape {
+  position: absolute;
+  top: 0;
+  left: 16px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 14px;
+  border-radius: 0 0 4px 4px;
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ws-surface) 40%, transparent) 0 5px,
+    transparent 5px 10px
+  );
+  clip-path: polygon(0 0, 100% 0, 97% 33%, 100% 66%, 97% 100%, 3% 100%, 0 66%, 3% 33%);
+}
+.tape-urgent {
+  background-color: color-mix(in srgb, var(--status-overdue) 42%, var(--note-body));
+  color: var(--text-overdue);
+}
+.tape-normal {
+  background-color: color-mix(in srgb, var(--ws-accent) 30%, var(--note-body));
+  color: var(--note-ink);
+}
+.tape-optional {
+  background-color: color-mix(in srgb, var(--status-notif-completed) 44%, var(--note-body));
+  color: color-mix(in srgb, var(--status-notif-completed) 30%, var(--ws-text));
+}
+.tapeDone {
+  opacity: 0.6;
 }
 .noteHeader {
-  padding: 12px 14px;
-  background: var(--note-header);
-  border-radius: var(--radius-task) var(--radius-task) 0 0;
+  padding: 30px 16px 0;
 }
 .noteHeader h3 {
   color: var(--note-ink);
 }
 .descriptionSlot {
-  margin: 10px 14px 0;
+  margin: 8px 16px 0;
   padding: 0;
 }
 .metadata {
-  padding: 10px 14px 12px;
+  padding: 10px 16px 12px;
   margin-top: auto;
   display: flex;
   flex-direction: column;
