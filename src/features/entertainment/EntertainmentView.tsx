@@ -1,5 +1,6 @@
 'use client';
 
+import { usePageReady } from '@/features/transitions/TransitionProvider';
 import React, { useId, useRef, useState } from 'react';
 import { AlertTriangle, Headphones, Play, Plus, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
@@ -91,6 +92,7 @@ export function EntertainmentView() {
 
   // Queries & Mutations
   const { data, isLoading, isError: loadFailed, refetch } = useEntertainmentData();
+  usePageReady(!isLoading);
   const createBook = useCreateBook();
   const createGame = useCreateGame();
   const updateProgress = useUpdateBookProgress();
@@ -456,10 +458,7 @@ export function EntertainmentView() {
                     <h3 className={styles.bookTitle}>{book.title}</h3>
                     <p className={styles.bookAuthor}>By {book.author}</p>
                     {book.thoughts ? (
-                      <FormattedNoteContent
-                        value={book.thoughts}
-                        className={styles.bookThoughts}
-                      />
+                      <FormattedNoteContent value={book.thoughts} className={styles.bookThoughts} />
                     ) : null}
                   </div>
 

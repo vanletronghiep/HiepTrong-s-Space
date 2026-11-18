@@ -18,7 +18,6 @@ import type { ZodiacThumbnailControl } from './FeatureThumbnail';
 import styles from './feature-collection.module.css';
 
 const CARD_GAP = 24;
-const TRACK_PAD_START = 24;
 const WHEEL_GESTURE_GAP_MS = 220;
 const WHEEL_RELEASE_THRESHOLD_PX = 120;
 const TOUCH_RELEASE_THRESHOLD_PX = 24;
@@ -459,8 +458,8 @@ function buildInitialStageMetrics(featureCount: number): StageMetrics {
   const stageH = 900;
   const cardWidth = 588;
   const pairWidth = cardWidth * 2 + CARD_GAP;
-  const trackPadStart = TRACK_PAD_START;
-  const trackPadEnd = Math.max(20, Math.round((stageW - pairWidth) / 2));
+  const trackPadStart = Math.max(0, (stageW - pairWidth) / 2);
+  const trackPadEnd = Math.max(20, stageW - trackPadStart - pairWidth);
   const gapCount = Math.max(0, featureCount - 1);
   const totalTrackWidth =
     trackPadStart + trackPadEnd + featureCount * cardWidth + gapCount * CARD_GAP;
@@ -537,8 +536,14 @@ function PinnedHorizontalStage({
     const cardWidth = Math.max(280, Math.floor(Math.min(maxByWidth, maxByHeight)));
 
     const pairWidth = cardWidth * 2 + CARD_GAP;
-    const trackPadStart = TRACK_PAD_START;
-    const trackPadEnd = Math.max(20, Math.round((stageW - pairWidth) / 2));
+    // The first card starts on the same content gutter as the collection heading (v3.1 §4):
+    // both edges derive from one measurement of the header's content box, at every width,
+    // zoom level, and font load. The final pair ends on that same gutter, so the last card
+    // stays naturally reachable.
+    const stageLeft = stageEl.getBoundingClientRect().left;
+    const contentLeft = contentEl.getBoundingClientRect().left;
+    const trackPadStart = Math.max(0, contentLeft - stageLeft);
+    const trackPadEnd = Math.max(20, stageW - trackPadStart - pairWidth);
     const gapCount = Math.max(0, features.length - 1);
     const totalTrackWidth =
       trackPadStart + trackPadEnd + features.length * cardWidth + gapCount * CARD_GAP;
@@ -712,6 +717,9 @@ function PinnedHorizontalStage({
         recalculate();
       });
       observer.observe(stageEl);
+      // The heading gutter can move without the stage changing size (viewport/zoom changes);
+      // re-measure whenever the document box changes as well.
+      observer.observe(document.documentElement);
       if (headerEl) observer.observe(headerEl);
       const collectionSection = outerEl.closest('section');
       const precedingSection = collectionSection?.previousElementSibling;

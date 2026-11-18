@@ -8,6 +8,28 @@
   font-family: var(--font-ui);
 }
 
+/*
+ * Homepage presentation text (wordmark, intro, collection heading, card labels and titles)
+ * is not selectable (v3.1 §4). Editable fields and overlays keep normal text selection.
+ */
+.page {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.page
+  :is(
+    input,
+    textarea,
+    select,
+    [contenteditable='true'],
+    [role='dialog'],
+    [data-overlay-popup='true']
+  ) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .page[data-home-journey]:focus,
 .page[data-home-journey]:focus-visible {
   outline: none;
@@ -274,7 +296,6 @@
 
 .introColumn[data-home-intro-visible='true'] {
   pointer-events: auto;
-  user-select: text;
 }
 
 .introColumn::before {

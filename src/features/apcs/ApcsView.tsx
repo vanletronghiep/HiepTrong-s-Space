@@ -1,5 +1,6 @@
 'use client';
 
+import { usePageReady } from '@/features/transitions/TransitionProvider';
 import React, { useId, useState } from 'react';
 import {
   AlertTriangle,
@@ -110,6 +111,7 @@ export function ApcsView() {
     isError: overviewFailed,
     refetch: retryOverview,
   } = useApcsOverview();
+  usePageReady(!isOverviewLoading);
   const {
     data: directory,
     isLoading: isDirLoading,

@@ -170,7 +170,8 @@ describe('TaskCard component states', () => {
     expect(dialog.closest('article')).toBeNull();
     expect(onToggle).not.toHaveBeenCalled();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Schedule for today' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Choose day' }));
+    fireEvent.click(within(dialog).getByRole('menuitem', { name: 'Today' }));
     expect(onScheduleDate).toHaveBeenCalledWith(task, '2026-10-30');
 
     fireEvent.keyDown(document, { key: 'Escape' });

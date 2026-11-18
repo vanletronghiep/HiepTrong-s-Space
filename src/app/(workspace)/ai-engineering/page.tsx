@@ -1,4 +1,3 @@
-import { PageReady } from '@/features/transitions/TransitionProvider';
 import type { Metadata } from 'next';
 import { AiEngineeringView } from '@/features/ai-engineering/AiEngineeringView';
 import { getFeatureById } from '@/features/registry';
@@ -10,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function AiEngineeringPage() {
-  return <><PageReady /><AiEngineeringView /></>;
+  return <AiEngineeringView />;
 }

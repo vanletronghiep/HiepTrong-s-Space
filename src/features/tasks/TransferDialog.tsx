@@ -23,9 +23,11 @@ export interface TransferDialogProps {
   timeZone?: string;
   isSubmitting?: boolean;
   portal?: boolean;
+  /** Preselects the transfer day (e.g. Today / Tomorrow from Choose day). */
+  initialDate?: string | null;
 }
 
-function buildInitialTransferDraft(now: Date, timeZone: string) {
+function buildInitialTransferDraft(now: Date, timeZone: string, initialDate?: string | null) {
   const todayStr = formatScheduledDate(now, timeZone);
   const tomorrowStr = shiftScheduledDate(todayStr, 1, timeZone);
   const todayEndOfDay = buildDeadlineFromInputs({
@@ -35,7 +37,8 @@ function buildInitialTransferDraft(now: Date, timeZone: string) {
     timeZone,
   });
   const defaultDate =
-    todayEndOfDay.ok && isFutureInstant(todayEndOfDay.deadlineAt, now) ? todayStr : tomorrowStr;
+    initialDate ??
+    (todayEndOfDay.ok && isFutureInstant(todayEndOfDay.deadlineAt, now) ? todayStr : tomorrowStr);
   const resolved = resolveDateInput(defaultDate, now, timeZone);
 
   return {
@@ -53,6 +56,7 @@ export function TransferDialog({
   timeZone = DEFAULT_APP_TIMEZONE,
   isSubmitting = false,
   portal = false,
+  initialDate = null,
 }: TransferDialogProps) {
   const isOpen = open && task !== null;
   const [prevOpen, setPrevOpen] = useState(isOpen);
@@ -83,6 +87,7 @@ export function TransferDialog({
           now={now}
           timeZone={timeZone}
           isSubmitting={isSubmitting}
+          initialDate={initialDate}
         />
       ) : null}
     </Dialog>
@@ -96,6 +101,7 @@ interface TransferDialogBodyProps {
   now: Date;
   timeZone: string;
   isSubmitting: boolean;
+  initialDate: string | null;
 }
 
 function TransferDialogBody({
@@ -105,12 +111,15 @@ function TransferDialogBody({
   now,
   timeZone,
   isSubmitting,
+  initialDate,
 }: TransferDialogBodyProps) {
   const todayStr = formatScheduledDate(now, timeZone);
   const tomorrowStr = shiftScheduledDate(todayStr, 1, timeZone);
   const referenceYear = Number(todayStr.slice(0, 4));
 
-  const [initialDraft] = useState(() => buildInitialTransferDraft(now, timeZone));
+  const [initialDraft] = useState(() =>
+    buildInitialTransferDraft(now, timeZone, initialDate),
+  );
   const [dateInput, setDateInput] = useState(initialDraft.dateInput);
   const [canonicalDate, setCanonicalDate] = useState<string | null>(initialDraft.canonicalDate);
   const [timeInput, setTimeInput] = useState('23:59');

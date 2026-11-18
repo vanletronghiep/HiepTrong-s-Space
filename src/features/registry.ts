@@ -34,7 +34,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
   {
     id: 'daily-tasks',
     slug: 'daily',
-    title: 'Daily Task Management',
+    title: 'Task Management',
     label: 'Tasks',
     href: '/tasks/daily',
     status: 'built',

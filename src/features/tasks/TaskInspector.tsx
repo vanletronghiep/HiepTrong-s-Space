@@ -1,22 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRightLeft, CalendarClock, CalendarDays, Clock, Pin } from 'lucide-react';
+import { CalendarClock, CalendarDays, Clock, Pin } from 'lucide-react';
 import type { TaskDto } from '@/contracts';
 import { deriveTaskState, formatTimeLeftLabel } from '@/domain/task-status';
 import {
   DEFAULT_APP_TIMEZONE,
   formatInspectorDeadline,
-  formatScheduledDate,
   formatScheduledDateWithYear,
-  shiftScheduledDate,
 } from '@/domain/time';
 import { Badge, type BadgeTone } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
-import { Chip } from '@/ui/Chip';
 import { Dialog } from '@/ui/Dialog';
 import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
 import { cn } from '@/ui/cn';
+import { ChooseDayMenu } from './ChooseDayMenu';
 import { DueSoonDot } from './DueSoonDot';
 import { PriorityBadge } from './PriorityBadge';
 
@@ -30,7 +28,7 @@ export interface TaskInspectorProps {
   onEdit: (task: TaskDto) => void;
   onScheduleDate: (task: TaskDto, scheduledDate: string | null) => void;
   onOpenPickDate: (task: TaskDto) => void;
-  onOpenTransfer: (task: TaskDto) => void;
+  onOpenTransfer: (task: TaskDto, initialDate?: string) => void;
   onRequestDelete: (task: TaskDto) => void;
   portal?: boolean;
 }
@@ -66,10 +64,8 @@ export function TaskInspector({
 
   const derived = deriveTaskState(currentTask, now);
   const isCompleted = currentTask.status === 'completed';
-  const todayStr = formatScheduledDate(now, timeZone);
-  const tomorrowStr = shiftScheduledDate(todayStr, 1, timeZone);
-
-  let statusLabel = 'Active';
+  // Active tasks carry no status badge (v3.2); only Completed / Overdue / Due soon are shown.
+  let statusLabel: string | null = null;
   let statusTone: BadgeTone = 'normal';
   if (isCompleted) {
     statusLabel = 'Completed';
@@ -95,7 +91,7 @@ export function TaskInspector({
       portal={portal}
       className="w-[calc(100%-24px)] max-w-none sm:w-[min(75vw,960px)] max-h-[88dvh] overflow-y-auto"
       footer={
-        <div className="flex w-full flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-ws-border">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
@@ -104,6 +100,15 @@ export function TaskInspector({
             >
               {isCompleted ? 'Mark active' : 'Mark complete'}
             </Button>
+            <ChooseDayMenu
+              task={currentTask}
+              isOverdue={derived.isOverdue}
+              now={now}
+              timeZone={timeZone}
+              onScheduleDate={onScheduleDate}
+              onOpenPickDate={onOpenPickDate}
+              onOpenTransfer={onOpenTransfer}
+            />
             <Button size="sm" variant="secondary" onClick={() => onEdit(currentTask)}>
               Edit
             </Button>
@@ -125,9 +130,11 @@ export function TaskInspector({
         {/* Badges row */}
         <div className="flex flex-wrap items-center gap-2">
           <PriorityBadge priority={currentTask.priority} />
-          <Badge tone={statusTone} withDot>
-            {statusLabel}
-          </Badge>
+          {statusLabel ? (
+            <Badge tone={statusTone} withDot>
+              {statusLabel}
+            </Badge>
+          ) : null}
           {currentTask.pinned ? (
             <Badge tone="general">
               <Pin size={12} strokeWidth={1.5} />
@@ -184,72 +191,6 @@ export function TaskInspector({
             </p>
           </div>
         </div>
-
-        {/* Daily calendar placement group */}
-        <section
-          aria-labelledby="task-inspector-daily-heading"
-          className="space-y-2 rounded-input border border-ws-border p-3.5"
-        >
-          <div className="space-y-0.5">
-            <h3
-              id="task-inspector-daily-heading"
-              className="text-[length:var(--fs-ui)] font-medium text-ws-text"
-            >
-              Daily calendar placement
-            </h3>
-            <p className="text-[length:var(--fs-small)] text-ws-text-muted">
-              Changes which Daily column this task appears on without changing its deadline.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 pt-0.5">
-            <Chip
-              active={currentTask.scheduledDate === todayStr}
-              onClick={() => onScheduleDate(currentTask, todayStr)}
-            >
-              Schedule for today
-            </Chip>
-            <Chip
-              active={currentTask.scheduledDate === tomorrowStr}
-              onClick={() => onScheduleDate(currentTask, tomorrowStr)}
-            >
-              Schedule for tomorrow
-            </Chip>
-            <Chip onClick={() => onOpenPickDate(currentTask)}>Choose day…</Chip>
-            {currentTask.scheduledDate !== null ? (
-              <Chip onClick={() => onScheduleDate(currentTask, null)}>Remove from Daily</Chip>
-            ) : null}
-          </div>
-        </section>
-
-        {/* Overdue deadline reschedule group */}
-        {derived.isOverdue ? (
-          <section
-            aria-labelledby="task-inspector-transfer-heading"
-            className="space-y-2 rounded-input border border-tint-overdue-border bg-tint-overdue-bg p-3.5"
-          >
-            <div className="space-y-0.5">
-              <h3
-                id="task-inspector-transfer-heading"
-                className="text-[length:var(--fs-ui)] font-medium text-ws-text"
-              >
-                Overdue deadline reschedule
-              </h3>
-              <p className="text-[length:var(--fs-small)] text-ws-text-muted">
-                Updates both the Daily scheduled day and the task deadline.
-              </p>
-            </div>
-            <div className="pt-0.5">
-              <Button
-                size="sm"
-                variant="secondary"
-                leftIcon={<ArrowRightLeft size={14} strokeWidth={1.5} />}
-                onClick={() => onOpenTransfer(currentTask)}
-              >
-                Reschedule overdue task…
-              </Button>
-            </div>
-          </section>
-        ) : null}
       </div>
     </Dialog>
   );

@@ -144,7 +144,10 @@ describe('AchievementsView Roman Marble Gallery', () => {
     }
 
     const { container } = renderAchievements();
-    const images = Array.from(container.querySelectorAll('img'));
+    // The hard-load route overlay (v3.2) draws its own zodiac art; only page art is asserted here.
+    const images = Array.from(container.querySelectorAll('img')).filter(
+      (img) => !img.closest('[data-route-loader]'),
+    );
     const srcs = images.map((img) => img.getAttribute('src') ?? '').sort();
 
     expect(srcs).toEqual([

@@ -59,6 +59,30 @@ describe('UniverseMenu frameless search and keyboard flow', () => {
     expect(pushMock).toHaveBeenCalledWith('/events');
   });
 
+  it('renders destinations as real links so Ctrl/Cmd+click opens a new tab without navigating in place', () => {
+    const onClose = vi.fn();
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    render(<UniverseMenu open onClose={onClose} />);
+
+    const input = screen.getByRole('combobox');
+    fireEvent.change(input, { target: { value: 'Events' } });
+    const option = screen.getByRole('option', { name: /Events/i });
+    expect(option.tagName).toBe('A');
+    expect(option).toHaveAttribute('href', '/events');
+
+    fireEvent.click(option, { ctrlKey: true });
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
+    expect(openSpy).toHaveBeenCalledWith('/events', '_blank', 'noopener');
+    expect(pushMock).not.toHaveBeenCalled();
+
+    fireEvent.click(option);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(pushMock).toHaveBeenCalledWith('/events');
+  });
+
   it('keeps Tasks Hub available in the Universe menu', () => {
     const onClose = vi.fn();
     render(<UniverseMenu open onClose={onClose} />);

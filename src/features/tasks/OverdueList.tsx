@@ -53,7 +53,7 @@ export function OverdueList({
       layout={reducedMotion ? false : 'position'}
       transition={transition}
       aria-labelledby="overdue-section-heading"
-      className="pt-3 mt-2"
+      className="mt-6"
     >
       <div className={styles.overdueHeader}>
         <h2

@@ -177,28 +177,6 @@
   color: var(--daily-violet);
 }
 
-.titleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px 20px;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-.titleRow h1 {
-  position: relative;
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-family: var(--font-display);
-  font-size: clamp(29px, 3.1vw, 45px);
-  line-height: 1.04;
-  font-weight: 600;
-}
-.titleRow h1 svg {
-  color: var(--daily-violet);
-  margin-top: 1px;
-}
 .titleActions {
   display: flex;
   gap: 10px;
@@ -235,7 +213,7 @@
 .dashboard {
   display: grid;
   gap: 12px;
-  margin-bottom: 9px;
+  margin-bottom: var(--space-5);
 }
 .topCards {
   display: grid;
@@ -415,8 +393,7 @@
   inset: 0;
   pointer-events: none;
 }
-.moon,
-.deadlineStar {
+.moon {
   position: absolute;
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -432,11 +409,6 @@
   background: radial-gradient(var(--ws-surface), var(--daily-pill));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--daily-arc-line) 24%, transparent);
   color: var(--daily-heading-accent);
-}
-.deadlineStar {
-  left: 100%;
-  top: 78%;
-  color: var(--status-overdue);
 }
 .times {
   position: absolute;
@@ -476,9 +448,6 @@
   }
   .datePill {
     display: none;
-  }
-  .titleRow {
-    margin-bottom: 18px;
   }
   .topCards {
     grid-template-columns: minmax(0, 1fr);

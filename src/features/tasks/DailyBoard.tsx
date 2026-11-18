@@ -36,7 +36,6 @@ import { IconButton } from '@/ui/IconButton';
 import { SegmentedControl, type SegmentedOption } from '@/ui/SegmentedControl';
 import { Skeleton } from '@/ui/Skeleton';
 import { useToast } from '@/ui/Toast';
-import { StarIcon } from '@/ui/StarIcon';
 import { DayCarousel } from './DayCarousel';
 import carouselStyles from './day-carousel.module.css';
 import { DayEmpty, DayTaskList } from './DayTaskList';
@@ -50,6 +49,7 @@ import { TaskForm } from './TaskForm';
 import { TaskInspector } from './TaskInspector';
 import { ScheduleDateDialog, TransferDialog } from './TransferDialog';
 import { WeekView } from './WeekView';
+import masthead from './task-masthead.module.css';
 
 const VIEW_OPTIONS: readonly SegmentedOption<DailyViewMode>[] = [
   { value: 'day', label: 'Day' },
@@ -153,6 +153,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
 
   const [inspectedTaskId, setInspectedTaskId] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<TaskDto | null>(null);
+  const [transferInitialDate, setTransferInitialDate] = useState<string | null>(null);
   const [scheduleTarget, setScheduleTarget] = useState<TaskDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskDto | null>(null);
   const [recentlyCreatedId, setRecentlyCreatedId] = useState<string | null>(null);
@@ -320,10 +321,16 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
     <div className="flex flex-col flex-1">
       <PageReady ready={!tasksQuery.isLoading} />
 
-      <div className={foundation.titleRow}>
-        <h1>
-          Daily Task Management <StarIcon size={17} />
-        </h1>
+      <div className={masthead.masthead}>
+        <div className={masthead.mastheadText}>
+          <h1 className={masthead.title}>
+            Task <span className={masthead.titleEmphasis}>management</span>
+          </h1>
+          <p className={masthead.subtitle}>
+            Plan each day under a calm sky, keep today in orbit, and let unfinished tasks drift
+            gently toward tomorrow.
+          </p>
+        </div>
         <div className={foundation.titleActions}>
           {viewMode === 'week' ? (
             <div className={`${foundation.dateNav} ${foundation.dateNavWeek}`}>
@@ -608,7 +615,10 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
         }
         onScheduleDate={handleScheduleDate}
         onOpenPickDate={(target) => setScheduleTarget(target)}
-        onOpenTransfer={(target) => setTransferTarget(target)}
+        onOpenTransfer={(target, initialDate) => {
+          setTransferInitialDate(initialDate ?? null);
+          setTransferTarget(target);
+        }}
         onRequestDelete={(target) => setDeleteTarget(target)}
       />
 
@@ -632,7 +642,11 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
         portal
         task={transferTarget}
         open={transferTarget !== null}
-        onClose={() => setTransferTarget(null)}
+        onClose={() => {
+          setTransferTarget(null);
+          setTransferInitialDate(null);
+        }}
+        initialDate={transferInitialDate}
         onSubmitTransfer={handleTransferSubmit}
         now={now}
         timeZone={timeZone}

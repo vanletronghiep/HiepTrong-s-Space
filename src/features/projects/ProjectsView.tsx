@@ -1,5 +1,6 @@
 'use client';
 
+import { usePageReady } from '@/features/transitions/TransitionProvider';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Image from 'next/image';
 import {
@@ -113,6 +114,7 @@ function isSafeExternalUrl(raw: string | null | undefined): raw is string {
 export function ProjectsView() {
   const inheritedTheme = useFeatureTheme();
   const { data: projects = [], isLoading, isError: loadFailed, refetch } = useProjects();
+  usePageReady(!isLoading);
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
   const deleteMutation = useDeleteProject();

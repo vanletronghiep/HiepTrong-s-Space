@@ -138,8 +138,8 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     });
 
     // Switch to Vertical mode
-    const verticalRadio = screen.getByRole('radio', { name: 'Vertical' });
-    fireEvent.click(verticalRadio);
+    const gridToggle = screen.getByRole('button', { name: /switch to grid view/i });
+    fireEvent.click(gridToggle);
 
     await waitFor(() => {
       expect(screen.getByTestId('vertical-feature-grid')).toBeInTheDocument();
@@ -215,6 +215,42 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     expect(section?.innerHTML).not.toContain('w-[55vw]');
   });
 
+  it('renders one morphing layout toggle that flips its label, icon, and accessible name', async () => {
+    render(<FeatureCollection />);
+
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: 'Gallery view, switch to grid view' });
+    expect(toggle).toHaveAttribute('data-mode', 'horizontal');
+    expect(toggle.querySelector('span[data-active="true"]')).toHaveTextContent('Gallery');
+    expect(toggle.querySelector('svg[data-active="true"]')).toHaveClass(
+      'lucide-gallery-horizontal',
+    );
+
+    fireEvent.click(toggle);
+
+    const gridToggle = await screen.findByRole('button', {
+      name: 'Grid view, switch to gallery view',
+    });
+    expect(gridToggle).toHaveAttribute('data-mode', 'vertical');
+    expect(gridToggle.querySelector('span[data-active="true"]')).toHaveTextContent('Grid');
+    expect(gridToggle.querySelector('svg[data-active="true"]')).toHaveClass('lucide-layout-grid');
+  });
+
+  it('pairs each static zodiac thumbnail with a hidden pre-glowed halo copy behind the artwork', () => {
+    const { container } = render(<FeatureCollection />);
+
+    const thumbs = container.querySelectorAll('[data-zodiac-thumb="static"]');
+    expect(thumbs.length).toBeGreaterThan(0);
+    thumbs.forEach((thumb) => {
+      const copies = thumb.querySelectorAll('[data-zodiac-sign]');
+      expect(copies).toHaveLength(2);
+      expect(copies[0]?.closest('[aria-hidden="true"]')).not.toBeNull();
+      expect(copies[0]?.getAttribute('data-zodiac-sign')).toBe(
+        copies[1]?.getAttribute('data-zodiac-sign'),
+      );
+    });
+  });
+
   it('computes 11-step (features.length - 1) pinned distance and smoothly interpolates translate3d without per-frame layout reads', async () => {
     Object.defineProperty(window, 'innerWidth', {
       value: 1440,
@@ -257,16 +293,17 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     const outer = await waitFor(() => screen.getByTestId('horizontal-pinned-outer'));
     const track = screen.getByTestId('horizontal-pinned-track');
 
-    // 1440x900 with 12 cards (588px), 11 gaps (24px), 24px start gutter + 120px end padding => travel = 6024, outerHeight = 6924
-    expect(outer.style.height).toBe('6924px');
-    expect(track.style.paddingLeft).toBe('24px');
-    expect(track.style.paddingRight).toBe('120px');
+    // 1440x900 with 12 cards (588px), 11 gaps (24px); the track starts and ends on the header content gutter (120px each side) => travel = 6120, outerHeight = 7020
+    expect(outer.style.height).toBe('7020px');
+    // jsdom has no layout, so the measured header gutter is 0; the first pair still spans the
+    // header content width, so start + end insets always total stage width minus the pair.
+    expect(parseFloat(track.style.paddingLeft) + parseFloat(track.style.paddingRight)).toBe(240);
     expect(track.style.gap).toBe('24px');
     expect(track.style.transform).toBe('translate3d(0px, 0, 0)');
 
     const outerRectSpy = vi.spyOn(outer, 'getBoundingClientRect');
     Object.defineProperty(window, 'scrollY', {
-      value: 3012,
+      value: 3060,
       configurable: true,
       writable: true,
     });
@@ -279,7 +316,7 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     firstFrame.cb(16.67);
     expect(outerRectSpy).not.toHaveBeenCalled();
     expect(track.style.transform).not.toBe('translate3d(0px, 0, 0)');
-    expect(track.style.transform).not.toBe('translate3d(-3012px, 0, 0)');
+    expect(track.style.transform).not.toBe('translate3d(-3060px, 0, 0)');
 
     let time = 33.34;
     let safety = 0;
@@ -291,7 +328,7 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     }
 
     expect(outerRectSpy).not.toHaveBeenCalled();
-    expect(track.style.transform).toBe('translate3d(-3012px, 0, 0)');
+    expect(track.style.transform).toBe('translate3d(-3060px, 0, 0)');
     expect(rafQueue).toHaveLength(0);
 
     // Keyboard :focus-visible sync scrolls horizontally obscured card into view cleanly
@@ -406,7 +443,7 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     const track = screen.getByTestId('horizontal-pinned-track');
     const firstCardBefore = screen.getAllByRole('link')[0];
 
-    expect(outer.style.height).toBe('6924px');
+    expect(outer.style.height).toBe('7020px');
     expect(track.style.transform).toBe('translate3d(0px, 0, 0)');
 
     // Scrolling during partial reveal does not move the horizontal track or queue rAF loops
@@ -436,9 +473,9 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     expect(screen.getAllByRole('link')[0]).toBe(firstCardBefore);
     expect(track.style.transform).toBe('translate3d(0px, 0, 0)');
 
-    // Scroll halfway through 6024px horizontal travel (3600 + 3012 = 6612)
+    // Scroll halfway through 6120px horizontal travel (3600 + 3060 = 6660)
     Object.defineProperty(window, 'scrollY', {
-      value: 6612,
+      value: 6660,
       configurable: true,
       writable: true,
     });
@@ -451,7 +488,7 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
       time += 16.67;
       safety += 1;
     }
-    expect(track.style.transform).toBe('translate3d(-3012px, 0, 0)');
+    expect(track.style.transform).toBe('translate3d(-3060px, 0, 0)');
 
     // Keyboard Tab focus sync anchors against scrollStartOffset (3600 + next)
     const scrollToSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
@@ -505,7 +542,7 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
       <FeatureCollection revealState="revealed" revealComplete={true} scrollStartOffset={3600} />,
     );
     Object.defineProperty(window, 'scrollY', {
-      value: 6612,
+      value: 6660,
       configurable: true,
       writable: true,
     });
@@ -518,7 +555,7 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
       forwardTime += 16.67;
       forwardSafety += 1;
     }
-    expect(track.style.transform).toBe('translate3d(-3012px, 0, 0)');
+    expect(track.style.transform).toBe('translate3d(-3060px, 0, 0)');
 
     computedStyleSpy.mockClear();
     outerRectSpy.mockClear();
@@ -552,7 +589,7 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
       <FeatureCollection revealState="revealed" revealComplete={true} scrollStartOffset={3600} />,
     );
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Vertical' }));
+    fireEvent.click(screen.getByRole('button', { name: /switch to grid view/i }));
     await waitFor(() => {
       expect(screen.getByTestId('vertical-feature-grid')).toBeInTheDocument();
     });
@@ -870,7 +907,9 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     // Re-enter collection and test keyboard repeat + interactive input exclusion
     currentScrollY = 4000;
     window.dispatchEvent(new Event('scroll'));
-    window.dispatchEvent(new WheelEvent('wheel', { deltaY: -500, bubbles: true, cancelable: true }));
+    window.dispatchEvent(
+      new WheelEvent('wheel', { deltaY: -500, bubbles: true, cancelable: true }),
+    );
     expect(currentScrollY).toBe(3600);
     act(() => {
       vi.advanceTimersByTime(220);
@@ -925,32 +964,48 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     expect(screen.getByTestId('horizontal-native-gallery')).toBeInTheDocument();
 
     // Crossing touch swipe stays clamped until finger lifts
-    window.dispatchEvent(createTouchEvent('touchstart', [{ identifier: 1, clientX: 120, clientY: 120 }]));
+    window.dispatchEvent(
+      createTouchEvent('touchstart', [{ identifier: 1, clientX: 120, clientY: 120 }]),
+    );
     currentScrollY = 3600;
-    const crossingSwipe = createTouchEvent('touchmove', [{ identifier: 1, clientX: 120, clientY: 170 }]);
+    const crossingSwipe = createTouchEvent('touchmove', [
+      { identifier: 1, clientX: 120, clientY: 170 },
+    ]);
     window.dispatchEvent(crossingSwipe);
     expect(crossingSwipe.defaultPrevented).toBe(true);
     expect(currentScrollY).toBe(3600);
     window.dispatchEvent(createTouchEvent('touchend', []));
 
     // Horizontal touch gesture is ignored while armed
-    window.dispatchEvent(createTouchEvent('touchstart', [{ identifier: 2, clientX: 200, clientY: 200 }]));
-    const horizontalSwipe = createTouchEvent('touchmove', [{ identifier: 2, clientX: 140, clientY: 208 }]);
+    window.dispatchEvent(
+      createTouchEvent('touchstart', [{ identifier: 2, clientX: 200, clientY: 200 }]),
+    );
+    const horizontalSwipe = createTouchEvent('touchmove', [
+      { identifier: 2, clientX: 140, clientY: 208 },
+    ]);
     window.dispatchEvent(horizontalSwipe);
     expect(horizontalSwipe.defaultPrevented).toBe(false);
     window.dispatchEvent(createTouchEvent('touchend', []));
 
     // Sub-threshold vertical touch swipe (< 24px) stays clamped
-    window.dispatchEvent(createTouchEvent('touchstart', [{ identifier: 3, clientX: 120, clientY: 200 }]));
-    const shortSwipe = createTouchEvent('touchmove', [{ identifier: 3, clientX: 120, clientY: 218 }]);
+    window.dispatchEvent(
+      createTouchEvent('touchstart', [{ identifier: 3, clientX: 120, clientY: 200 }]),
+    );
+    const shortSwipe = createTouchEvent('touchmove', [
+      { identifier: 3, clientX: 120, clientY: 218 },
+    ]);
     window.dispatchEvent(shortSwipe);
     expect(shortSwipe.defaultPrevented).toBe(true);
     expect(currentScrollY).toBe(3600);
     window.dispatchEvent(createTouchEvent('touchend', []));
 
     // Fresh deliberate upward touch swipe (>= 24px) releases back toward Homepage
-    window.dispatchEvent(createTouchEvent('touchstart', [{ identifier: 4, clientX: 120, clientY: 200 }]));
-    const releaseSwipe = createTouchEvent('touchmove', [{ identifier: 4, clientX: 120, clientY: 228 }]);
+    window.dispatchEvent(
+      createTouchEvent('touchstart', [{ identifier: 4, clientX: 120, clientY: 200 }]),
+    );
+    const releaseSwipe = createTouchEvent('touchmove', [
+      { identifier: 4, clientX: 120, clientY: 228 },
+    ]);
     window.dispatchEvent(releaseSwipe);
     expect(releaseSwipe.defaultPrevented).toBe(true);
     expect(currentScrollY).toBe(3592);
@@ -969,7 +1024,7 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     expect(unblockedAfterResetWheel.defaultPrevented).toBe(false);
 
     // Switching to Vertical disables backward scroll clamping completely
-    fireEvent.click(screen.getByRole('radio', { name: 'Vertical' }));
+    fireEvent.click(screen.getByRole('button', { name: /switch to grid view/i }));
     act(() => {
       vi.advanceTimersByTime(150);
     });
@@ -1009,7 +1064,7 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     expect(screen.getByTestId('horizontal-pinned-outer')).toBeInTheDocument();
 
     // Rapid consecutive toggle: Vertical -> Horizontal before 150ms swap lands
-    fireEvent.click(screen.getByRole('radio', { name: 'Vertical' }));
+    fireEvent.click(screen.getByRole('button', { name: /switch to grid view/i }));
     expect(transitionStage).toHaveAttribute('data-layout-transition', 'fading-out');
     expect(screen.getByTestId('horizontal-pinned-outer')).toBeInTheDocument();
     expect(screen.queryByTestId('vertical-feature-grid')).not.toBeInTheDocument();
@@ -1017,11 +1072,11 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     act(() => {
       vi.advanceTimersByTime(60);
     });
-    fireEvent.click(screen.getByRole('radio', { name: 'Horizontal' }));
+    fireEvent.click(screen.getByRole('button', { name: /switch to gallery view/i }));
     expect(transitionStage).toHaveAttribute('data-layout-transition', 'fading-in');
     expect(screen.getByTestId('horizontal-pinned-outer')).toBeInTheDocument();
     expect(screen.queryByTestId('vertical-feature-grid')).not.toBeInTheDocument();
-    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Horizontal' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /^gallery view/i }));
 
     act(() => {
       vi.advanceTimersByTime(250);
@@ -1031,7 +1086,7 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     expect(screen.queryByTestId('vertical-feature-grid')).not.toBeInTheDocument();
 
     // Complete Horizontal -> Vertical transition
-    fireEvent.click(screen.getByRole('radio', { name: 'Vertical' }));
+    fireEvent.click(screen.getByRole('button', { name: /switch to grid view/i }));
     expect(transitionStage).toHaveAttribute('data-layout-transition', 'fading-out');
 
     act(() => {
@@ -1043,7 +1098,7 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
 
     const controlsWrapper = container.querySelector<HTMLElement>('[data-collection-controls]');
     expect(controlsWrapper).toHaveAttribute('data-layout-mode', 'vertical');
-    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Vertical' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /^grid view/i }));
 
     act(() => {
       while (rafQueue.length > 0) {
@@ -1073,10 +1128,10 @@ describe('FeatureCollection Horizontal & Vertical modes (§9.9 & ui_readme.md §
     const reducedStage = reducedContainer.querySelector<HTMLElement>('[data-layout-transition]');
     expect(screen.getByTestId('horizontal-native-gallery')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Vertical' }));
+    fireEvent.click(screen.getByRole('button', { name: /switch to grid view/i }));
     expect(reducedStage).toHaveAttribute('data-layout-transition', 'idle');
     expect(screen.getByTestId('vertical-feature-grid')).toBeInTheDocument();
     expect(screen.queryByTestId('horizontal-native-gallery')).not.toBeInTheDocument();
-    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Vertical' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /^grid view/i }));
   });
 });

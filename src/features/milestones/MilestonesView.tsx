@@ -1,5 +1,6 @@
 'use client';
 
+import { usePageReady } from '@/features/transitions/TransitionProvider';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Image from 'next/image';
 import { Calendar, Compass, Plus, RotateCcw, Trash2 } from 'lucide-react';
@@ -111,6 +112,7 @@ function formatTargetDate(targetDate: string): string {
 export function MilestonesView() {
   const inheritedTheme = useFeatureTheme();
   const { data: milestones = [], isLoading, isError: loadFailed, refetch } = useMilestones();
+  usePageReady(!isLoading);
   const createMutation = useCreateMilestone();
   const updateMutation = useUpdateMilestone();
   const toggleMutation = useToggleLandmark();

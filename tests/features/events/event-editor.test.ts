@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { EventItem } from '@/contracts/event';
+import { eventItemSchema, type EventItem } from '@/contracts/event';
 import {
   eventEditorPatch,
   eventEditorValues,
@@ -7,8 +7,9 @@ import {
   isEventDraftPublishable,
   isValidEventTimeHm,
 } from '@/features/events/event-editor';
+import { blankEditorValues } from '@/domain/event-editor-values';
 
-export const event: EventItem = {
+export const event: EventItem = eventItemSchema.parse({
   id: 'meeting',
   title: 'Project review',
   category: 'meeting',
@@ -24,7 +25,7 @@ export const event: EventItem = {
   recurrence: { frequency: 'weekly', daysOfWeek: [5] },
   createdAt: '2026-11-01T00:00:00.000Z',
   updatedAt: '2026-11-01T00:00:00.000Z',
-};
+});
 
 describe('event editing preserves fields outside the editor', () => {
   it('does not rewrite an untouched title while another field is edited', () => {
@@ -78,40 +79,86 @@ describe('event editing preserves fields outside the editor', () => {
     expect(isValidEventTimeHm('9:00')).toBe(false);
 
     expect(
-      isEventDraftPublishable({
-        title: 'Lab checkoff',
-        category: 'school',
-        date: '2026-11-25',
-        time: '00:15',
-        location: '',
-        isOnline: false,
-        isExam: false,
-        notes: '',
-      }),
+      isEventDraftPublishable(
+        blankEditorValues('2026-11-25', {
+          title: 'Lab checkoff',
+          category: 'school',
+          time: '00:15',
+        }),
+      ),
     ).toBe(true);
     expect(
-      isEventDraftPublishable({
-        title: '   ',
-        category: 'school',
-        date: '2026-11-25',
-        time: '00:15',
-        location: '',
-        isOnline: false,
-        isExam: false,
-        notes: '',
-      }),
+      isEventDraftPublishable(
+        blankEditorValues('2026-11-25', { title: '   ', category: 'school', time: '00:15' }),
+      ),
     ).toBe(false);
     expect(
-      isEventDraftPublishable({
-        title: 'Incomplete date',
-        category: 'school',
-        date: '2026-02-30',
-        time: '19:00',
-        location: '',
-        isOnline: false,
-        isExam: false,
-        notes: '',
-      }),
+      isEventDraftPublishable(
+        blankEditorValues('2026-02-30', {
+          title: 'Incomplete date',
+          category: 'school',
+          time: '19:00',
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('v3.1 editor preservation rules', () => {
+  it('keeps a legacy venue + link pair intact on a title-only edit', () => {
+    const values = eventEditorValues(event);
+    expect(values.location).toBe('Room 4');
+    expect(eventEditorPatch(event, { ...values, title: 'Renamed' })).toEqual({ title: 'Renamed' });
+  });
+
+  it('edits the stored link when a legacy record has only a URL', () => {
+    const linkOnly = eventItemSchema.parse({ ...event, location: null });
+    const values = eventEditorValues(linkOnly);
+    expect(values.location).toBe('https://example.com/meeting');
+    expect(eventEditorPatch(linkOnly, { ...values, location: 'https://example.com/new' })).toEqual({
+      url: 'https://example.com/new',
+    });
+  });
+
+  it('never sends category or exam changes when only other fields change, preserving legacy exam flags', () => {
+    const legacy = eventItemSchema.parse({ ...event, category: 'school', isExam: true });
+    const patch = eventEditorPatch(legacy, { ...eventEditorValues(legacy), notes: 'More' });
+    expect(patch).toEqual({ notes: 'More' });
+    expect(patch).not.toHaveProperty('isExam');
+    expect(patch).not.toHaveProperty('category');
+  });
+
+  it('requires a category for new ordinary events and an end time for classes', () => {
+    expect(isEventDraftPublishable(blankEditorValues('2026-11-25', { title: 'Untyped' }))).toBe(
+      false,
+    );
+    expect(
+      isEventDraftPublishable(
+        blankEditorValues('2026-11-25', { title: 'Class', kind: 'class', time: '07:30' }),
+      ),
+    ).toBe(false);
+    expect(
+      isEventDraftPublishable(
+        blankEditorValues('2026-11-25', {
+          title: 'Class',
+          kind: 'class',
+          time: '07:30',
+          endTime: '09:30',
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects an end before its start', () => {
+    expect(
+      isEventDraftPublishable(
+        blankEditorValues('2026-11-25', {
+          title: 'Backwards',
+          category: 'meeting',
+          time: '10:00',
+          endTime: '09:00',
+        }),
+      ),
     ).toBe(false);
   });
 });

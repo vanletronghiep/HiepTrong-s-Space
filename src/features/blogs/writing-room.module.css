@@ -132,10 +132,6 @@
   transition: border-color var(--dur-fast) var(--ease);
 }
 
-.searchInput:focus {
-  border-color: var(--ws-accent);
-}
-
 .filterRow {
   display: flex;
   flex-wrap: wrap;
@@ -677,12 +673,6 @@
 .proseTextarea {
   max-width: 68ch;
   line-height: var(--lh-relaxed);
-}
-
-.inputField:focus,
-.selectField:focus,
-.textareaField:focus {
-  border-color: var(--ws-accent);
 }
 
 .metaHint {

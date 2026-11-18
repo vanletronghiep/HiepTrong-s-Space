@@ -39,14 +39,15 @@ export function createInitialPlayheadState(initialP = 0): PlayheadState {
 export function stepPlayhead(
   state: PlayheadState,
   dtSeconds: number,
-  options: { glowEnabled?: boolean } = {},
+  options: { glowEnabled?: boolean; forwardMaxSpeed?: number } = {},
 ): boolean {
   const glowEnabled = options.glowEnabled ?? true;
+  const forwardMaxSpeed = options.forwardMaxSpeed ?? FORWARD_MAX_SPEED;
   let remaining = Math.min(Math.max(dtSeconds, 0), MAX_FRAME_ELAPSED_S);
 
   const integrateSubstep = (dt: number) => {
     const rawDesired = (state.target - state.p) / VELOCITY_RESPONSE_TIME_S;
-    const desiredVelocity = Math.max(-REVERSE_MAX_SPEED, Math.min(FORWARD_MAX_SPEED, rawDesired));
+    const desiredVelocity = Math.max(-REVERSE_MAX_SPEED, Math.min(forwardMaxSpeed, rawDesired));
 
     const alpha = dt > 0 ? 1 - Math.exp(-dt / VELOCITY_RESPONSE_TIME_S) : 0;
     const nextV = state.v + (desiredVelocity - state.v) * alpha;
@@ -122,6 +123,8 @@ export function getControllerSnapshot(state: PlayheadState): ZodiacControllerSna
 export interface ZodiacPlayheadControllerOptions {
   initialP?: number;
   glowEnabled?: boolean;
+  /** Forward playhead speed in playhead-units per second (defaults to 1 / 4.8s). */
+  forwardMaxSpeed?: number;
   onRender: (snapshot: ZodiacControllerSnapshot) => void;
 }
 
@@ -132,6 +135,8 @@ export interface ZodiacPlayheadController {
   setTarget(target: number): void;
   setPaused(paused: boolean): void;
   setGlowEnabled(enabled: boolean): void;
+  /** Overrides the forward speed; non-positive values restore the default. */
+  setForwardSpeed(unitsPerSecond: number): void;
   setManualProgress(progress: number, options?: { runCompletedGlow?: boolean }): void;
   destroy(): void;
 }
@@ -145,6 +150,7 @@ export function createZodiacPlayheadController(
 ): ZodiacPlayheadController {
   const state = createInitialPlayheadState(options.initialP ?? 0);
   let glowEnabled = options.glowEnabled ?? true;
+  let forwardMaxSpeed = options.forwardMaxSpeed ?? FORWARD_MAX_SPEED;
   let paused = false;
   let manualMode = false;
   let destroyed = false;
@@ -187,7 +193,7 @@ export function createZodiacPlayheadController(
       lastTimestampMs === null ? 0 : Math.max(0, (timestampMs - lastTimestampMs) / 1000);
     lastTimestampMs = timestampMs;
 
-    const keepRunning = stepPlayhead(state, dtSeconds, { glowEnabled });
+    const keepRunning = stepPlayhead(state, dtSeconds, { glowEnabled, forwardMaxSpeed });
     options.onRender(getControllerSnapshot(state));
 
     if (keepRunning && !destroyed && !paused && needsAnimation()) {
@@ -245,6 +251,9 @@ export function createZodiacPlayheadController(
       } else {
         ensureRunning();
       }
+    },
+    setForwardSpeed(unitsPerSecond: number) {
+      forwardMaxSpeed = unitsPerSecond > 0 ? unitsPerSecond : FORWARD_MAX_SPEED;
     },
     setManualProgress(progress: number, manualOptions?: { runCompletedGlow?: boolean }) {
       const clamped = clamp01(progress);

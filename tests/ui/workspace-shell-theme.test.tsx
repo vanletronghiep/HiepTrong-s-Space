@@ -119,7 +119,7 @@ describe('WorkspaceShell full-page feature theme & overlay isolation', () => {
     expect(shellRoot).toHaveAttribute('data-feature-theme', 'events');
   });
 
-  it('preserves protected routes (/tasks/hub, /tasks/daily) without fullpage theme override', () => {
+  it('renders /tasks/hub as an open full-page theme without the bordered FeatureTheme frame (v3.2)', () => {
     mockedPathname = '/tasks/hub';
     const { container } = render(
       <ToastProvider>
@@ -130,13 +130,14 @@ describe('WorkspaceShell full-page feature theme & overlay isolation', () => {
     );
 
     const shellRoot = container.firstElementChild as HTMLElement;
-    expect(shellRoot).not.toHaveAttribute('data-fullpage-theme');
-    expect(shellRoot).not.toHaveAttribute('data-feature-theme');
-    expect(container.querySelector('main [data-feature-theme="tasks-hub"]')).toBeInTheDocument();
+    expect(shellRoot).toHaveAttribute('data-fullpage-theme', 'true');
+    expect(shellRoot).toHaveAttribute('data-feature-theme', 'tasks-hub');
+    expect(container.querySelector('main [data-feature-theme="tasks-hub"]')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open universe menu' }));
-    expect(screen.getByRole('dialog', { name: 'Universe menu' })).not.toHaveAttribute(
+    expect(screen.getByRole('dialog', { name: 'Universe menu' })).toHaveAttribute(
       'data-feature-theme',
+      'tasks-hub',
     );
   });
 

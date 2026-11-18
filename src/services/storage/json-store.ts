@@ -3,6 +3,21 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { getAppConfig } from '@/server/config';
 
+/**
+ * One-time, timestamped copy of the current file taken before the first format-changing
+ * write (v3.1 §8.3). Unlike the rotating `.bak`, later saves never overwrite it.
+ */
+export interface FormatBackupPolicy<T> {
+  /** Stable label such as 'pre-v3.1'; one backup per label is kept. */
+  label: string;
+  /** True when the loaded records still use the older format. */
+  needsBackup: (items: readonly T[]) => boolean;
+}
+
+export interface TransactionOptions<T> {
+  formatBackup?: FormatBackupPolicy<T>;
+}
+
 /** Atomic single-file transactions. A lock file also excludes other processes. */
 export class JsonFileStore<T extends { id: string }> {
   private readonly filePath: string;
@@ -12,6 +27,11 @@ export class JsonFileStore<T extends { id: string }> {
     this.filePath = path.resolve(directory ?? getAppConfig().dataDir, fileName);
     const legacy = path.resolve('data', fileName);
     this.legacyPath = directory === undefined && legacy !== this.filePath ? legacy : null;
+  }
+
+  /** Resolved path of the backing file (diagnostics and migration evidence only). */
+  get resolvedFilePath(): string {
+    return this.filePath;
   }
 
   private async load(): Promise<T[]> {
@@ -47,7 +67,37 @@ export class JsonFileStore<T extends { id: string }> {
     return items as T[];
   }
 
-  private async transact<R>(change: (items: T[]) => { items: T[]; result: R }): Promise<R> {
+  private async ensureFormatBackup(items: readonly T[], policy: FormatBackupPolicy<T>) {
+    if (items.length === 0 || !policy.needsBackup(items)) return;
+    const directory = path.dirname(this.filePath);
+    const prefix = `${path.basename(this.filePath)}.${policy.label}-`;
+    const existing = (await fs.readdir(directory)).some(
+      (name) => name.startsWith(prefix) && name.endsWith('.bak'),
+    );
+    if (existing) return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupName = `${prefix}${stamp}.bak`;
+    await fs.copyFile(this.filePath, path.join(directory, backupName));
+    // Migration summary: counts only, never record content.
+    const summary = {
+      file: path.basename(this.filePath),
+      label: policy.label,
+      backup: backupName,
+      records: items.length,
+      recordsInOlderFormat: items.filter((item) => policy.needsBackup([item])).length,
+      createdAt: new Date().toISOString(),
+    };
+    await fs.writeFile(
+      path.join(directory, `${prefix}${stamp}.summary.json`),
+      JSON.stringify(summary, null, 2),
+      'utf8',
+    );
+  }
+
+  private async transact<R>(
+    change: (items: T[]) => { items: T[]; result: R },
+    options: TransactionOptions<T> = {},
+  ): Promise<R> {
     await fs.mkdir(path.dirname(this.filePath), { recursive: true });
     const lockPath = `${this.filePath}.lock`;
     const deadline = Date.now() + 5000;
@@ -57,14 +107,20 @@ export class JsonFileStore<T extends { id: string }> {
         lock = await fs.open(lockPath, 'wx');
       } catch (error) {
         // Windows can report EPERM while a competing lock is being deleted.
-        if (!['EEXIST', 'EPERM'].includes((error as NodeJS.ErrnoException).code ?? '') || Date.now() >= deadline)
+        if (
+          !['EEXIST', 'EPERM'].includes((error as NodeJS.ErrnoException).code ?? '') ||
+          Date.now() >= deadline
+        )
           throw error;
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
     }
     const temporary = `${this.filePath}.${randomUUID()}.tmp`;
     try {
-      const { items, result } = change(await this.load());
+      const loaded = await this.load();
+      // Validation and mutation observe the same locked snapshot; a throw writes nothing.
+      const { items, result } = change(loaded);
+      if (options.formatBackup) await this.ensureFormatBackup(loaded, options.formatBackup);
       const handle = await fs.open(temporary, 'wx');
       try {
         await handle.writeFile(JSON.stringify(items, null, 2), 'utf8');
@@ -88,6 +144,17 @@ export class JsonFileStore<T extends { id: string }> {
         await fs.unlink(lockPath);
       }
     }
+  }
+
+  /**
+   * Whole-collection transaction under the file lock with atomic replacement and the
+   * last-valid `.bak`. Throwing from `change` leaves the original bytes untouched.
+   */
+  async transaction<R>(
+    change: (items: T[]) => { items: T[]; result: R },
+    options: TransactionOptions<T> = {},
+  ): Promise<R> {
+    return this.transact(change, options);
   }
 
   async getAll(): Promise<T[]> {

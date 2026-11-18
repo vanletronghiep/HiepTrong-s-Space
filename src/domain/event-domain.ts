@@ -83,3 +83,16 @@ export function eventsForWeekday(events: EventItem[], index: number, now = new D
   const date = getEventWeekDates(now)[index];
   return events.filter(event => formatScheduledDate(event.startAt) === date);
 }
+
+const WEB_URL_RE = /^(?:https?:\/\/|www\.)[^\s]+$/i;
+
+/** Supported web links in the single "Location or link" field (http, https, or www.). */
+export function isWebUrl(value: string | null | undefined): boolean {
+  return typeof value === 'string' && WEB_URL_RE.test(value.trim());
+}
+
+/** Navigable href for a detected web link; `www.` hosts get https. */
+export function toWebHref(value: string): string {
+  const trimmed = value.trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}

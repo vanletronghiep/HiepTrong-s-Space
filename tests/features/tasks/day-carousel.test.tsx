@@ -7,7 +7,7 @@ import { DailyBoard } from '@/features/tasks/DailyBoard';
 import { DailySky } from '@/features/tasks/DailySky';
 import { DayCarousel } from '@/features/tasks/DayCarousel';
 import { TransitionLink } from '@/features/transitions/TransitionLink';
-import { TransitionProvider } from '@/features/transitions/TransitionProvider';
+import { PageReady, TransitionProvider } from '@/features/transitions/TransitionProvider';
 import { ToastProvider } from '@/ui/Toast';
 
 let mockedPathname = '/tasks/daily';
@@ -313,12 +313,17 @@ it('defers DailySky twinkle activation while Cosmic Launch or popstate quick-fad
   const second = render(
     <ToastProvider>
       <TransitionProvider>
+        <PageReady />
         <DailySky />
       </TransitionProvider>
     </ToastProvider>,
   );
   const sky2 = second.container.querySelector('[class*="sky"]') as HTMLElement;
 
+  // The hard-load overlay of /tasks/daily dismisses (150ms) before the sky settles (180ms).
+  act(() => {
+    vi.advanceTimersByTime(150);
+  });
   act(() => {
     vi.advanceTimersByTime(180);
   });

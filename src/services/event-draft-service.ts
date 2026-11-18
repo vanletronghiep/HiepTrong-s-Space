@@ -1,7 +1,12 @@
-import { isValidScheduledDate } from '@/contracts/task';
-import type { CreateEventInput, EventItem } from '@/contracts/event';
+import type {
+  CreateEventInput,
+  EventItem,
+  OccurrenceMutation,
+  PatchEventInput,
+} from '@/contracts/event';
 import {
   eventDraftRecordSchema,
+  eventDraftSourceKey,
   patchEventDraftInputSchema,
   publishEventDraftInputSchema,
   saveEventDraftInputSchema,
@@ -12,17 +17,24 @@ import {
   type PublishEventDraftResult,
   type SaveEventDraftInput,
 } from '@/contracts/event-draft';
-import { buildZonedInstant } from '@/domain/time';
+import {
+  editorTimes,
+  editorValuesFromEvent,
+  editorValuesFromOccurrence,
+  eventEditorPatch,
+  occurrenceEditFields,
+  validateEditorValues,
+} from '@/domain/event-editor-values';
+import { resolveClassOccurrence } from '@/domain/event-occurrence';
 import { ConflictError, NotFoundError, ValidationError } from './errors';
-import { eventService } from './event-service';
-import { JsonFileStore } from './storage/json-store';
-
-const TIME_24H_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+import { eventService, type OccurrenceMutationResult } from './event-service';
+import { JsonFileStore, type FormatBackupPolicy } from './storage/json-store';
 
 export interface EventStorePort {
   getEvent(id: string): Promise<EventItem | null>;
   createEvent(input: CreateEventInput): Promise<EventItem>;
-  updateEvent(id: string, patch: Partial<CreateEventInput>): Promise<EventItem | null>;
+  updateEvent(id: string, patch: PatchEventInput): Promise<EventItem | null>;
+  mutateOccurrence(id: string, mutation: OccurrenceMutation): Promise<OccurrenceMutationResult>;
 }
 
 export interface EventDraftServiceOptions {
@@ -34,6 +46,18 @@ export interface SaveEventDraftResult {
   item: EventDraftRecord;
   created: boolean;
 }
+
+/** Drafts saved before v3.1 lack the kind/end/highlight/occurrence fields. */
+const DRAFTS_FORMAT_BACKUP: FormatBackupPolicy<EventDraftRecord> = {
+  label: 'pre-v3.1',
+  needsBackup: (items) =>
+    items.some(
+      (item) =>
+        !Object.hasOwn(item, 'occurrence') ||
+        !Object.hasOwn(item.values ?? {}, 'kind') ||
+        !Object.hasOwn(item.values ?? {}, 'highlighted'),
+    ),
+};
 
 export class EventDraftService {
   private readonly draftsStore: JsonFileStore<EventDraftRecord>;
@@ -73,12 +97,27 @@ export class EventDraftService {
     }
   }
 
+  /** Replaces one draft under the file lock; the first v3.1 write keeps a dated backup. */
+  private async putDraft(draft: EventDraftRecord): Promise<void> {
+    await this.draftsStore.transaction(
+      (items) => ({
+        items: [
+          draft,
+          ...items
+            .filter((existing) => existing.id !== draft.id)
+            .map((existing) => eventDraftRecordSchema.parse(existing)),
+        ],
+        result: undefined,
+      }),
+      { formatBackup: DRAFTS_FORMAT_BACKUP },
+    );
+  }
+
   async listDrafts(): Promise<EventDraftRecord[]> {
-    const items = await this.draftsStore.getAll();
-    for (const item of items) {
-      eventDraftRecordSchema.parse(item);
-    }
-    return [...items].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+    const items = (await this.draftsStore.getAll()).map((item) =>
+      eventDraftRecordSchema.parse(item),
+    );
+    return items.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   }
 
   async getDraft(id: string): Promise<EventDraftRecord | null> {
@@ -88,16 +127,34 @@ export class EventDraftService {
 
   async saveDraft(input: SaveEventDraftInput): Promise<SaveEventDraftResult> {
     const parsed = saveEventDraftInputSchema.parse(input);
+    // Older clients and imported browser drafts omit v3.1 fields; for edit drafts, take those
+    // from the source instead of defaulting them, so an end time or highlight is never cleared.
+    const rawValues = (input.values ?? {}) as Record<string, unknown>;
+    const missing = (['endDate', 'endTime', 'highlighted'] as const).filter(
+      (field) => !Object.hasOwn(rawValues, field),
+    );
+    if (missing.length > 0 && parsed.sourceEventId) {
+      const source = await this.events.getEvent(parsed.sourceEventId);
+      if (source) {
+        const stored = editorValuesFromEvent(source);
+        for (const field of missing) Object.assign(parsed.values, { [field]: stored[field] });
+      }
+    }
     return this.withLock(async () => {
-      const drafts = await this.draftsStore.getAll();
+      const drafts = (await this.draftsStore.getAll()).map((draft) =>
+        eventDraftRecordSchema.parse(draft),
+      );
       const nowIso = new Date().toISOString();
+      const sourceKey = eventDraftSourceKey(parsed);
 
       const existingByImport = parsed.importKey
         ? drafts.find((draft) => draft.importKey === parsed.importKey)
         : undefined;
+      // Class occurrence drafts are keyed by series + original week + scope, so two weeks of
+      // one series never overwrite each other.
       const existingBySource =
-        !existingByImport && parsed.sourceEventId
-          ? drafts.find((draft) => draft.sourceEventId === parsed.sourceEventId)
+        !existingByImport && sourceKey
+          ? drafts.find((draft) => eventDraftSourceKey(draft) === sourceKey)
           : undefined;
       const existingById =
         !existingByImport && !existingBySource && parsed.id
@@ -113,11 +170,13 @@ export class EventDraftService {
             parsed.sourceUpdatedAt !== undefined
               ? parsed.sourceUpdatedAt
               : existing.sourceUpdatedAt,
+          sourceRevision:
+            parsed.sourceRevision !== undefined ? parsed.sourceRevision : existing.sourceRevision,
           values: parsed.values,
           importKey: existing.importKey ?? parsed.importKey ?? null,
           updatedAt: nowIso,
         });
-        await this.draftsStore.save(updated);
+        await this.putDraft(updated);
         return { item: updated, created: false };
       }
 
@@ -125,12 +184,14 @@ export class EventDraftService {
         id: parsed.id ?? crypto.randomUUID(),
         sourceEventId: parsed.sourceEventId ?? null,
         sourceUpdatedAt: parsed.sourceUpdatedAt ?? null,
+        sourceRevision: parsed.sourceRevision ?? null,
+        occurrence: parsed.occurrence ?? null,
         values: parsed.values,
         importKey: parsed.importKey ?? null,
         createdAt: nowIso,
         updatedAt: nowIso,
       });
-      await this.draftsStore.save(created);
+      await this.putDraft(created);
       return { item: created, created: true };
     });
   }
@@ -138,17 +199,19 @@ export class EventDraftService {
   async updateDraft(id: string, input: PatchEventDraftInput): Promise<EventDraftRecord | null> {
     const parsed = patchEventDraftInputSchema.parse(input);
     return this.withLock(async () => {
-      return this.draftsStore.modify(id, (existing) =>
-        eventDraftRecordSchema.parse({
-          ...existing,
-          sourceUpdatedAt:
-            parsed.sourceUpdatedAt !== undefined
-              ? parsed.sourceUpdatedAt
-              : existing.sourceUpdatedAt,
-          values: parsed.values ? { ...existing.values, ...parsed.values } : existing.values,
-          updatedAt: new Date().toISOString(),
-        }),
-      );
+      const existing = await this.getDraft(id);
+      if (!existing) return null;
+      const updated = eventDraftRecordSchema.parse({
+        ...existing,
+        sourceUpdatedAt:
+          parsed.sourceUpdatedAt !== undefined ? parsed.sourceUpdatedAt : existing.sourceUpdatedAt,
+        sourceRevision:
+          parsed.sourceRevision !== undefined ? parsed.sourceRevision : existing.sourceRevision,
+        values: parsed.values ? { ...existing.values, ...parsed.values } : existing.values,
+        updatedAt: new Date().toISOString(),
+      });
+      await this.putDraft(updated);
+      return updated;
     });
   }
 
@@ -156,12 +219,44 @@ export class EventDraftService {
     return this.withLock(async () => this.draftsStore.delete(id));
   }
 
+  private assertFresh(draft: EventDraftRecord, current: EventItem, force: boolean): void {
+    if (force) return;
+    const revisionChanged =
+      draft.sourceRevision !== null && draft.sourceRevision !== current.revision;
+    const timestampChanged =
+      draft.sourceRevision === null &&
+      draft.sourceUpdatedAt !== null &&
+      current.updatedAt !== draft.sourceUpdatedAt;
+    if (revisionChanged || timestampChanged) {
+      throw new ConflictError(
+        'This event was updated after your draft was saved. Review changes before overwriting.',
+      );
+    }
+  }
+
+  private async recordPublication(
+    draft: EventDraftRecord,
+    eventId: string,
+    mode: 'create' | 'update',
+  ): Promise<void> {
+    await this.receiptsStore.save({
+      id: draft.id,
+      draftId: draft.id,
+      eventId,
+      publishedAt: new Date().toISOString(),
+      mode,
+    });
+    await this.draftsStore.delete(draft.id);
+  }
+
   async publishDraft(
     id: string,
     options: PublishEventDraftInput = {},
   ): Promise<PublishEventDraftResult> {
     const parsedOptions = publishEventDraftInputSchema.parse(options);
+    const force = parsedOptions.forceOverwrite === true;
     return this.withLock(async () => {
+      // Idempotency: a draft that already published returns its event, never a second copy.
       const existingReceipt = await this.receiptsStore.getById(id);
       if (existingReceipt) {
         const publishedEvent = await this.events.getEvent(existingReceipt.eventId);
@@ -175,111 +270,108 @@ export class EventDraftService {
         }
       }
 
-      const draft = await this.draftsStore.getById(id);
+      const rawDraft = await this.draftsStore.getById(id);
+      const draft = rawDraft ? eventDraftRecordSchema.parse(rawDraft) : null;
       if (!draft) {
         throw new NotFoundError('Event draft not found');
       }
-
-      const fieldErrors: Record<string, string> = {};
-      const title = draft.values.title.trim();
-      if (!title) {
-        fieldErrors.title = 'Title is required';
-      } else if (title.length > 200) {
-        fieldErrors.title = 'Title must be 200 characters or fewer';
-      }
-
-      const date = draft.values.date.trim();
-      if (!isValidScheduledDate(date)) {
-        fieldErrors.date = 'Choose a valid date in YYYY-MM-DD format';
-      }
-
-      const time = draft.values.time.trim();
-      if (!TIME_24H_RE.test(time)) {
-        fieldErrors.time = 'Choose a valid 24-hour time in HH:mm format';
-      }
-
+      // Drafts saved before v3.1 never carried end/highlight fields; they must not clear them.
+      const rawValues = (rawDraft?.values ?? {}) as Record<string, unknown>;
+      const legacyFields = (['endDate', 'endTime', 'highlighted'] as const).filter(
+        (field) => !Object.hasOwn(rawValues, field),
+      );
+      let values = draft.values;
+      // Legacy drafts (no source) may still publish their School category without conversion.
+      const fieldErrors = validateEditorValues(values, {
+        requireCategory: !draft.sourceEventId,
+      });
       if (Object.keys(fieldErrors).length > 0) {
         throw new ValidationError(
           'Complete the required event fields before adding to schedule',
           fieldErrors,
         );
       }
-
-      const startAt = buildZonedInstant(date, time);
-      const location = draft.values.location.trim() || null;
-      const locationType = draft.values.isOnline ? 'online' : 'in_person';
-      const isExam = draft.values.isExam || draft.values.category === 'exam';
-      const notes = draft.values.notes.trim() || null;
+      const title = values.title.trim();
+      const { startAt, endAt } = editorTimes(values);
 
       if (draft.sourceEventId) {
         const currentEvent = await this.events.getEvent(draft.sourceEventId);
         if (!currentEvent) {
           throw new NotFoundError('Original event no longer exists');
         }
-        if (
-          draft.sourceUpdatedAt &&
-          currentEvent.updatedAt !== draft.sourceUpdatedAt &&
-          !parsedOptions.forceOverwrite
-        ) {
-          throw new ConflictError(
-            'This event was updated after your draft was saved. Review changes before overwriting.',
-          );
+        this.assertFresh(draft, currentEvent, force);
+        if (legacyFields.length > 0) {
+          const stored = editorValuesFromEvent(currentEvent);
+          values = { ...values };
+          for (const field of legacyFields) Object.assign(values, { [field]: stored[field] });
         }
 
+        if (draft.occurrence) {
+          const occurrence = resolveClassOccurrence(currentEvent, draft.occurrence.originalWeek);
+          if (!occurrence) throw new NotFoundError('This class occurrence no longer exists');
+          const result = await this.events.mutateOccurrence(currentEvent.id, {
+            action: 'edit',
+            originalWeek: draft.occurrence.originalWeek,
+            scope: draft.occurrence.scope,
+            expectedRevision: currentEvent.revision,
+            fields: occurrenceEditFields(
+              values,
+              draft.occurrence.scope,
+              editorValuesFromOccurrence(occurrence, currentEvent),
+            ),
+          });
+          if (!result.item) throw new NotFoundError('Original event no longer exists');
+          await this.recordPublication(draft, result.item.id, 'update');
+          return { event: result.item, alreadyPublished: false, mode: 'update' };
+        }
+
+        // Only changed fields are applied, so unrelated stored data is preserved.
+        const patch = eventEditorPatch(currentEvent, values);
+        if (!patch.title && title !== currentEvent.title) patch.title = title;
         const updatedEvent = await this.events.updateEvent(draft.sourceEventId, {
-          title,
-          category: draft.values.category,
-          startAt,
-          location,
-          locationType,
-          isExam,
-          notes,
+          ...patch,
+          ...(force ? {} : { expectedRevision: currentEvent.revision }),
         });
         if (!updatedEvent) {
           throw new NotFoundError('Original event no longer exists');
         }
-
-        await this.receiptsStore.save({
-          id: draft.id,
-          draftId: draft.id,
-          eventId: updatedEvent.id,
-          publishedAt: new Date().toISOString(),
-          mode: 'update',
-        });
-        await this.draftsStore.delete(draft.id);
-
-        return {
-          event: updatedEvent,
-          alreadyPublished: false,
-          mode: 'update',
-        };
+        await this.recordPublication(draft, updatedEvent.id, 'update');
+        return { event: updatedEvent, alreadyPublished: false, mode: 'update' };
       }
 
-      const createdEvent = await this.events.createEvent({
-        title,
-        description: null,
-        category: draft.values.category,
-        startAt,
-        location,
-        locationType,
-        isExam,
-        notes,
-      });
+      const location = values.location.trim() || null;
+      const createdEvent =
+        values.kind === 'class'
+          ? await this.events.createEvent({
+              kind: 'class',
+              title,
+              startAt,
+              endAt,
+              location,
+              highlighted: values.highlighted,
+              notes: values.notes.trim() || null,
+              classRepeat: {
+                weekly: values.classWeekly,
+                endDate: values.classWeekly ? values.classEndDate.trim() || null : null,
+              },
+            })
+          : await this.events.createEvent({
+              kind: 'event',
+              title,
+              description: null,
+              category: values.category,
+              startAt,
+              endAt,
+              location,
+              ...(values.isOnline ? { locationType: 'online' as const } : {}),
+              highlighted: values.highlighted,
+              isExam: values.isExam,
+              notes: values.notes.trim() || null,
+              allowLegacyCategory: values.category === 'school',
+            });
 
-      await this.receiptsStore.save({
-        id: draft.id,
-        draftId: draft.id,
-        eventId: createdEvent.id,
-        publishedAt: new Date().toISOString(),
-        mode: 'create',
-      });
-      await this.draftsStore.delete(draft.id);
-
-      return {
-        event: createdEvent,
-        alreadyPublished: false,
-        mode: 'create',
-      };
+      await this.recordPublication(draft, createdEvent.id, 'create');
+      return { event: createdEvent, alreadyPublished: false, mode: 'create' };
     });
   }
 }

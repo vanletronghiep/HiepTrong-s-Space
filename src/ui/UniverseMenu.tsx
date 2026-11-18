@@ -5,6 +5,7 @@ import { Search } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { MOTION_DURATION, MOTION_EASE } from '@/design/motion';
 import { FEATURE_REGISTRY } from '@/features/registry';
+import { TransitionLink } from '@/features/transitions/TransitionLink';
 import { useTransitionRouter } from '@/features/transitions/TransitionProvider';
 import { cn } from './cn';
 import { useFeatureTheme, type FeatureThemeName } from './FeatureTheme';
@@ -97,7 +98,12 @@ export function UniverseMenu({ open, onClose, featureTheme }: UniverseMenuProps)
       event.preventDefault();
       const target = filteredFeatures[activeIndex];
       if (target) {
-        selectFeature(target.href);
+        if (event.ctrlKey || event.metaKey) {
+          // Ctrl/Cmd+Enter opens the destination in a new tab, like Ctrl+click.
+          window.open(target.href, '_blank', 'noopener');
+        } else {
+          selectFeature(target.href);
+        }
       }
     }
   };
@@ -180,16 +186,27 @@ export function UniverseMenu({ open, onClose, featureTheme }: UniverseMenuProps)
                 filteredFeatures.map((feature, index) => {
                   const isActive = index === activeIndex;
                   return (
-                    <button
+                    <TransitionLink
                       key={feature.id}
                       id={`universe-item-${feature.id}`}
-                      type="button"
+                      href={feature.href}
                       role="option"
                       aria-selected={isActive}
+                      tabIndex={-1}
                       onMouseEnter={() => setActiveIndex(index)}
-                      onClick={() => selectFeature(feature.href)}
+                      onClick={(event) => {
+                        // Modified clicks open a new tab natively; keep the menu open for those.
+                        if (!(
+                          event.ctrlKey ||
+                          event.metaKey ||
+                          event.shiftKey ||
+                          event.button !== 0
+                        )) {
+                          onClose();
+                        }
+                      }}
                       className={cn(
-                        'flex items-center justify-between w-full h-10 px-3 rounded-sm text-left cursor-pointer transition-colors duration-[var(--dur-fast)]',
+                        'flex items-center justify-between w-full h-10 px-3 rounded-sm text-left no-underline cursor-pointer transition-colors duration-[var(--dur-fast)]',
                         isActive
                           ? 'bg-ws-accent-soft text-ws-text'
                           : 'text-ws-text hover:bg-ws-accent-soft',
@@ -201,7 +218,7 @@ export function UniverseMenu({ open, onClose, featureTheme }: UniverseMenuProps)
                       <span className="ml-3 text-[length:var(--fs-small)] text-ws-text-muted shrink-0">
                         {feature.href}
                       </span>
-                    </button>
+                    </TransitionLink>
                   );
                 })
               )}

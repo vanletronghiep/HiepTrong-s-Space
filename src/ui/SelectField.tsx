@@ -131,7 +131,7 @@ export function SelectField<T extends string = string>({
           'flex w-full items-center justify-between gap-2 rounded-item border bg-ws-surface text-left text-ws-text cursor-pointer select-none',
           'transition-[border-color,background-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease)]',
           'hover:border-[color-mix(in_srgb,var(--ws-accent)_75%,var(--ws-border))]',
-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ws-focus)]',
+          'focus-visible:outline-none focus-visible:bg-[var(--focus-tint)]',
           'data-[disabled]:opacity-45 data-[disabled]:cursor-not-allowed',
           error ? 'border-tint-overdue-border' : 'border-ws-border',
           size === 'sm'

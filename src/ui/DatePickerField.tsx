@@ -122,7 +122,8 @@ export function DatePickerField({
     [selectedCalendarDate],
   );
 
-  const resolvedPlaceholder = placeholder ?? (mode === 'task' ? 'DD/MM or YYYY-MM-DD' : 'YYYY-MM-DD');
+  const resolvedPlaceholder =
+    placeholder ?? (mode === 'task' ? 'DD/MM or YYYY-MM-DD' : 'YYYY-MM-DD');
 
   return (
     <div className={cn('relative flex flex-col gap-1', className)}>
@@ -133,11 +134,10 @@ export function DatePickerField({
       ) : null}
 
       <div
+        data-focus-field
         className={cn(
-          'flex min-h-[42px] items-center rounded-item border bg-ws-surface pr-1 transition-[border-color] duration-[var(--dur-fast)]',
-          error
-            ? 'border-tint-overdue-border focus-within:border-status-overdue'
-            : 'border-ws-border focus-within:border-ws-accent',
+          'flex min-h-[42px] items-center rounded-item border bg-ws-surface pr-1',
+          error ? 'border-tint-overdue-border' : 'border-ws-border',
           disabled && 'opacity-45 pointer-events-none',
         )}
       >
@@ -151,7 +151,7 @@ export function DatePickerField({
           aria-label={label ? undefined : (ariaLabel ?? 'Date')}
           aria-describedby={ariaDescribedBy}
           aria-invalid={error || undefined}
-          className="min-w-0 flex-1 bg-transparent px-3 py-2 text-[length:var(--fs-small)] text-ws-text placeholder:text-ws-text-muted/75 focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent px-3 py-2 text-[length:var(--fs-small)] text-ws-text placeholder:text-ws-text-muted/75 outline-none"
         />
 
         {clearable && value && !disabled ? (
@@ -178,7 +178,8 @@ export function DatePickerField({
             ref={triggerRef}
             isDisabled={disabled}
             aria-label="Open calendar"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-ws-text-muted hover:bg-ws-accent-soft hover:text-ws-text cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ws-focus)]"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-ws-text-muted hover:bg-ws-accent-soft hover:text-ws-text cursor-pointer"
+            data-focus-tint
           >
             <CalendarDays size={16} aria-hidden="true" />
           </AriaButton>

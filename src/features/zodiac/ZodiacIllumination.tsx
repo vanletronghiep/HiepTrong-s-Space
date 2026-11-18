@@ -509,6 +509,8 @@ export function ZodiacIllumination({
   showWordmark = true,
   showSymbol = true,
   showGuides = false,
+  presentation = 'hover',
+  forwardSpeed,
   className,
 }: ZodiacIlluminationProps) {
   const rawUid = useId();
@@ -613,7 +615,11 @@ export function ZodiacIllumination({
     };
   }, [hasActivated]);
 
-  const staticFullFallback = prefersReducedMotion || noHover || loadFailed;
+  const staticFullFallback =
+    presentation === 'static' ||
+    prefersReducedMotion ||
+    (presentation !== 'loader' && noHover) ||
+    loadFailed;
 
   // Lazy-load enhancement data when enabled and near/in viewport or activated.
   useEffect(() => {
@@ -624,7 +630,7 @@ export function ZodiacIllumination({
       typeof window !== 'undefined' &&
       typeof window.matchMedia === 'function' &&
       (window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
-        window.matchMedia('(hover: none)').matches)
+        (presentation !== 'loader' && window.matchMedia('(hover: none)').matches))
     ) {
       return;
     }
@@ -645,7 +651,17 @@ export function ZodiacIllumination({
     return () => {
       cancelled = true;
     };
-  }, [sign, staticFullFallback, asset, loadFailed, isInViewport, active, enabled, manualProgress]);
+  }, [
+    sign,
+    staticFullFallback,
+    asset,
+    loadFailed,
+    isInViewport,
+    active,
+    enabled,
+    manualProgress,
+    presentation,
+  ]);
 
   const symbolDefinition = showSymbol ? getZodiacSymbolDefinition(sign) : null;
   const symbolSchedule = showSymbol ? getCompiledSymbolSchedule(sign) : null;
@@ -711,6 +727,7 @@ export function ZodiacIllumination({
     const controller = createZodiacPlayheadController({
       initialP,
       glowEnabled: !disableGlow,
+      forwardMaxSpeed: forwardSpeed && forwardSpeed > 0 ? forwardSpeed : undefined,
       onRender: applySnapshot,
     });
     controllerRef.current = controller;
@@ -731,6 +748,7 @@ export function ZodiacIllumination({
     if (!controller) return;
 
     controller.setGlowEnabled(!disableGlow);
+    controller.setForwardSpeed(forwardSpeed ?? 0);
     controller.setPaused(paused);
 
     if (typeof manualProgress === 'number') {
@@ -748,7 +766,7 @@ export function ZodiacIllumination({
         setHasActivated(false);
       }
     }
-  }, [active, enabled, paused, disableGlow, manualProgress, shouldMountEnhancedSvg]);
+  }, [active, enabled, paused, disableGlow, manualProgress, shouldMountEnhancedSvg, forwardSpeed]);
 
   const canonicalUrl =
     fallbackSvgUrl ?? asset?.data.canonicalSvgUrl ?? getZodiacCanonicalSvgUrl(sign);
@@ -761,6 +779,7 @@ export function ZodiacIllumination({
         ref={containerRef}
         data-zodiac-sign={sign}
         data-zodiac-mode={staticFullFallback ? 'static-full' : 'idle-dim'}
+        data-zodiac-presentation={presentation}
         className={cn(styles.root, className)}
       >
         <div className={styles.editorialColumn} data-zodiac-column="editorial">
@@ -815,6 +834,7 @@ export function ZodiacIllumination({
       ref={containerRef}
       data-zodiac-sign={sign}
       data-zodiac-mode="enhanced"
+      data-zodiac-presentation={presentation}
       className={cn(styles.root, className)}
     >
       <div className={styles.editorialColumn} data-zodiac-column="editorial">

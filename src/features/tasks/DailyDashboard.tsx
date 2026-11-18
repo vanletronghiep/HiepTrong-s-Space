@@ -127,7 +127,6 @@ function DayArc({ timeZone }: { timeZone: string }) {
             </span>
           </div>
         )}
-        <StarIcon size={19} className={styles.deadlineStar} />
         <div className={styles.times}>
           {['00:00', '06:00', '12:00', '18:00', '24:00'].map((time) => (
             <span key={time}>{time}</span>

@@ -273,5 +273,13 @@ export interface ZodiacIlluminationProps {
   showSymbol?: boolean;
   /** Preview-only diagnostic overlay showing vector guide paths over masks. Defaults to false. */
   showGuides?: boolean;
+  /**
+   * Presentation mode. 'hover' (default) draws on interaction intent; 'static' renders the
+   * fully drawn, illuminated artwork at rest; 'loader' draws progressively whenever active,
+   * independent of hover capability (route loading overlay). Reduced motion is always static.
+   */
+  presentation?: 'hover' | 'static' | 'loader';
+  /** Forward drawing speed in playhead-units per second (loader use); defaults to 1 / 4.8s. */
+  forwardSpeed?: number;
   className?: string;
 }

@@ -330,3 +330,30 @@ describe('Zodiac playhead controller timing & interruption', () => {
     expect(controller.isRunning()).toBe(false);
   });
 });
+
+describe('forward speed override (v3.2 route loader pacing)', () => {
+  function secondsToDraw(forwardMaxSpeed: number | undefined): number {
+    const state = createInitialPlayheadState(0);
+    state.target = 1;
+    let elapsed = 0;
+    while (state.p < 0.999 && elapsed < 20) {
+      stepPlayhead(state, 1 / 60, { glowEnabled: false, forwardMaxSpeed });
+      elapsed += 1 / 60;
+    }
+    return elapsed;
+  }
+
+  it('paces the drawing to the requested duration and keeps 4.8s as the default', () => {
+    expect(secondsToDraw(undefined)).toBeCloseTo(4.8, 0);
+    expect(secondsToDraw(1 / 1.2)).toBeCloseTo(1.2, 0);
+    expect(secondsToDraw(1 / 0.3)).toBeLessThan(0.5);
+  });
+
+  it('lets a running controller be sped up and restores the default for non-positive values', () => {
+    const controller = createZodiacPlayheadController({ glowEnabled: false, onRender: () => {} });
+    controller.setForwardSpeed(1 / 0.3);
+    controller.setForwardSpeed(0);
+    controller.destroy();
+    expect(controller.getState().target).toBe(0);
+  });
+});

@@ -569,12 +569,6 @@
   resize: vertical;
 }
 
-.inputField:focus,
-.textareaField:focus,
-.selectField:focus {
-  border-color: var(--ws-accent);
-}
-
 .inlineAlert {
   border-radius: var(--radius-item);
   border: 1px solid var(--tint-overdue-border);

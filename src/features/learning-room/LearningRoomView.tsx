@@ -1,5 +1,6 @@
 'use client';
 
+import { usePageReady } from '@/features/transitions/TransitionProvider';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { AlertTriangle, Check, Eye, EyeOff, Pause, Play, RotateCcw, Sprout } from 'lucide-react';
 import Image from 'next/image';
@@ -85,6 +86,7 @@ export function LearningRoomView() {
 
   // Queries & Mutations
   const { data, isLoading, isError: loadFailed, refetch } = useLearningRoomData();
+  usePageReady(!isLoading);
   const createSession = useCreateLearningSession();
 
   const startedAt = useRef<number | null>(null);

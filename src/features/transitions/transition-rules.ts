@@ -31,13 +31,13 @@ export function parseInternalHref(href: string): ParsedInternalHref | null {
 }
 
 /**
- * Determines whether an internal navigation should play Cosmic Launch (§9.10 & ui_readme.md §12).
- * Plays ONLY when:
+ * Determines whether an internal navigation shows the destination route loader (v3.1 §3.2).
+ * Shows ONLY when:
  * - No transition is already running
  * - `href` is an internal root-relative URL (`/…`)
  * - The destination `pathname` differs from `currentPathname` (never for hash or query-only changes)
  */
-export function shouldTriggerCosmicLaunch(options: {
+export function shouldTriggerRouteLoader(options: {
   href: string;
   currentPathname: string;
   isTransitioning: boolean;
@@ -51,3 +51,6 @@ export function shouldTriggerCosmicLaunch(options: {
   }
   return parsed.pathname !== normalizePathname(options.currentPathname);
 }
+
+/** @deprecated Cosmic Launch was replaced by the destination zodiac loader in v3.1. */
+export const shouldTriggerCosmicLaunch = shouldTriggerRouteLoader;

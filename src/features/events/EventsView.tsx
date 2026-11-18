@@ -1,39 +1,28 @@
 'use client';
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import {
   AlertTriangle,
   ArrowLeft,
   Calendar as CalendarIcon,
+  CalendarRange,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
   Clock,
-  ExternalLink,
-  FileText,
   GraduationCap,
   MapPin,
   Plus,
-  Repeat,
   RotateCcw,
-  Video,
-  X,
 } from 'lucide-react';
+import { ClientApiError } from '@/client/api-client';
 import {
   listBrowserEventDraftEntries,
   removeBrowserDraftKey,
   type BrowserEventDraftEntry,
 } from '@/client/editor-drafts';
-import { ClientApiError } from '@/client/api-client';
 import {
   useDeleteEventDraft,
   useEventDrafts,
@@ -41,665 +30,471 @@ import {
   useSaveEventDraft,
 } from '@/client/queries/event-drafts';
 import {
-  useCreateEvent,
   useDeleteEvent,
+  useEventOccurrenceWindow,
   useEvents,
-  useUpdateEvent,
+  useMutateOccurrence,
 } from '@/client/queries/events';
-import type { EventCategory, EventItem } from '@/contracts/event';
-import type { EventDraftEditorValues, EventDraftRecord } from '@/contracts/event-draft';
-import { isValidScheduledDate } from '@/contracts/task';
+import type { EventCategory, EventOccurrence, OccurrenceScope } from '@/contracts/event';
+import type { EventDraftRecord } from '@/contracts/event-draft';
 import {
   formatMonthTitle,
-  getAgendaEventsForState,
   getMonthGridDays,
-  getWeekDaysForAnchor,
-  matchesEventCategory,
   monthKeyFromDateStr,
   shiftMonthKey,
-  type EventHorizon,
 } from '@/domain/event-calendar';
+import { formatRelativeEventTime } from '@/domain/event-domain';
 import {
-  computeEventStats,
-  formatRelativeEventTime,
-  getUpcomingExams,
-} from '@/domain/event-domain';
+  addDays,
+  computeOccurrenceStats,
+  isOccurrenceExpired,
+  localDateOf,
+  occurrenceDateSpan,
+  pastOccurrences,
+  selectHighlights,
+  upcomingOccurrences,
+  weekStartOf,
+} from '@/domain/event-occurrence';
 import { extractNotePlainText } from '@/domain/note-format';
-import {
-  buildZonedInstant,
-  DEFAULT_APP_TIMEZONE,
-  formatScheduledDate,
-  shiftScheduledDate,
-} from '@/domain/time';
+import { DEFAULT_APP_TIMEZONE, formatScheduledDate } from '@/domain/time';
+import { usePageReady } from '@/features/transitions/TransitionProvider';
 import { Button } from '@/ui/Button';
-import { Checkbox } from '@/ui/Checkbox';
 import { cn } from '@/ui/cn';
-import { DatePickerField } from '@/ui/DatePickerField';
 import { Dialog } from '@/ui/Dialog';
-import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
-import {
-  LargeEditorDialog,
-  LargeEditorTwoColumn,
-  type DraftSaveOutcome,
-} from '@/ui/LargeEditorDialog';
-import { RichNoteEditor } from '@/ui/RichNoteEditor';
-import { SelectField, type SelectOption } from '@/ui/SelectField';
 import { Skeleton } from '@/ui/Skeleton';
-import { TimeFieldControl } from '@/ui/TimeFieldControl';
 import { useItemAnchor } from '@/ui/use-item-anchor';
+import { KindBadge, StatusBadges } from './EventBadges';
+import { EventDetailPane } from './EventDetailPane';
+import { EventEditorDialog, type EditorRequest, type EditorSaveResult } from './EventEditorDialog';
+import { EventReader } from './EventReader';
+import { isEventDraftPublishable } from './event-editor';
 import {
-  eventEditorPatch,
-  eventEditorValues,
-  formatZonedTime24,
-  isEventDraftPublishable,
-  isValidEventTimeHm,
-} from './event-editor';
+  formatDayHeader,
+  formatRangeLabel,
+  formatShortDay,
+  formatTime,
+  formatTimestamp,
+  pluralize,
+} from './events-format';
+import { HighlightsSection } from './HighlightsSection';
+import { SchoolTimetable } from './SchoolTimetable';
+import { WeekCalendarPanel, type WeekCalendarState } from './WeekCalendarPanel';
 import styles from './events.module.css';
 
-type EventsTab = EventHorizon | 'drafts';
+type AgendaTab = 'upcoming' | 'past' | 'drafts';
+type CategoryFilter = 'all' | Exclude<EventCategory, 'school'>;
 
 const FALLBACK_TODAY = '2026-11-13';
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
-
-const CATEGORY_LABELS: Record<'all' | EventCategory, string> = {
+/** Upcoming and Past load in 12-week batches (v3.1 §6.3, §8.4). */
+const BATCH_WEEKS = 12;
+const FILTERS: readonly CategoryFilter[] = ['all', 'exam', 'meeting', 'deadline', 'contest'];
+const FILTER_LABEL: Record<CategoryFilter, string> = {
   all: 'All',
   exam: 'Exams',
-  school: 'School',
   meeting: 'Meetings',
   deadline: 'Deadlines',
+  contest: 'Contests',
 };
 
-const EVENT_CATEGORY_OPTIONS: readonly SelectOption<EventCategory>[] = [
-  { value: 'school', label: 'School' },
-  { value: 'exam', label: 'Exam' },
-  { value: 'meeting', label: 'Meeting' },
-  { value: 'deadline', label: 'Deadline' },
-];
-
-function defaultEditorValues(
-  selectedDate: string | null,
-  fallbackDate: string,
-): EventDraftEditorValues {
-  return {
-    title: '',
-    category: 'school',
-    date: selectedDate ?? fallbackDate,
-    time: '09:00',
-    location: '',
-    isOnline: false,
-    isExam: false,
-    notes: '',
-  };
+function matchesFilter(occurrence: EventOccurrence, filter: CategoryFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'exam') return occurrence.isExam;
+  return occurrence.kind === 'event' && occurrence.category === filter;
 }
 
-function sameEditorValues(a: EventDraftEditorValues, b: EventDraftEditorValues): boolean {
-  return (
-    a.title === b.title &&
-    a.category === b.category &&
-    a.date === b.date &&
-    a.time === b.time &&
-    a.location === b.location &&
-    a.isOnline === b.isOnline &&
-    a.isExam === b.isExam &&
-    a.notes === b.notes
-  );
+interface ScopeAction {
+  action: 'cancel' | 'delete';
+  occurrence: EventOccurrence;
 }
 
-function formatZonedDayHeader(dateStr: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: DEFAULT_APP_TIMEZONE,
-  }).format(new Date(`${dateStr}T12:00:00+07:00`));
-}
-
-function formatShortDay(dateStr: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: DEFAULT_APP_TIMEZONE,
-  }).format(new Date(`${dateStr}T12:00:00+07:00`));
-}
-
-function formatZonedTime(iso: string): string {
-  return formatZonedTime24(new Date(iso), DEFAULT_APP_TIMEZONE);
-}
-
-function formatZonedDetailDate(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: DEFAULT_APP_TIMEZONE,
-  }).format(new Date(iso));
-}
-
-function formatZonedTimeRange(startIso: string, endIso: string | null): string {
-  const start = formatZonedTime(startIso);
-  if (!endIso) {
-    return start;
-  }
-  return `${start} – ${formatZonedTime(endIso)}`;
-}
-
-function formatDraftTimestamp(iso: string): string {
-  const ms = Date.parse(iso);
-  if (Number.isNaN(ms)) {
-    return 'recently';
-  }
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: DEFAULT_APP_TIMEZONE,
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    hourCycle: 'h23',
-  }).format(new Date(ms));
-}
-
-function CategoryBadge({ category, isExam }: { category: EventCategory; isExam?: boolean }) {
-  const icon =
-    category === 'exam' || isExam ? (
-      <GraduationCap size={12} strokeWidth={1.6} aria-hidden="true" />
-    ) : category === 'meeting' ? (
-      <Video size={12} strokeWidth={1.6} aria-hidden="true" />
-    ) : category === 'deadline' ? (
-      <Clock size={12} strokeWidth={1.6} aria-hidden="true" />
-    ) : (
-      <CalendarIcon size={12} strokeWidth={1.6} aria-hidden="true" />
-    );
-
-  const toneClass =
-    category === 'exam' || isExam
-      ? 'bg-tint-due-soon-bg text-text-due-soon border-tint-due-soon-border'
-      : 'bg-ws-accent-soft text-ws-text border-ws-border';
-
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-pill border px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium',
-        toneClass,
-      )}
-    >
-      {icon}
-      <span>
-        {category === 'exam'
-          ? 'Exam'
-          : category === 'meeting'
-            ? 'Meeting'
-            : category === 'deadline'
-              ? 'Deadline'
-              : 'School'}
-      </span>
-    </span>
-  );
-}
-
+/** Events & schedule dashboard (v3.1 §6–7). */
 export function EventsView() {
-  const { data: events = [], isLoading, isError: loadFailed, refetch } = useEvents();
-  const {
-    data: drafts = [],
-    isLoading: draftsLoading,
-    isError: draftsLoadFailed,
-    refetch: refetchDrafts,
-  } = useEventDrafts();
-  const createMutation = useCreateEvent();
-  const updateMutation = useUpdateEvent();
+  const eventsQuery = useEvents();
+  const records = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
+  const draftsQuery = useEventDrafts();
+  const drafts = useMemo(() => draftsQuery.data ?? [], [draftsQuery.data]);
   const deleteMutation = useDeleteEvent();
+  const occurrenceMutation = useMutateOccurrence();
   const saveDraftMutation = useSaveEventDraft();
   const deleteDraftMutation = useDeleteEventDraft();
   const publishDraftMutation = usePublishEventDraft();
 
-  const savingRef = useRef(false);
-  const editorTitleInputRef = useRef<HTMLInputElement>(null);
-  const anchoredItemHandledRef = useRef<string | null>(null);
-  const initialDateSyncedRef = useRef(false);
+  /* ─── Clock ─── */
+  const [today, setToday] = useState(FALLBACK_TODAY);
+  const [nowMs, setNowMs] = useState(() => Date.parse(`${FALLBACK_TODAY}T00:00:00+07:00`));
+  const [clockLabel, setClockLabel] = useState('');
+  const clockSyncedRef = useRef(false);
+  // Occurrence windows wait for the real Saigon date so no placeholder range is fetched.
+  const [clockReady, setClockReady] = useState(false);
 
-  const [todayStr, setTodayStr] = useState(FALLBACK_TODAY);
-  const [currentTime, setCurrentTime] = useState('');
-  const [agendaNowMs, setAgendaNowMs] = useState(() => Date.parse(`${FALLBACK_TODAY}T00:00:00+07:00`));
-
-  const [horizon, setHorizon] = useState<EventsTab>('upcoming');
-  const [activeCategory, setActiveCategory] = useState<'all' | EventCategory>('all');
+  /* ─── Dashboard state ─── */
+  const [dashboard, setDashboard] = useState<'regular' | 'school'>('regular');
+  const [tab, setTab] = useState<AgendaTab>('upcoming');
+  const [filter, setFilter] = useState<CategoryFilter>('all');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => monthKeyFromDateStr(FALLBACK_TODAY));
-  const [weekAnchorDate, setWeekAnchorDate] = useState(FALLBACK_TODAY);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [savedEventOverride, setSavedEventOverride] = useState<EventItem | null>(null);
+  const [upcomingWeeks, setUpcomingWeeks] = useState(BATCH_WEEKS);
+  const [pastWeeks, setPastWeeks] = useState(BATCH_WEEKS);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedSnapshot, setSelectedSnapshot] = useState<EventOccurrence | null>(null);
+  const [readerOccurrence, setReaderOccurrence] = useState<EventOccurrence | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarState, setCalendarState] = useState<WeekCalendarState>({
+    weekStart: weekStartOf(FALLBACK_TODAY),
+    mode: 'overview',
+    day: null,
+  });
+  const [timetableWeek, setTimetableWeek] = useState(weekStartOf(FALLBACK_TODAY));
+  const [editorRequest, setEditorRequest] = useState<EditorRequest | null>(null);
+  const [editorKey, setEditorKey] = useState(0);
+  const [scopeAction, setScopeAction] = useState<ScopeAction | null>(null);
+  const [scopeChoice, setScopeChoice] = useState<OccurrenceScope>('this-week');
   const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
   const [actionError, setActionError] = useState('');
-  const [draftStatusMessage, setDraftStatusMessage] = useState('');
-
+  const [statusMessage, setStatusMessage] = useState('');
+  const [browserDrafts, setBrowserDrafts] = useState<BrowserEventDraftEntry[]>([]);
+  const [isImportingBrowserDrafts, setIsImportingBrowserDrafts] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return undefined;
-    }
-    const mq = window.matchMedia('(min-width: 768px)');
-    if (!mq || typeof mq.addEventListener !== 'function') {
-      return undefined;
-    }
-    const sync = () => setIsDesktop(mq.matches);
-    sync();
-    mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
-  }, []);
+  const regularScrollRef = useRef(0);
+  const anchoredItemRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const updateClock = () => {
-      const now = new Date();
-      const zonedDate = formatScheduledDate(now, DEFAULT_APP_TIMEZONE);
-      const formatted = new Intl.DateTimeFormat('en-GB', {
-        timeZone: DEFAULT_APP_TIMEZONE,
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-        hourCycle: 'h23',
-      }).format(now);
-      setTodayStr(zonedDate);
-      setCurrentTime(formatted);
-      setAgendaNowMs(now.getTime());
-      if (!initialDateSyncedRef.current) {
-        initialDateSyncedRef.current = true;
-        setCalendarMonth(monthKeyFromDateStr(zonedDate));
-        setWeekAnchorDate(zonedDate);
+    const tick = () => {
+      const current = new Date();
+      const zoned = formatScheduledDate(current, DEFAULT_APP_TIMEZONE);
+      setToday(zoned);
+      setNowMs(current.getTime());
+      setClockLabel(
+        new Intl.DateTimeFormat('en-GB', {
+          timeZone: DEFAULT_APP_TIMEZONE,
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+          hourCycle: 'h23',
+        }).format(current),
+      );
+      if (!clockSyncedRef.current) {
+        clockSyncedRef.current = true;
+        setCalendarMonth(monthKeyFromDateStr(zoned));
+        setCalendarState({ weekStart: weekStartOf(zoned), mode: 'overview', day: null });
+        setTimetableWeek(weekStartOf(zoned));
+        setClockReady(true);
       }
     };
-    updateClock();
-    const interval = window.setInterval(updateClock, 10_000);
+    tick();
+    const interval = window.setInterval(tick, 10_000);
     return () => window.clearInterval(interval);
   }, []);
 
-  useItemAnchor(events);
-
   useEffect(() => {
-    if (typeof window === 'undefined' || events.length === 0) {
-      return;
-    }
-    const itemId = new URLSearchParams(window.location.search).get('item');
-    if (!itemId || anchoredItemHandledRef.current === itemId) {
-      return;
-    }
-    const target = events.find((evt) => evt.id === itemId);
-    if (!target) {
-      return;
-    }
-    anchoredItemHandledRef.current = itemId;
-    if (Date.parse(target.startAt) < Date.now()) {
-      setHorizon('past');
-    }
-    setSelectedDate(null);
-    setSelectedEventId(target.id);
-  }, [events]);
-
-  // Editor + persisted server draft state + one-time browser draft import state
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<EventItem | null>(null);
-  const [activeDraft, setActiveDraft] = useState<EventDraftRecord | null>(null);
-  const [loadedDraft, setLoadedDraft] = useState<EventDraftRecord | null>(null);
-  const [staleConflictPrompt, setStaleConflictPrompt] = useState(false);
-  const [initialFormValues, setInitialFormValues] = useState<EventDraftEditorValues>(() =>
-    defaultEditorValues(null, FALLBACK_TODAY),
-  );
-  const [formValues, setFormValues] = useState<EventDraftEditorValues>(() =>
-    defaultEditorValues(null, FALLBACK_TODAY),
-  );
-  const [editorError, setEditorError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [browserDrafts, setBrowserDrafts] = useState<BrowserEventDraftEntry[]>([]);
-  const [isImportingBrowserDrafts, setIsImportingBrowserDrafts] = useState(false);
-
-  const refreshBrowserDrafts = useCallback(() => {
-    setBrowserDrafts(listBrowserEventDraftEntries());
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const query = window.matchMedia('(min-width: 768px)');
+    const sync = () => setIsDesktop(query.matches);
+    sync();
+    query.addEventListener?.('change', sync);
+    return () => query.removeEventListener?.('change', sync);
   }, []);
 
-  useEffect(() => {
-    refreshBrowserDrafts();
-  }, [refreshBrowserDrafts]);
+  const refreshBrowserDrafts = useCallback(
+    () => setBrowserDrafts(listBrowserEventDraftEntries()),
+    [],
+  );
+  useEffect(() => refreshBrowserDrafts(), [refreshBrowserDrafts]);
 
-  const agendaNow = useMemo(() => new Date(agendaNowMs), [agendaNowMs]);
-  const stats = useMemo(() => computeEventStats(events, agendaNow), [agendaNow, events]);
-  const upcomingExams = useMemo(() => getUpcomingExams(events, agendaNow), [agendaNow, events]);
+  const now = useMemo(() => new Date(nowMs), [nowMs]);
 
-  const categoryMatchedEvents = useMemo(
-    () => events.filter((evt) => matchesEventCategory(evt, activeCategory)),
-    [events, activeCategory],
+  /* ─── Occurrence windows ─── */
+  const upcomingTo = addDays(today, upcomingWeeks * 7);
+  const pastFrom = addDays(today, -pastWeeks * 7);
+  const currentWeek = weekStartOf(today);
+  const upcomingWindow = useEventOccurrenceWindow(today, upcomingTo, { enabled: clockReady });
+  const pastWindow = useEventOccurrenceWindow(pastFrom, addDays(today, 1), {
+    enabled: clockReady && (tab === 'past' || Boolean(selectedDate)),
+  });
+  const weekWindow = useEventOccurrenceWindow(currentWeek, addDays(currentWeek, 7), {
+    enabled: clockReady,
+  });
+  const monthDays = useMemo(() => getMonthGridDays(calendarMonth), [calendarMonth]);
+  const monthFrom = monthDays[0]?.dateStr ?? today;
+  const monthWindow = useEventOccurrenceWindow(monthFrom, addDays(monthFrom, 42), {
+    enabled: clockReady,
+  });
+
+  // Ready once the primary agenda (or a visible error) is usable — not on shell mount.
+  usePageReady(clockReady && !upcomingWindow.isLoading && !eventsQuery.isLoading);
+  useItemAnchor(records);
+
+  const recordsById = useMemo(
+    () => new Map(records.map((record) => [record.id, record])),
+    [records],
   );
 
-  const visibleAgendaEvents = useMemo(
-    () =>
-      getAgendaEventsForState({
-        events,
-        horizon: horizon === 'drafts' ? 'upcoming' : horizon,
-        categoryFilter: activeCategory,
-        selectedDate,
-        now: agendaNow,
-      }),
-    [events, horizon, activeCategory, selectedDate, agendaNow],
+  const occurrenceIndex = useMemo(() => {
+    const index = new Map<string, EventOccurrence>();
+    for (const list of [
+      monthWindow.occurrences,
+      pastWindow.occurrences,
+      weekWindow.occurrences,
+      upcomingWindow.occurrences,
+    ]) {
+      for (const occurrence of list) index.set(occurrence.key, occurrence);
+    }
+    return index;
+  }, [
+    monthWindow.occurrences,
+    pastWindow.occurrences,
+    upcomingWindow.occurrences,
+    weekWindow.occurrences,
+  ]);
+
+  const selectedOccurrence = selectedKey
+    ? (occurrenceIndex.get(selectedKey) ??
+      (selectedSnapshot?.key === selectedKey ? selectedSnapshot : null))
+    : null;
+
+  const upcomingList = useMemo(
+    () => upcomingOccurrences(upcomingWindow.occurrences, now),
+    [now, upcomingWindow.occurrences],
   );
+  const pastList = useMemo(
+    () => pastOccurrences(pastWindow.occurrences, now),
+    [now, pastWindow.occurrences],
+  );
+  const highlights = useMemo(
+    () => selectHighlights(upcomingWindow.occurrences, now),
+    [now, upcomingWindow.occurrences],
+  );
+  const stats = useMemo(() => {
+    const horizon = computeOccurrenceStats(upcomingWindow.occurrences, now);
+    const week = computeOccurrenceStats(weekWindow.occurrences, now);
+    return { ...horizon, thisWeekCount: week.thisWeekCount };
+  }, [now, upcomingWindow.occurrences, weekWindow.occurrences]);
+
+  const horizonLabel = formatRangeLabel(today, addDays(upcomingTo, -1));
+  const pastLabel = formatRangeLabel(pastFrom, today);
+
+  const visibleAgenda = useMemo(() => {
+    if (selectedDate) {
+      return [...occurrenceIndex.values()]
+        .filter((occurrence) => {
+          const span = occurrenceDateSpan(occurrence);
+          return span.first <= selectedDate && span.last >= selectedDate;
+        })
+        .filter((occurrence) => matchesFilter(occurrence, filter))
+        .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt) || (a.key < b.key ? -1 : 1));
+    }
+    const list = tab === 'past' ? pastList : upcomingList;
+    return list.filter((occurrence) => matchesFilter(occurrence, filter));
+  }, [filter, occurrenceIndex, pastList, selectedDate, tab, upcomingList]);
 
   const dayIndicators = useMemo(() => {
     const map = new Map<string, { count: number; hasExam: boolean }>();
-    for (const evt of events) {
-      const dateStr = formatScheduledDate(evt.startAt, DEFAULT_APP_TIMEZONE);
-      const prev = map.get(dateStr) ?? { count: 0, hasExam: false };
-      map.set(dateStr, {
-        count: prev.count + 1,
-        hasExam: prev.hasExam || evt.isExam || evt.category === 'exam',
-      });
+    for (const occurrence of monthWindow.occurrences) {
+      if (occurrence.status === 'canceled') continue;
+      const span = occurrenceDateSpan(occurrence);
+      for (let day = span.first; day <= span.last; day = addDays(day, 1)) {
+        const previous = map.get(day) ?? { count: 0, hasExam: false };
+        map.set(day, {
+          count: previous.count + 1,
+          hasExam: previous.hasExam || occurrence.isExam,
+        });
+      }
     }
     return map;
-  }, [events]);
+  }, [monthWindow.occurrences]);
 
-  const monthCells = useMemo(() => getMonthGridDays(calendarMonth), [calendarMonth]);
-  const weekDays = useMemo(() => getWeekDaysForAnchor(weekAnchorDate), [weekAnchorDate]);
-
-  const selectedEvent = useMemo(() => {
-    if (!selectedEventId) {
-      return null;
-    }
-    const fromQuery = events.find((evt) => evt.id === selectedEventId) ?? null;
-    if (
-      savedEventOverride &&
-      savedEventOverride.id === selectedEventId &&
-      (!fromQuery || savedEventOverride.updatedAt >= fromQuery.updatedAt)
-    ) {
-      return savedEventOverride;
-    }
-    return fromQuery;
-  }, [events, savedEventOverride, selectedEventId]);
-
-  const isEditorDirty = editorOpen && !sameEditorValues(initialFormValues, formValues);
-
-  const handleSelectHorizon = (next: EventsTab) => {
-    setHorizon(next);
-    setDraftStatusMessage('');
-    if (next === 'upcoming' || next === 'past' || next === 'drafts') {
-      setSelectedDate(null);
-    } else if (next === 'week') {
-      setWeekAnchorDate(selectedDate ?? todayStr);
-    }
-  };
-
-  const handleSelectCalendarDay = (dateStr: string) => {
-    if (selectedDate === dateStr) {
-      setSelectedDate(null);
+  /* ─── Deep link ?item=<eventId> ─── */
+  useEffect(() => {
+    const itemId = new URLSearchParams(window.location.search).get('item');
+    if (!itemId || anchoredItemRef.current === itemId) return;
+    const match =
+      upcomingWindow.occurrences.find((o) => o.eventId === itemId) ??
+      pastWindow.occurrences.find((o) => o.eventId === itemId);
+    if (!match) {
+      if (!upcomingWindow.isLoading && recordsById.has(itemId) && tab !== 'past') setTab('past');
       return;
     }
-    setSelectedDate(dateStr);
-    setWeekAnchorDate(dateStr);
-    setCalendarMonth(monthKeyFromDateStr(dateStr));
-    if (horizon === 'past' || horizon === 'drafts') {
-      setHorizon('upcoming');
+    anchoredItemRef.current = itemId;
+    if (isOccurrenceExpired(match, now)) setTab('past');
+    setSelectedKey(match.key);
+    setSelectedSnapshot(match);
+  }, [
+    now,
+    pastWindow.occurrences,
+    recordsById,
+    tab,
+    upcomingWindow.isLoading,
+    upcomingWindow.occurrences,
+  ]);
+
+  /* ─── Selection and overlays ─── */
+  const selectOccurrence = (occurrence: EventOccurrence) => {
+    setSelectedKey(occurrence.key);
+    setSelectedSnapshot(occurrence);
+    // Phones show details in the full-screen reader instead of the side pane.
+    if (!isDesktop) setReaderOccurrence(occurrence);
+  };
+
+  const openEditor = (request: EditorRequest) => {
+    setEditorKey((key) => key + 1);
+    setEditorRequest(request);
+  };
+
+  const openEditFor = (occurrence: EventOccurrence) => {
+    const record = recordsById.get(occurrence.eventId);
+    if (!record) {
+      setActionError('This event is still loading. Try again in a moment.');
+      return;
+    }
+    if (occurrence.kind === 'class' && occurrence.originalWeek) {
+      openEditor({ mode: 'edit-occurrence', record, occurrence });
+    } else {
+      openEditor({ mode: 'edit-event', record });
     }
   };
 
-  const handleClearDayToUpcoming = () => {
-    setSelectedDate(null);
-    setHorizon('upcoming');
-  };
-
-  const openCreateEditor = () => {
-    const base = defaultEditorValues(selectedDate, todayStr);
-    setEditingRecord(null);
-    setActiveDraft(null);
-    setLoadedDraft(null);
-    setStaleConflictPrompt(false);
-    setInitialFormValues(base);
-    setFormValues(base);
-    setEditorError('');
-    setEditorOpen(true);
-  };
-
-  const openEditEditor = (evt: EventItem) => {
-    const base = eventEditorValues(evt);
-    const existingDraft = drafts.find((draft) => draft.sourceEventId === evt.id) ?? null;
-    setEditingRecord(evt);
-    setActiveDraft(null);
-    setLoadedDraft(existingDraft);
-    setStaleConflictPrompt(false);
-    setInitialFormValues(base);
-    setFormValues(base);
-    setEditorError('');
-    setEditorOpen(true);
-  };
-
-  const openDraftEditor = (
+  const openDraft = (
     draft: EventDraftRecord,
     options?: { initialError?: string; staleConflict?: boolean },
   ) => {
-    const sourceEvent = draft.sourceEventId
-      ? (events.find((evt) => evt.id === draft.sourceEventId) ?? null)
-      : null;
-    setEditingRecord(sourceEvent);
-    setActiveDraft(draft);
-    setLoadedDraft(null);
-    setStaleConflictPrompt(Boolean(options?.staleConflict));
-    setInitialFormValues(draft.values);
-    setFormValues(draft.values);
-    setEditorError(options?.initialError ?? '');
-    setEditorOpen(true);
-  };
-
-  const handleSaveDraft = async (): Promise<DraftSaveOutcome> => {
-    try {
-      const result = await saveDraftMutation.mutateAsync({
-        id: activeDraft?.id,
-        sourceEventId: activeDraft ? activeDraft.sourceEventId : (editingRecord?.id ?? null),
-        sourceUpdatedAt: activeDraft
-          ? activeDraft.sourceUpdatedAt
-          : (editingRecord?.updatedAt ?? null),
-        values: formValues,
-        importKey: activeDraft?.importKey ?? null,
-      });
-      setActiveDraft(result.item);
-      setLoadedDraft(null);
-      setStaleConflictPrompt(false);
-      setInitialFormValues(formValues);
-      return {
-        ok: true,
-        message: `Draft saved (${formatDraftTimestamp(result.item.updatedAt)}).`,
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Could not save this draft right now. Your input is retained.',
-      };
-    }
-  };
-
-  const executeEditorSubmit = async (forceOverwrite = false) => {
-    if (savingRef.current) {
-      return;
-    }
-    const trimmedTitle = formValues.title.trim();
-    if (!trimmedTitle) {
-      setEditorError('Enter an event title.');
-      editorTitleInputRef.current?.focus();
-      return;
-    }
-    if (trimmedTitle.length > 200) {
-      setEditorError('Title must be 200 characters or fewer.');
-      editorTitleInputRef.current?.focus();
-      return;
-    }
-    if (!isValidScheduledDate(formValues.date.trim())) {
-      setEditorError('Enter a valid date in YYYY-MM-DD format.');
-      return;
-    }
-    if (!isValidEventTimeHm(formValues.time)) {
-      setEditorError('Enter a valid 24-hour time in HH:mm format.');
-      return;
-    }
-
-    savingRef.current = true;
-    setIsSubmitting(true);
-    setEditorError('');
-    setActionError('');
-    setDraftStatusMessage('');
-
-    try {
-      if (activeDraft) {
-        if (!sameEditorValues(activeDraft.values, formValues)) {
-          const savedDraft = await saveDraftMutation.mutateAsync({
-            id: activeDraft.id,
-            sourceEventId: activeDraft.sourceEventId,
-            sourceUpdatedAt: activeDraft.sourceUpdatedAt,
-            values: formValues,
-            importKey: activeDraft.importKey,
-          });
-          setActiveDraft(savedDraft.item);
-        }
-        const published = await publishDraftMutation.mutateAsync({
-          id: activeDraft.id,
-          forceOverwrite,
-        });
-        setSavedEventOverride(published.event);
-        setSelectedEventId(published.event.id);
-      } else if (editingRecord) {
-        const patch = eventEditorPatch(editingRecord, formValues);
-        const saved = await updateMutation.mutateAsync({
-          id: editingRecord.id,
-          patch,
-        });
-        if (loadedDraft) {
-          await deleteDraftMutation.mutateAsync(loadedDraft.id).catch(() => {});
-        }
-        setSavedEventOverride(saved);
-        setSelectedEventId(saved.id);
-      } else {
-        const created = await createMutation.mutateAsync({
-          title: trimmedTitle,
-          description: null,
-          category: formValues.category,
-          startAt: buildZonedInstant(formValues.date.trim(), formValues.time.trim()),
-          endAt: null,
-          locationType: formValues.isOnline ? 'online' : 'in_person',
-          location: formValues.location.trim() || null,
-          url: null,
-          isExam: formValues.isExam || formValues.category === 'exam',
-          notes: formValues.notes.trim() || null,
-        });
-        setSavedEventOverride(created);
-        setSelectedEventId(created.id);
-      }
-      setActiveDraft(null);
-      setLoadedDraft(null);
-      setStaleConflictPrompt(false);
-      setEditorOpen(false);
-      setEditingRecord(null);
-    } catch (error) {
-      if (error instanceof ClientApiError && error.code === 'CONFLICT') {
-        setStaleConflictPrompt(true);
-      }
-      setEditorError(
-        error instanceof Error
-          ? error.message
-          : 'Could not save this event. Your input is retained.',
-      );
-    } finally {
-      savingRef.current = false;
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleEditorSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    void executeEditorSubmit(false);
-  };
-
-  const handleDeleteEvent = (evt: EventItem) => {
-    setActionError('');
-    setDraftStatusMessage('');
-    deleteMutation.mutate(evt.id, {
-      onSuccess: () => {
-        if (savedEventOverride?.id === evt.id) {
-          setSavedEventOverride(null);
-        }
-        setSelectedEventId(null);
-      },
-      onError: (error) => {
-        setActionError(
-          error instanceof Error
-            ? error.message
-            : 'Could not delete this event right now. Retry when ready.',
-        );
-      },
+    openEditor({
+      mode: 'draft',
+      draft,
+      record: draft.sourceEventId ? (recordsById.get(draft.sourceEventId) ?? null) : null,
+      ...options,
     });
   };
 
-  const handleDeleteDraft = async (draft: EventDraftRecord) => {
+  const handleSaved = (result: EditorSaveResult) => {
+    setEditorRequest(null);
     setActionError('');
-    setDraftStatusMessage('');
+    if (result.occurrenceKey) {
+      setSelectedKey(result.occurrenceKey);
+      setSelectedSnapshot(null);
+    }
+    if (Date.parse(result.startAt) < nowMs && tab === 'upcoming') setTab('past');
+  };
+
+  const switchDashboard = (next: 'regular' | 'school') => {
+    if (next === dashboard) return;
+    if (next === 'school') {
+      regularScrollRef.current = window.scrollY;
+      setDashboard('school');
+      return;
+    }
+    setDashboard('regular');
+    const restore = regularScrollRef.current;
+    window.requestAnimationFrame(() => window.scrollTo({ top: restore }));
+  };
+
+  const confirmScopeAction = async () => {
+    if (!scopeAction) return;
+    const { action, occurrence } = scopeAction;
+    const record = recordsById.get(occurrence.eventId);
+    if (!record || !occurrence.originalWeek) return;
     try {
-      await deleteDraftMutation.mutateAsync(draft.id);
-      setDraftStatusMessage('Draft deleted.');
-    } catch (error) {
-      setActionError(
-        error instanceof Error
-          ? error.message
-          : 'Could not delete this draft right now. Retry when ready.',
+      const result = await occurrenceMutation.mutateAsync({
+        id: record.id,
+        mutation: {
+          action,
+          originalWeek: occurrence.originalWeek,
+          scope: occurrence.isRepeating ? scopeChoice : 'this-week',
+          expectedRevision: record.revision,
+        },
+      });
+      setScopeAction(null);
+      setStatusMessage(
+        action === 'cancel'
+          ? 'Class canceled. It stays visible, marked as canceled.'
+          : result.removed
+            ? 'Class deleted.'
+            : 'Class removed for the chosen weeks.',
       );
+      if (action === 'delete') {
+        setSelectedKey(null);
+        setReaderOccurrence(null);
+      }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not update this class.');
+      setScopeAction(null);
     }
   };
 
+  const deleteOrdinary = (occurrence: EventOccurrence) => {
+    setActionError('');
+    deleteMutation.mutate(occurrence.eventId, {
+      onSuccess: () => {
+        setSelectedKey(null);
+        setReaderOccurrence(null);
+        setStatusMessage('Event deleted.');
+      },
+      onError: (error) =>
+        setActionError(
+          error instanceof Error ? error.message : 'Could not delete this event right now.',
+        ),
+    });
+  };
+
+  const requestDelete = (occurrence: EventOccurrence) => {
+    if (occurrence.kind === 'class') {
+      setScopeChoice('this-week');
+      setScopeAction({ action: 'delete', occurrence });
+    } else {
+      deleteOrdinary(occurrence);
+    }
+  };
+
+  /* ─── Drafts ─── */
   const handlePublishDraft = async (draft: EventDraftRecord) => {
     setActionError('');
-    setDraftStatusMessage('');
-    if (!isEventDraftPublishable(draft.values)) {
-      openDraftEditor(draft, {
-        initialError:
-          'Complete title, date (YYYY-MM-DD), and 24-hour time (HH:mm) before adding to schedule.',
-      });
+    setStatusMessage('');
+    if (!isEventDraftPublishable(draft.values, { hasSource: Boolean(draft.sourceEventId) })) {
+      openDraft(draft, { initialError: 'Complete the required fields before adding to schedule.' });
       return;
     }
-
     try {
       const published = await publishDraftMutation.mutateAsync({ id: draft.id });
-      setSavedEventOverride(published.event);
-      setSelectedEventId(published.event.id);
-      setHorizon(Date.parse(published.event.startAt) < agendaNowMs ? 'past' : 'upcoming');
-      setDraftStatusMessage(
+      setSelectedKey(
+        draft.occurrence
+          ? `${published.event.id}@${draft.occurrence.originalWeek}`
+          : published.event.id,
+      );
+      setStatusMessage(
         published.mode === 'update' ? 'Changes applied to schedule.' : 'Event added to schedule.',
       );
     } catch (error) {
       if (error instanceof ClientApiError && error.code === 'CONFLICT') {
-        openDraftEditor(draft, {
-          initialError: error.message,
-          staleConflict: true,
-        });
+        openDraft(draft, { initialError: error.message, staleConflict: true });
         return;
       }
       setActionError(
-        error instanceof Error
-          ? error.message
-          : 'Could not publish this draft right now. Retry when ready.',
+        error instanceof Error ? error.message : 'Could not publish this draft right now.',
+      );
+    }
+  };
+
+  const handleDeleteDraft = async (draft: EventDraftRecord) => {
+    setActionError('');
+    try {
+      await deleteDraftMutation.mutateAsync(draft.id);
+      setStatusMessage('Draft deleted.');
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : 'Could not delete this draft right now.',
       );
     }
   };
 
   const handleImportBrowserDrafts = async () => {
-    if (isImportingBrowserDrafts || browserDrafts.length === 0) {
-      return;
-    }
+    if (isImportingBrowserDrafts || browserDrafts.length === 0) return;
     setIsImportingBrowserDrafts(true);
-    setActionError('');
-    setDraftStatusMessage('');
-
     let imported = 0;
     let failed = 0;
     let firstError = '';
-
     for (const entry of browserDrafts) {
       try {
         await saveDraftMutation.mutateAsync({
@@ -718,10 +513,8 @@ export function EventsView() {
         }
       }
     }
-
     refreshBrowserDrafts();
     setIsImportingBrowserDrafts(false);
-
     if (failed > 0) {
       setActionError(
         imported > 0
@@ -729,44 +522,99 @@ export function EventsView() {
           : `Could not import browser drafts (${firstError}). Local copies were kept.`,
       );
     } else if (imported > 0) {
-      setDraftStatusMessage(
+      setStatusMessage(
         imported === 1 ? 'Imported 1 browser draft.' : `Imported ${imported} browser drafts.`,
       );
     }
   };
 
-  const agendaEmptyTitle = selectedDate
-    ? `No matching events on ${formatShortDay(selectedDate)}.`
-    : horizon === 'past'
-      ? 'No past events match this filter.'
-      : 'No upcoming events yet.';
+  /* ─── Render helpers ─── */
+  const header = (
+    <section className={styles.masthead} aria-labelledby="events-page-heading">
+      <Image
+        src="/visuals/events/manta-in-the-current.svg"
+        alt=""
+        aria-hidden="true"
+        width={480}
+        height={300}
+        loading="eager"
+        unoptimized
+        className={styles.mantaBackdrop}
+      />
+      <div className={styles.mastheadText}>
+        <div className="mb-2 inline-flex items-center gap-2 text-[length:var(--fs-small)] font-medium text-ws-accent">
+          <CalendarIcon size={15} strokeWidth={1.6} aria-hidden="true" />
+          <span>Schedule &amp; milestones</span>
+        </div>
+        <h1 id="events-page-heading" className={styles.displayTitle}>
+          Events <span className={styles.displayTitleEmphasis}>&amp; schedule</span>
+        </h1>
+        <p className="mt-3 text-[length:var(--fs-ui)] text-ws-text-muted tabular-nums">
+          {stats.upcomingCount} upcoming ({horizonLabel}) · {stats.thisWeekCount} this week ·{' '}
+          {stats.upcomingExamsCount} upcoming {stats.upcomingExamsCount === 1 ? 'exam' : 'exams'}{' '}
+          <span className="whitespace-nowrap">(next 7 days)</span>
+        </p>
+      </div>
 
-  const renderCalendarContent = () => (
+      <div className="relative z-1 flex flex-wrap items-center gap-2.5">
+        {clockLabel ? (
+          <div className="inline-flex items-center gap-1.5 rounded-pill border border-ws-border bg-ws-surface px-3.5 py-2 text-[length:var(--fs-small)] text-ws-text tabular-nums">
+            <Clock size={14} className="shrink-0 text-ws-accent" aria-hidden="true" />
+            <span>{clockLabel}</span>
+          </div>
+        ) : null}
+        <Button
+          variant="secondary"
+          size="sm"
+          leftIcon={<CalendarRange size={15} aria-hidden="true" />}
+          onClick={() => setCalendarOpen(true)}
+        >
+          Week calendar
+        </Button>
+        <Button
+          variant={dashboard === 'school' ? 'primary' : 'secondary'}
+          size="sm"
+          aria-pressed={dashboard === 'school'}
+          leftIcon={<GraduationCap size={15} aria-hidden="true" />}
+          onClick={() => switchDashboard(dashboard === 'school' ? 'regular' : 'school')}
+        >
+          School timetable
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          leftIcon={<Plus size={16} aria-hidden="true" />}
+          onClick={() => openEditor({ mode: 'create-event', date: selectedDate ?? today })}
+        >
+          New event
+        </Button>
+      </div>
+    </section>
+  );
+
+  const renderMonthCalendar = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="font-display text-[1.4rem] leading-tight text-ws-text">
+          <h2 className="font-display text-[1.4rem] font-medium leading-tight text-ws-text">
             {formatMonthTitle(calendarMonth)}
           </h2>
           <p className="text-[length:var(--fs-micro)] text-ws-text-muted">
-            Select a day to filter agenda &amp; week
+            Select a day to filter the agenda
           </p>
         </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
             aria-label="Previous month"
-            onClick={() => setCalendarMonth((m) => shiftMonthKey(m, -1))}
+            onClick={() => setCalendarMonth((month) => shiftMonthKey(month, -1))}
             className="inline-flex h-9 w-9 items-center justify-center rounded-pill border border-ws-border bg-ws-surface text-ws-text hover:bg-ws-accent-soft cursor-pointer transition-colors duration-[var(--dur-fast)]"
           >
             <ChevronLeft size={16} strokeWidth={1.6} aria-hidden="true" />
           </button>
           <button
             type="button"
-            onClick={() => {
-              setCalendarMonth(monthKeyFromDateStr(todayStr));
-              setWeekAnchorDate(todayStr);
-            }}
+            onClick={() => setCalendarMonth(monthKeyFromDateStr(today))}
             className="min-h-9 rounded-pill border border-ws-border bg-ws-surface px-2.5 text-[length:var(--fs-micro)] font-medium text-ws-text hover:bg-ws-accent-soft cursor-pointer transition-colors duration-[var(--dur-fast)]"
           >
             Today
@@ -774,14 +622,13 @@ export function EventsView() {
           <button
             type="button"
             aria-label="Next month"
-            onClick={() => setCalendarMonth((m) => shiftMonthKey(m, 1))}
+            onClick={() => setCalendarMonth((month) => shiftMonthKey(month, 1))}
             className="inline-flex h-9 w-9 items-center justify-center rounded-pill border border-ws-border bg-ws-surface text-ws-text hover:bg-ws-accent-soft cursor-pointer transition-colors duration-[var(--dur-fast)]"
           >
             <ChevronRight size={16} strokeWidth={1.6} aria-hidden="true" />
           </button>
         </div>
       </div>
-
       <div role="grid" aria-label={`Calendar for ${formatMonthTitle(calendarMonth)}`}>
         <div className={cn(styles.calendarGrid, 'mb-1')}>
           {WEEKDAY_SHORT.map((day) => (
@@ -795,23 +642,26 @@ export function EventsView() {
           ))}
         </div>
         <div className={styles.calendarGrid}>
-          {monthCells.map((cell) => {
+          {monthDays.map((cell) => {
             const info = dayIndicators.get(cell.dateStr);
             const isSelected = selectedDate === cell.dateStr;
-            const isToday = todayStr === cell.dateStr;
-            const labelParts = [formatZonedDayHeader(cell.dateStr)];
+            const isToday = today === cell.dateStr;
+            const label = [formatDayHeader(cell.dateStr)];
             if (info?.count) {
-              labelParts.push(`${info.count} ${info.count === 1 ? 'event' : 'events'}`);
-              if (info.hasExam) labelParts.push('includes exam');
+              label.push(pluralize(info.count, 'event'));
+              if (info.hasExam) label.push('includes exam');
             }
             return (
               <button
                 key={cell.dateStr}
                 type="button"
-                aria-label={labelParts.join(', ')}
+                aria-label={label.join(', ')}
                 aria-pressed={isSelected}
                 aria-current={isToday ? 'date' : undefined}
-                onClick={() => handleSelectCalendarDay(cell.dateStr)}
+                onClick={() => {
+                  setSelectedDate(isSelected ? null : cell.dateStr);
+                  if (tab === 'drafts') setTab('upcoming');
+                }}
                 className={cn(
                   styles.calendarCell,
                   'text-[length:var(--fs-small)] tabular-nums',
@@ -840,189 +690,343 @@ export function EventsView() {
           })}
         </div>
       </div>
+    </div>
+  );
 
-      {upcomingExams.length > 0 && (
-        <div className="border-t border-ws-border pt-4 space-y-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="inline-flex items-center gap-1.5 text-[length:var(--fs-ui)] font-medium text-ws-text">
-              <AlertTriangle size={15} className="text-text-due-soon shrink-0" aria-hidden="true" />
-              <span>Exam highlights</span>
-            </h3>
-            <span className="rounded-pill bg-tint-due-soon-bg border border-tint-due-soon-border px-2 py-0.5 text-[length:var(--fs-micro)] font-medium text-text-due-soon">
-              {upcomingExams.length} ahead
+  const renderAgendaRow = (occurrence: EventOccurrence) => {
+    const isSelected = selectedKey === occurrence.key;
+    const preview = occurrence.notes ? extractNotePlainText(occurrence.notes) : '';
+    return (
+      <li key={occurrence.key}>
+        <button
+          id={`item-${occurrence.eventId}`}
+          type="button"
+          aria-pressed={isSelected}
+          onClick={() => selectOccurrence(occurrence)}
+          className={cn(styles.eventRow, isSelected && styles.eventRowSelected)}
+        >
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center gap-1.5">
+              <KindBadge occurrence={occurrence} />
+              <StatusBadges occurrence={occurrence} now={now} />
+            </span>
+            <span className="text-[length:var(--fs-micro)] font-medium text-ws-text-muted tabular-nums">
+              {formatRelativeEventTime(occurrence.startAt, now)}
             </span>
           </div>
-          <div className="space-y-2">
-            {upcomingExams.slice(0, 3).map((exam) => (
-              <button
-                key={exam.id}
-                type="button"
-                onClick={() => setSelectedEventId(exam.id)}
-                className={cn(
-                  'w-full text-left rounded-item border px-3 py-2.5 transition-colors duration-[var(--dur-fast)] cursor-pointer',
-                  selectedEventId === exam.id
-                    ? 'border-ws-accent bg-ws-accent-soft'
-                    : 'border-tint-due-soon-border bg-tint-due-soon-bg hover:border-ws-accent',
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-[length:var(--fs-small)] font-medium text-ws-text [overflow-wrap:anywhere]">
-                    {exam.title}
-                  </span>
-                  <span className="shrink-0 text-[length:var(--fs-micro)] font-medium text-text-due-soon tabular-nums">
-                    {formatRelativeEventTime(exam.startAt, agendaNow)}
-                  </span>
-                </div>
-                <p className="mt-1 text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums">
-                  {formatShortDay(formatScheduledDate(exam.startAt, DEFAULT_APP_TIMEZONE))} ·{' '}
-                  {formatZonedTime(exam.startAt)}
-                  {exam.location ? ` · ${exam.location}` : ''}
-                </p>
-              </button>
-            ))}
+          <h3
+            className={cn(
+              styles.eventTitle,
+              occurrence.status === 'canceled' && 'line-through opacity-70',
+            )}
+          >
+            {occurrence.title}
+          </h3>
+          {preview ? (
+            <p className="mt-1.5 line-clamp-2 text-[length:var(--fs-small)] text-ws-text-muted [overflow-wrap:anywhere]">
+              {preview}
+            </p>
+          ) : null}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--fs-small)] text-ws-text-muted tabular-nums">
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarIcon size={14} className="shrink-0 text-ws-accent" aria-hidden="true" />
+              <span>
+                {formatShortDay(localDateOf(occurrence.startAt))} · {formatTime(occurrence.startAt)}
+                {occurrence.endAt ? `–${formatTime(occurrence.endAt)}` : ''}
+              </span>
+            </span>
+            {occurrence.location ? (
+              <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+                <MapPin size={14} className="shrink-0 text-ws-accent" aria-hidden="true" />
+                <span className="truncate">{occurrence.location}</span>
+              </span>
+            ) : null}
+          </div>
+        </button>
+      </li>
+    );
+  };
+
+  const activeWindow = selectedDate ? monthWindow : tab === 'past' ? pastWindow : upcomingWindow;
+
+  const renderDrafts = () => (
+    <div className="space-y-4">
+      {browserDrafts.length > 0 ? (
+        <div className={styles.draftImportBanner} role="region" aria-label="Browser draft import">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <p className="text-[length:var(--fs-small)] font-medium text-ws-text">
+                {browserDrafts.length === 1
+                  ? '1 event draft found in browser storage.'
+                  : `${browserDrafts.length} event drafts found in browser storage.`}
+              </p>
+              <p className="text-[length:var(--fs-micro)] text-ws-text-muted">
+                Import them into saved drafts. Any draft that fails to import stays stored locally.
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={isImportingBrowserDrafts}
+              onClick={() => void handleImportBrowserDrafts()}
+            >
+              {isImportingBrowserDrafts ? 'Importing…' : 'Import browser drafts'}
+            </Button>
           </div>
         </div>
+      ) : null}
+      {draftsQuery.isError ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-item border border-tint-overdue-border bg-tint-overdue-bg px-4 py-3 text-[length:var(--fs-small)] text-text-overdue"
+        >
+          <span>Could not load saved drafts right now.</span>
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<RotateCcw size={14} aria-hidden="true" />}
+            onClick={() => void draftsQuery.refetch()}
+          >
+            Retry
+          </Button>
+        </div>
+      ) : null}
+      {draftsQuery.isLoading && drafts.length === 0 ? (
+        <div className="space-y-3" aria-label="Loading drafts">
+          <Skeleton className="h-24 w-full rounded-item" />
+          <Skeleton className="h-24 w-full rounded-item" />
+        </div>
+      ) : drafts.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
+          <Image
+            src="/visuals/events/hermit-shell-haven.svg"
+            alt=""
+            aria-hidden="true"
+            width={320}
+            height={280}
+            loading="eager"
+            unoptimized
+            className={styles.emptyShellArt}
+          />
+          <h2 className="font-display text-[1.5rem] font-medium text-ws-text">
+            No saved drafts yet.
+          </h2>
+          <p className="max-w-md text-[length:var(--fs-ui)] text-ws-text-muted">
+            Save an unfinished event or edit and it waits here without cluttering your calendar.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-3" aria-label="Saved event drafts">
+          {drafts.map((draft) => {
+            const source = draft.sourceEventId
+              ? (recordsById.get(draft.sourceEventId) ?? null)
+              : null;
+            const isEditDraft = draft.sourceEventId !== null;
+            const missingSource =
+              isEditDraft && !eventsQuery.isLoading && !eventsQuery.isError && !source;
+            const stale = Boolean(
+              source &&
+              ((draft.sourceRevision !== null && draft.sourceRevision !== source.revision) ||
+                (draft.sourceRevision === null &&
+                  draft.sourceUpdatedAt &&
+                  source.updatedAt !== draft.sourceUpdatedAt)),
+            );
+            const preview = draft.values.notes ? extractNotePlainText(draft.values.notes) : '';
+            const publishable = isEventDraftPublishable(draft.values, { hasSource: isEditDraft });
+            return (
+              <li key={draft.id} className={styles.draftCard}>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {draft.values.kind === 'class' || draft.values.category ? (
+                      <KindBadge
+                        occurrence={{
+                          kind: draft.values.kind,
+                          category: draft.values.category,
+                          isExam: draft.values.isExam,
+                        }}
+                      />
+                    ) : null}
+                    <span className="inline-flex items-center rounded-pill border border-ws-border bg-ws-surface px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-ws-text-muted">
+                      {isEditDraft
+                        ? draft.occurrence
+                          ? `Class edit · week of ${formatShortDay(draft.occurrence.originalWeek)}${
+                              draft.occurrence.scope === 'this-week-onward' ? ' onward' : ''
+                            }`
+                          : 'Edit draft'
+                        : 'New draft'}
+                    </span>
+                    {stale ? (
+                      <span className="inline-flex items-center gap-1 rounded-pill border border-tint-due-soon-border bg-tint-due-soon-bg px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-text-due-soon">
+                        <AlertTriangle size={12} aria-hidden="true" />
+                        <span>Stale — source changed</span>
+                      </span>
+                    ) : null}
+                    {missingSource ? (
+                      <span className="inline-flex items-center gap-1 rounded-pill border border-tint-overdue-border bg-tint-overdue-bg px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-text-overdue">
+                        <AlertTriangle size={12} aria-hidden="true" />
+                        <span>Original event missing</span>
+                      </span>
+                    ) : null}
+                  </div>
+                  <span className="text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums">
+                    Saved {formatTimestamp(draft.updatedAt)}
+                  </span>
+                </div>
+                <h3 className={styles.eventTitle}>
+                  {draft.values.title.trim() || 'Untitled event'}
+                </h3>
+                {source ? (
+                  <p className="mt-1 text-[length:var(--fs-micro)] text-ws-text-muted">
+                    Editing: {source.title}
+                  </p>
+                ) : null}
+                {preview ? (
+                  <p className="mt-1.5 line-clamp-2 text-[length:var(--fs-small)] text-ws-text-muted [overflow-wrap:anywhere]">
+                    {preview}
+                  </p>
+                ) : null}
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--fs-small)] text-ws-text-muted tabular-nums">
+                  <span>
+                    {draft.values.date || 'No date'} · {draft.values.time || 'No time'}
+                    {draft.values.endTime ? `–${draft.values.endTime}` : ''}
+                  </span>
+                  {draft.values.location.trim() ? (
+                    <span className="truncate">{draft.values.location.trim()}</span>
+                  ) : null}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-ws-border pt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-text-overdue hover:bg-tint-overdue-bg"
+                    onClick={() => void handleDeleteDraft(draft)}
+                  >
+                    Delete
+                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="secondary" size="sm" onClick={() => openDraft(draft)}>
+                      Resume
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={publishDraftMutation.isPending}
+                      onClick={() =>
+                        publishable
+                          ? void handlePublishDraft(draft)
+                          : openDraft(draft, {
+                              initialError:
+                                'Complete the required fields before adding to schedule.',
+                            })
+                      }
+                    >
+                      {isEditDraft ? 'Apply changes' : 'Add to schedule'}
+                    </Button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );
 
-  const renderDetailContent = (evt: EventItem, onClose: () => void, inModal = false) => (
-    <div className="space-y-4">
-      {!inModal ? (
-        <div className="flex items-center justify-between gap-2 border-b border-ws-border pb-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex items-center gap-1.5 min-h-9 rounded-pill px-2.5 text-[length:var(--fs-small)] font-medium text-ws-text hover:bg-ws-accent-soft cursor-pointer transition-colors duration-[var(--dur-fast)]"
-          >
-            <ArrowLeft size={15} aria-hidden="true" />
-            <span>Back to calendar</span>
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close event details"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-pill text-ws-text-muted hover:bg-ws-accent-soft hover:text-ws-text cursor-pointer transition-colors duration-[var(--dur-fast)]"
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
+  const renderAgenda = () => {
+    if (tab === 'drafts') return renderDrafts();
+    if ((!clockReady || activeWindow.isLoading) && visibleAgenda.length === 0) {
+      return (
+        <div className="space-y-3" aria-label="Loading events">
+          <Skeleton className="h-24 w-full rounded-item" />
+          <Skeleton className="h-24 w-full rounded-item" />
+          <Skeleton className="h-24 w-full rounded-item" />
         </div>
-      ) : null}
-
-      <div className="space-y-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <CategoryBadge category={evt.category} isExam={evt.isExam} />
-            <span className="text-[length:var(--fs-micro)] font-medium text-ws-text-muted tabular-nums">
-              {formatRelativeEventTime(evt.startAt, agendaNow)}
-            </span>
-          </div>
-          {inModal ? (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close event details"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-pill text-ws-text-muted hover:bg-ws-accent-soft hover:text-ws-text cursor-pointer transition-colors duration-[var(--dur-fast)]"
-            >
-              <X size={16} aria-hidden="true" />
-            </button>
-          ) : null}
-        </div>
-        {!inModal ? (
-          <h2 className="font-display text-[1.7rem] leading-snug text-ws-text [overflow-wrap:anywhere]">
-            {evt.title}
-          </h2>
-        ) : null}
-        {evt.description && evt.description !== evt.notes ? (
-          <p className="text-[length:var(--fs-ui)] text-ws-text-muted [overflow-wrap:anywhere]">
-            {evt.description}
+      );
+    }
+    return (
+      <div className="space-y-3">
+        {!selectedDate ? (
+          <p className="text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums">
+            {tab === 'past' ? `Past · ${pastLabel}` : `Upcoming · ${horizonLabel}`} ·{' '}
+            {pluralize(visibleAgenda.length, 'item')}
           </p>
         ) : null}
-      </div>
-
-      <dl className="space-y-2.5 border-y border-ws-border py-3.5 text-[length:var(--fs-small)]">
-        <div className={styles.detailScheduleList}>
-          <div className={styles.detailScheduleRow}>
-            <dt className="inline-flex items-center gap-1.5 text-ws-text-muted">
-              <CalendarIcon size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />
-              <span>Date</span>
-            </dt>
-            <dd className="font-medium text-ws-text tabular-nums text-right">
-              {formatZonedDetailDate(evt.startAt)}
-            </dd>
+        {visibleAgenda.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
+            <Image
+              src="/visuals/events/hermit-shell-haven.svg"
+              alt=""
+              aria-hidden="true"
+              width={320}
+              height={280}
+              loading="eager"
+              unoptimized
+              className={styles.emptyShellArt}
+            />
+            <h2 className="font-display text-[1.5rem] font-medium text-ws-text">
+              {eventsQuery.isError || activeWindow.isError
+                ? 'Schedule unavailable right now.'
+                : selectedDate
+                  ? `Nothing on ${formatShortDay(selectedDate)}.`
+                  : tab === 'past'
+                    ? 'No past events in this range.'
+                    : 'No upcoming events in this range.'}
+            </h2>
+            <p className="max-w-md text-[length:var(--fs-ui)] text-ws-text-muted">
+              {selectedDate
+                ? 'Clear the day filter to see the full horizon, or add an event on this date.'
+                : 'Your harbor is quiet. Load more weeks or add an exam, meeting, deadline, or contest.'}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              {selectedDate ? (
+                <Button variant="secondary" size="sm" onClick={() => setSelectedDate(null)}>
+                  Show all upcoming
+                </Button>
+              ) : null}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => openEditor({ mode: 'create-event', date: selectedDate ?? today })}
+              >
+                Add event
+              </Button>
+            </div>
           </div>
-          <div className={styles.detailScheduleRow}>
-            <dt className="inline-flex items-center gap-1.5 text-ws-text-muted">
-              <Clock size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />
-              <span>Time</span>
-            </dt>
-            <dd className="font-medium text-ws-text tabular-nums text-right">
-              {formatZonedTimeRange(evt.startAt, evt.endAt)} · Saigon
-            </dd>
-          </div>
-        </div>
-        {evt.location ? (
-          <div className="flex items-start gap-2 text-ws-text-muted">
-            {evt.locationType === 'online' ? (
-              <Video size={15} className="mt-0.5 shrink-0 text-ws-accent" aria-hidden="true" />
-            ) : (
-              <MapPin size={15} className="mt-0.5 shrink-0 text-ws-accent" aria-hidden="true" />
+        ) : (
+          <ul
+            aria-label="Events agenda"
+            className={cn(
+              'space-y-3',
+              tab === 'past' &&
+                !selectedDate &&
+                visibleAgenda.length > 3 &&
+                styles.pastEventsScroller,
             )}
-            <dd className="[overflow-wrap:anywhere]">{evt.location}</dd>
+          >
+            {visibleAgenda.map(renderAgendaRow)}
+          </ul>
+        )}
+        {!selectedDate ? (
+          <div className="flex justify-center pt-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={activeWindow.isLoading}
+              onClick={() =>
+                tab === 'past'
+                  ? setPastWeeks((weeks) => weeks + BATCH_WEEKS)
+                  : setUpcomingWeeks((weeks) => weeks + BATCH_WEEKS)
+              }
+            >
+              {tab === 'past' ? 'Load older (12 weeks)' : 'Load more (12 weeks)'}
+            </Button>
           </div>
         ) : null}
-        {evt.url ? (
-          <div className="flex items-start gap-2 text-ws-accent">
-            <ExternalLink size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
-            <dd className="min-w-0 flex-1 [overflow-wrap:anywhere] underline decoration-ws-border underline-offset-2">
-              {evt.url}
-            </dd>
-          </div>
-        ) : null}
-        {evt.recurrence ? (
-          <div className="flex items-start gap-2 text-ws-text-muted">
-            <Repeat size={15} className="mt-0.5 shrink-0 text-ws-accent" aria-hidden="true" />
-            <dd>
-              Repeats {evt.recurrence.frequency}
-              {evt.recurrence.until ? ` until ${evt.recurrence.until}` : ''}
-            </dd>
-          </div>
-        ) : null}
-        {evt.preparationTaskId ? (
-          <div className="flex items-start gap-2 text-ws-text-muted">
-            <FileText size={15} className="mt-0.5 shrink-0 text-ws-accent" aria-hidden="true" />
-            <dd>Linked preparation task ({evt.preparationTaskId})</dd>
-          </div>
-        ) : null}
-      </dl>
-
-      {evt.notes ? (
-        <div className="space-y-1.5">
-          <h3 className="text-[length:var(--fs-small)] font-medium text-ws-text">
-            Notes &amp; instructions
-          </h3>
-          <FormattedNoteContent
-            value={evt.notes}
-            className="text-[length:var(--fs-small)] leading-relaxed text-ws-text-muted [overflow-wrap:anywhere]"
-          />
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-text-overdue hover:bg-tint-overdue-bg"
-          onClick={() => handleDeleteEvent(evt)}
-        >
-          Delete event
-        </Button>
-        <Button variant="secondary" size="sm" onClick={() => openEditEditor(evt)}>
-          Edit event
-        </Button>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const loadFailed = eventsQuery.isError || upcomingWindow.isError;
 
   return (
     <div className={styles.pageStack}>
@@ -1037,50 +1041,7 @@ export function EventsView() {
         className={styles.kelpEdgeDecor}
       />
 
-      {/* Editorial Aquatic Masthead */}
-      <section className={styles.masthead} aria-labelledby="events-page-heading">
-        <Image
-          src="/visuals/events/manta-in-the-current.svg"
-          alt=""
-          aria-hidden="true"
-          width={480}
-          height={300}
-          loading="eager"
-          unoptimized
-          className={styles.mantaBackdrop}
-        />
-        <div className={styles.mastheadText}>
-          <div className="inline-flex items-center gap-2 text-[length:var(--fs-small)] font-medium text-ws-accent mb-2">
-            <CalendarIcon size={15} strokeWidth={1.6} aria-hidden="true" />
-            <span>Schedule &amp; milestones</span>
-          </div>
-          <h1 id="events-page-heading" className={styles.displayTitle}>
-            Events <span className={styles.displayTitleEmphasis}>&amp; exams</span>
-          </h1>
-          <p className="mt-3 text-[length:var(--fs-ui)] text-ws-text-muted tabular-nums">
-            {stats.upcomingCount} upcoming · {stats.thisWeekCount} this week ·{' '}
-            {stats.approachingExamsCount} approaching{' '}
-            {stats.approachingExamsCount === 1 ? 'exam' : 'exams'}
-          </p>
-        </div>
-
-        <div className="relative z-1 flex flex-wrap items-center gap-2.5">
-          {currentTime ? (
-            <div className="inline-flex items-center gap-1.5 rounded-pill border border-ws-border bg-ws-surface px-3.5 py-2 text-[length:var(--fs-small)] text-ws-text tabular-nums">
-              <Clock size={14} className="text-ws-accent shrink-0" aria-hidden="true" />
-              <span>{currentTime}</span>
-            </div>
-          ) : null}
-          <Button
-            variant="primary"
-            size="sm"
-            leftIcon={<Plus size={16} aria-hidden="true" />}
-            onClick={openCreateEditor}
-          >
-            New event
-          </Button>
-        </div>
-      </section>
+      {header}
 
       {loadFailed ? (
         <div
@@ -1092,13 +1053,15 @@ export function EventsView() {
             variant="secondary"
             size="sm"
             leftIcon={<RotateCcw size={14} aria-hidden="true" />}
-            onClick={() => void refetch()}
+            onClick={() => {
+              void eventsQuery.refetch();
+              upcomingWindow.refetch();
+            }}
           >
             Retry
           </Button>
         </div>
       ) : null}
-
       {actionError ? (
         <div
           role="alert"
@@ -1107,556 +1070,203 @@ export function EventsView() {
           {actionError}
         </div>
       ) : null}
-
-      {draftStatusMessage ? (
+      {statusMessage ? (
         <div
           role="status"
           className="rounded-card border border-ws-border bg-ws-accent-soft px-4 py-3 text-[length:var(--fs-small)] text-ws-text"
         >
-          {draftStatusMessage}
+          {statusMessage}
         </div>
       ) : null}
 
-      {/* Mobile Calendar Disclosure (< 768px) */}
-      <div className="md:hidden">
-        <div className={styles.supportSurface}>
-          <button
-            type="button"
-            aria-expanded={mobileCalendarOpen}
-            onClick={() => setMobileCalendarOpen((v) => !v)}
-            className="flex w-full items-center justify-between gap-2 text-left cursor-pointer"
+      {dashboard === 'school' ? (
+        <div className="space-y-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<ArrowLeft size={15} aria-hidden="true" />}
+            onClick={() => switchDashboard('regular')}
           >
-            <div>
-              <span className="font-display text-[1.25rem] text-ws-text block leading-tight">
-                {selectedDate
-                  ? `Filtered: ${formatShortDay(selectedDate)}`
-                  : formatMonthTitle(calendarMonth)}
-              </span>
-              <span className="text-[length:var(--fs-micro)] text-ws-text-muted">
-                Month calendar &amp; exam highlights
-              </span>
-            </div>
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-pill bg-ws-accent-soft text-ws-text">
-              {mobileCalendarOpen ? (
-                <ChevronUp size={16} aria-hidden="true" />
-              ) : (
-                <ChevronDown size={16} aria-hidden="true" />
-              )}
-            </span>
-          </button>
-          {mobileCalendarOpen ? (
-            <div className="mt-4 border-t border-ws-border pt-4">{renderCalendarContent()}</div>
-          ) : null}
+            Back to Events dashboard
+          </Button>
+          <SchoolTimetable
+            weekStart={timetableWeek}
+            today={today}
+            onWeekChange={setTimetableWeek}
+            onOpenOccurrence={(occurrence) => {
+              setSelectedKey(occurrence.key);
+              setSelectedSnapshot(occurrence);
+              setReaderOccurrence(occurrence);
+            }}
+            onCreateClass={(date, periodIndex) =>
+              openEditor({ mode: 'create-class', date, periodIndex })
+            }
+          />
         </div>
-      </div>
+      ) : (
+        <>
+          <HighlightsSection
+            highlights={highlights}
+            rangeLabel={horizonLabel}
+            now={now}
+            selectedKey={selectedKey}
+            isLoading={!clockReady || upcomingWindow.isLoading}
+            onSelect={selectOccurrence}
+          />
 
-      {/* Coordinated Agenda + Calendar/Detail Two-Zone Workspace */}
-      <section className={styles.workspaceGrid} aria-label="Agenda and calendar">
-        <div className={styles.agendaSurface}>
-          <div className={cn(styles.controlsBand, 'pb-4 mb-4 border-b border-ws-border')}>
-            <div
-              role="tablist"
-              aria-label="Agenda view"
-              className="inline-flex flex-wrap items-center gap-0.5 sm:gap-1 rounded-pill bg-ws-accent-soft p-1 border border-ws-border self-start max-w-full"
-            >
-              {(['upcoming', 'past', 'week', 'drafts'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  role="tab"
-                  aria-selected={horizon === tab}
-                  onClick={() => handleSelectHorizon(tab)}
-                  className={cn(
-                    'min-h-9 whitespace-nowrap rounded-pill px-2.5 min-[375px]:px-3 sm:px-3.5 py-1.5 text-[0.75rem] min-[375px]:text-[length:var(--fs-small)] font-medium cursor-pointer transition-colors duration-[var(--dur-fast)]',
-                    horizon === tab
-                      ? 'bg-ws-surface text-ws-text shadow-card'
-                      : 'text-ws-text-muted hover:text-ws-text',
-                  )}
-                >
-                  {tab === 'upcoming' ? (
-                    'Upcoming'
-                  ) : tab === 'past' ? (
-                    'Past'
-                  ) : tab === 'week' ? (
-                    'Week calendar'
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5">
-                      <span>Drafts</span>
-                      {drafts.length > 0 ? (
-                        <span
-                          aria-label={`${drafts.length} saved`}
-                          className="inline-flex min-w-5 items-center justify-center rounded-pill bg-ws-accent px-1.5 py-0.5 text-[0.7rem] font-semibold leading-none text-ws-surface tabular-nums"
-                        >
-                          {drafts.length}
-                        </span>
-                      ) : null}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {horizon !== 'drafts' ? (
-              <div
-                role="tablist"
-                aria-label="Event category filter"
-                className="flex flex-wrap items-center gap-1.5"
+          <div className="md:hidden">
+            <div className={styles.supportSurface}>
+              <button
+                type="button"
+                aria-expanded={mobileCalendarOpen}
+                onClick={() => setMobileCalendarOpen((open) => !open)}
+                className="flex w-full items-center justify-between gap-2 text-left cursor-pointer"
               >
-                {(['all', 'exam', 'school', 'meeting', 'deadline'] as const).map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    role="tab"
-                    aria-selected={activeCategory === cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={cn(
-                      'min-h-9 rounded-pill border px-3 py-1 text-[length:var(--fs-small)] font-medium cursor-pointer transition-colors duration-[var(--dur-instant)]',
-                      activeCategory === cat
-                        ? 'bg-ws-accent text-ws-surface border-ws-accent'
-                        : 'bg-ws-surface text-ws-text-muted border-ws-border hover:text-ws-text',
-                    )}
-                  >
-                    {CATEGORY_LABELS[cat]}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+                <span>
+                  <span className="block font-display text-[1.25rem] font-medium leading-tight text-ws-text">
+                    {selectedDate
+                      ? `Filtered: ${formatShortDay(selectedDate)}`
+                      : formatMonthTitle(calendarMonth)}
+                  </span>
+                  <span className="text-[length:var(--fs-micro)] text-ws-text-muted">
+                    Month calendar
+                  </span>
+                </span>
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-pill bg-ws-accent-soft text-ws-text">
+                  {mobileCalendarOpen ? (
+                    <ChevronUp size={16} aria-hidden="true" />
+                  ) : (
+                    <ChevronDown size={16} aria-hidden="true" />
+                  )}
+                </span>
+              </button>
+              {mobileCalendarOpen ? (
+                <div className="mt-4 border-t border-ws-border pt-4">{renderMonthCalendar()}</div>
+              ) : null}
+            </div>
           </div>
 
-          {selectedDate ? (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-item border border-ws-border bg-ws-accent-soft px-3.5 py-2.5">
-              <span className="text-[length:var(--fs-small)] font-medium text-ws-text">
-                Showing events for {formatZonedDayHeader(selectedDate)}
-              </span>
-              <Button variant="secondary" size="sm" onClick={handleClearDayToUpcoming}>
-                Upcoming (show all)
-              </Button>
-            </div>
-          ) : null}
-
-          {horizon === 'drafts' ? (
-            <div className="space-y-4">
-              {browserDrafts.length > 0 ? (
-                <div className={styles.draftImportBanner} role="region" aria-label="Browser draft import">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <p className="text-[length:var(--fs-small)] font-medium text-ws-text">
-                        {browserDrafts.length === 1
-                          ? '1 event draft found in browser storage.'
-                          : `${browserDrafts.length} event drafts found in browser storage.`}
-                      </p>
-                      <p className="text-[length:var(--fs-micro)] text-ws-text-muted">
-                        Import them into saved server drafts. Any draft that fails to import stays stored locally.
-                      </p>
-                    </div>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={isImportingBrowserDrafts}
-                      onClick={() => void handleImportBrowserDrafts()}
-                    >
-                      {isImportingBrowserDrafts ? 'Importing…' : 'Import browser drafts'}
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-
-              {draftsLoadFailed ? (
+          <section className={styles.workspaceGrid} aria-label="Agenda and calendar">
+            <div className={styles.agendaSurface}>
+              <div className={cn(styles.controlsBand, 'mb-4 border-b border-ws-border pb-4')}>
                 <div
-                  role="alert"
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-item border border-tint-overdue-border bg-tint-overdue-bg px-4 py-3 text-[length:var(--fs-small)] text-text-overdue"
+                  role="tablist"
+                  aria-label="Agenda view"
+                  className="inline-flex max-w-full flex-wrap items-center gap-0.5 self-start rounded-pill border border-ws-border bg-ws-accent-soft p-1 sm:gap-1"
                 >
-                  <span>Could not load saved drafts right now.</span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    leftIcon={<RotateCcw size={14} aria-hidden="true" />}
-                    onClick={() => void refetchDrafts()}
+                  {(['upcoming', 'past', 'drafts'] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === value}
+                      onClick={() => {
+                        setTab(value);
+                        setSelectedDate(null);
+                        setStatusMessage('');
+                      }}
+                      className={cn(
+                        'min-h-9 whitespace-nowrap rounded-pill px-3 py-1.5 text-[length:var(--fs-small)] font-medium cursor-pointer transition-colors duration-[var(--dur-fast)] sm:px-3.5',
+                        tab === value
+                          ? 'bg-ws-surface text-ws-text shadow-card'
+                          : 'text-ws-text-muted hover:text-ws-text',
+                      )}
+                    >
+                      {value === 'upcoming' ? (
+                        'Upcoming'
+                      ) : value === 'past' ? (
+                        'Past'
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span>Drafts</span>
+                          {drafts.length > 0 ? (
+                            <span
+                              aria-label={`${drafts.length} saved`}
+                              className="inline-flex min-w-5 items-center justify-center rounded-pill bg-ws-accent px-1.5 py-0.5 text-[0.7rem] font-semibold leading-none text-ws-surface tabular-nums"
+                            >
+                              {drafts.length}
+                            </span>
+                          ) : null}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {tab !== 'drafts' ? (
+                  <div
+                    role="group"
+                    aria-label="Event category filter"
+                    className="flex flex-wrap items-center gap-1.5"
                   >
-                    Retry
+                    {FILTERS.map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={filter === value}
+                        onClick={() => setFilter(value)}
+                        className={cn(
+                          'min-h-9 rounded-pill border px-3 py-1 text-[length:var(--fs-small)] font-medium cursor-pointer transition-colors duration-[var(--dur-instant)]',
+                          filter === value
+                            ? 'border-ws-accent bg-ws-accent text-ws-surface'
+                            : 'border-ws-border bg-ws-surface text-ws-text-muted hover:text-ws-text',
+                        )}
+                      >
+                        {FILTER_LABEL[value]}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              {selectedDate ? (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-item border border-ws-border bg-ws-accent-soft px-3.5 py-2.5">
+                  <span className="text-[length:var(--fs-small)] font-medium text-ws-text">
+                    Showing {formatDayHeader(selectedDate)}
+                  </span>
+                  <Button variant="secondary" size="sm" onClick={() => setSelectedDate(null)}>
+                    Show all
                   </Button>
                 </div>
               ) : null}
 
-              {draftsLoading && drafts.length === 0 ? (
-                <div className="space-y-3" aria-label="Loading drafts">
-                  <Skeleton className="h-24 w-full rounded-item" />
-                  <Skeleton className="h-24 w-full rounded-item" />
-                </div>
-              ) : drafts.length === 0 ? (
-                <div className="py-10 px-4 text-center flex flex-col items-center gap-3">
-                  <Image
-                    src="/visuals/events/hermit-shell-haven.svg"
-                    alt=""
-                    aria-hidden="true"
-                    width={320}
-                    height={280}
-                    loading="eager"
-                    unoptimized
-                    className={styles.emptyShellArt}
-                  />
-                  <h2 className="font-display text-[1.5rem] text-ws-text">No saved drafts yet.</h2>
-                  <p className="max-w-md text-[length:var(--fs-ui)] text-ws-text-muted">
-                    Save an unfinished event or edit while drafting and it will stay waiting here without cluttering your calendar.
-                  </p>
-                  <Button variant="primary" size="sm" onClick={openCreateEditor}>
-                    New event
-                  </Button>
-                </div>
-              ) : (
-                <ul className="space-y-3" aria-label="Saved event drafts">
-                  {drafts.map((draft) => {
-                    const sourceEvent = draft.sourceEventId
-                      ? (events.find((evt) => evt.id === draft.sourceEventId) ?? null)
-                      : null;
-                    const isEditDraft = draft.sourceEventId !== null;
-                    const isMissingSource = isEditDraft && !isLoading && !loadFailed && !sourceEvent;
-                    const isStale = Boolean(
-                      isEditDraft &&
-                        sourceEvent &&
-                        draft.sourceUpdatedAt &&
-                        sourceEvent.updatedAt !== draft.sourceUpdatedAt,
-                    );
-                    const draftTitle = draft.values.title.trim() || 'Untitled event';
-                    const draftNotesPreview = draft.values.notes
-                      ? extractNotePlainText(draft.values.notes)
-                      : '';
-                    const publishable = isEventDraftPublishable(draft.values);
-
-                    return (
-                      <li key={draft.id} className={styles.draftCard}>
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <CategoryBadge
-                              category={draft.values.category}
-                              isExam={draft.values.isExam}
-                            />
-                            <span className="inline-flex items-center rounded-pill border border-ws-border bg-ws-surface px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-ws-text-muted">
-                              {isEditDraft ? 'Edit draft' : 'New event draft'}
-                            </span>
-                            {isStale ? (
-                              <span className="inline-flex items-center gap-1 rounded-pill border border-tint-due-soon-border bg-tint-due-soon-bg px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-text-due-soon">
-                                <AlertTriangle size={12} aria-hidden="true" />
-                                <span>Stale — source changed</span>
-                              </span>
-                            ) : null}
-                            {isMissingSource ? (
-                              <span className="inline-flex items-center gap-1 rounded-pill border border-tint-overdue-border bg-tint-overdue-bg px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-text-overdue">
-                                <AlertTriangle size={12} aria-hidden="true" />
-                                <span>Original event missing</span>
-                              </span>
-                            ) : null}
-                          </div>
-                          <span className="text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums">
-                            Saved {formatDraftTimestamp(draft.updatedAt)}
-                          </span>
-                        </div>
-
-                        <h3 className="font-display text-[1.3rem] leading-snug text-ws-text [overflow-wrap:anywhere]">
-                          {draftTitle}
-                        </h3>
-
-                        {sourceEvent ? (
-                          <p className="mt-1 text-[length:var(--fs-micro)] text-ws-text-muted">
-                            Editing: {sourceEvent.title}
-                          </p>
-                        ) : null}
-
-                        {draftNotesPreview ? (
-                          <p className="mt-1.5 text-[length:var(--fs-small)] text-ws-text-muted line-clamp-2 [overflow-wrap:anywhere]">
-                            {draftNotesPreview}
-                          </p>
-                        ) : null}
-
-                        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--fs-small)] text-ws-text-muted tabular-nums">
-                          <span>
-                            {draft.values.date || 'No date'} · {draft.values.time || 'No time'}
-                          </span>
-                          {draft.values.location.trim() ? (
-                            <span className="truncate">{draft.values.location.trim()}</span>
-                          ) : null}
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-ws-border">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-text-overdue hover:bg-tint-overdue-bg"
-                            onClick={() => void handleDeleteDraft(draft)}
-                          >
-                            Delete
-                          </Button>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => openDraftEditor(draft)}
-                            >
-                              Resume
-                            </Button>
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              disabled={publishDraftMutation.isPending}
-                              onClick={() => {
-                                if (publishable) {
-                                  void handlePublishDraft(draft);
-                                } else {
-                                  openDraftEditor(draft, {
-                                    initialError:
-                                      'Complete title, date (YYYY-MM-DD), and 24-hour time (HH:mm) before adding to schedule.',
-                                  });
-                                }
-                              }}
-                            >
-                              {isEditDraft ? 'Apply changes' : 'Add to schedule'}
-                            </Button>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+              {renderAgenda()}
             </div>
-          ) : isLoading && events.length === 0 ? (
-            <div className="space-y-3" aria-label="Loading events">
-              <Skeleton className="h-24 w-full rounded-item" />
-              <Skeleton className="h-24 w-full rounded-item" />
-              <Skeleton className="h-24 w-full rounded-item" />
-            </div>
-          ) : horizon === 'week' ? (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h2 className="font-display text-[1.45rem] leading-tight text-ws-text">
-                    {formatShortDay(weekDays[0]!)} – {formatShortDay(weekDays[6]!)}
-                  </h2>
-                  <p className="text-[length:var(--fs-micro)] text-ws-text-muted">
-                    Monday – Sunday · {DEFAULT_APP_TIMEZONE}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setWeekAnchorDate((d) => shiftScheduledDate(d, -7))}
-                  >
-                    Previous week
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      setWeekAnchorDate(todayStr);
-                      setSelectedDate(null);
+
+            <aside className={styles.supportColumn} aria-label="Calendar and details">
+              <div className={styles.supportSurface}>
+                {selectedOccurrence ? (
+                  <EventDetailPane
+                    occurrence={selectedOccurrence}
+                    now={now}
+                    busy={occurrenceMutation.isPending || deleteMutation.isPending}
+                    onClose={() => setSelectedKey(null)}
+                    onOpenReader={setReaderOccurrence}
+                    onEdit={openEditFor}
+                    onDelete={requestDelete}
+                    onCancelClass={(occurrence) => {
+                      setScopeChoice('this-week');
+                      setScopeAction({ action: 'cancel', occurrence });
                     }}
-                  >
-                    Today
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setWeekAnchorDate((d) => shiftScheduledDate(d, 7))}
-                  >
-                    Next week
-                  </Button>
-                </div>
+                  />
+                ) : (
+                  renderMonthCalendar()
+                )}
               </div>
-
-              <div className={styles.weekColumns}>
-                {weekDays.map((dateStr, idx) => {
-                  const dayItems = categoryMatchedEvents
-                    .filter(
-                      (evt) => formatScheduledDate(evt.startAt, DEFAULT_APP_TIMEZONE) === dateStr,
-                    )
-                    .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
-                  const isActive =
-                    selectedDate === dateStr || (!selectedDate && todayStr === dateStr);
-                  return (
-                    <div
-                      key={dateStr}
-                      className={cn(styles.weekDayBox, isActive && styles.weekDayBoxActive)}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleSelectCalendarDay(dateStr)}
-                        className="flex items-baseline justify-between gap-1 text-left border-b border-ws-border pb-1.5 cursor-pointer"
-                      >
-                        <span className="text-[length:var(--fs-small)] font-medium text-ws-text">
-                          {WEEKDAY_SHORT[idx]}
-                        </span>
-                        <span className="text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums">
-                          {dateStr.slice(8, 10)}
-                        </span>
-                      </button>
-                      <div className="flex flex-col gap-1.5">
-                        {dayItems.length === 0 ? (
-                          <span className="text-[length:var(--fs-micro)] text-ws-text-muted py-1">
-                            Clear
-                          </span>
-                        ) : (
-                          dayItems.map((evt) => (
-                            <button
-                              key={evt.id}
-                              id={`item-${evt.id}`}
-                              type="button"
-                              onClick={() => setSelectedEventId(evt.id)}
-                              className={cn(
-                                'w-full text-left rounded-sm border p-2 text-[length:var(--fs-micro)] cursor-pointer transition-colors duration-[var(--dur-instant)]',
-                                selectedEventId === evt.id
-                                  ? 'border-ws-accent bg-ws-accent-soft'
-                                  : 'border-ws-border bg-ws-surface hover:border-ws-accent',
-                              )}
-                            >
-                              <div className="font-medium text-ws-text [overflow-wrap:break-word] line-clamp-2">
-                                {evt.title}
-                              </div>
-                              <div className="mt-0.5 text-ws-text-muted tabular-nums">
-                                {formatZonedTime(evt.startAt)}
-                              </div>
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : visibleAgendaEvents.length === 0 ? (
-            <div className="py-10 px-4 text-center flex flex-col items-center gap-3">
               <Image
-                src="/visuals/events/hermit-shell-haven.svg"
+                src="/visuals/events/coral-garden.svg"
                 alt=""
                 aria-hidden="true"
-                width={320}
-                height={280}
+                width={240}
+                height={240}
                 loading="eager"
                 unoptimized
-                className={styles.emptyShellArt}
+                className={styles.coralFooterAccent}
               />
-              <h2 className="font-display text-[1.5rem] text-ws-text">
-                {loadFailed ? 'Schedule unavailable right now.' : agendaEmptyTitle}
-              </h2>
-              <p className="max-w-md text-[length:var(--fs-ui)] text-ws-text-muted">
-                {loadFailed
-                  ? 'We could not load events from the server. Retry loading above or try again shortly.'
-                  : selectedDate
-                    ? 'Switch back to Upcoming to see your full horizon, or add an event on this date.'
-                    : 'Your harbor is quiet for now. Add an exam, class milestone, or meeting when ready.'}
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                {selectedDate ? (
-                  <Button variant="secondary" size="sm" onClick={handleClearDayToUpcoming}>
-                    Upcoming (show all)
-                  </Button>
-                ) : null}
-                <Button variant="primary" size="sm" onClick={openCreateEditor}>
-                  Add event
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <ul
-              className={cn(
-                'space-y-3',
-                horizon === 'past' &&
-                  !selectedDate &&
-                  visibleAgendaEvents.length > 3 &&
-                  styles.pastEventsScroller,
-              )}
-              aria-label="Events agenda"
-            >
-              {visibleAgendaEvents.map((evt) => {
-                const isSelected = selectedEventId === evt.id;
-                const eventDay = formatScheduledDate(evt.startAt, DEFAULT_APP_TIMEZONE);
-                const notesPreview = evt.notes ? extractNotePlainText(evt.notes) : '';
-                return (
-                  <li key={evt.id}>
-                    <button
-                      id={`item-${evt.id}`}
-                      type="button"
-                      aria-pressed={isSelected}
-                      onClick={() => setSelectedEventId(evt.id)}
-                      className={cn(styles.eventRow, isSelected && styles.eventRowSelected)}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                        <CategoryBadge category={evt.category} isExam={evt.isExam} />
-                        <span className="text-[length:var(--fs-micro)] font-medium text-ws-text-muted tabular-nums">
-                          {formatRelativeEventTime(evt.startAt, agendaNow)}
-                        </span>
-                      </div>
+            </aside>
+          </section>
+        </>
+      )}
 
-                      <h3 className="font-display text-[1.35rem] leading-snug text-ws-text [overflow-wrap:anywhere]">
-                        {evt.title}
-                      </h3>
-
-                      {notesPreview ? (
-                        <p className="mt-1.5 text-[length:var(--fs-small)] text-ws-text-muted line-clamp-2 [overflow-wrap:anywhere]">
-                          {notesPreview}
-                        </p>
-                      ) : null}
-
-                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--fs-small)] text-ws-text-muted tabular-nums">
-                        <span className="inline-flex items-center gap-1.5">
-                          <CalendarIcon
-                            size={14}
-                            className="text-ws-accent shrink-0"
-                            aria-hidden="true"
-                          />
-                          <span>
-                            {formatShortDay(eventDay)} · {formatZonedTime(evt.startAt)}
-                          </span>
-                        </span>
-                        {evt.location ? (
-                          <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
-                            {evt.locationType === 'online' ? (
-                              <Video
-                                size={14}
-                                className="text-ws-accent shrink-0"
-                                aria-hidden="true"
-                              />
-                            ) : (
-                              <MapPin
-                                size={14}
-                                className="text-ws-accent shrink-0"
-                                aria-hidden="true"
-                              />
-                            )}
-                            <span className="truncate">{evt.location}</span>
-                          </span>
-                        ) : null}
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-
-        {/* Supporting Desktop/Tablet Pane */}
-        <aside className={styles.supportColumn} aria-label="Supporting calendar and details">
-          <div className={styles.supportSurface}>
-            {selectedEvent
-              ? renderDetailContent(selectedEvent, () => setSelectedEventId(null))
-              : renderCalendarContent()}
-          </div>
-          <Image
-            src="/visuals/events/coral-garden.svg"
-            alt=""
-            aria-hidden="true"
-            width={240}
-            height={240}
-            loading="eager"
-            unoptimized
-            className={styles.coralFooterAccent}
-          />
-        </aside>
-      </section>
-
-      {/* Quiet shoreline wave divider + mobile closing reef accent */}
       <div className={styles.tidalDividerWrap} aria-hidden="true">
         <Image
           src="/visuals/events/tidal-lace.svg"
@@ -1668,275 +1278,94 @@ export function EventsView() {
           className={styles.tidalDivider}
         />
       </div>
-      <div className="md:hidden">
-        <Image
-          src="/visuals/events/coral-garden.svg"
-          alt=""
-          aria-hidden="true"
-          width={240}
-          height={240}
-          loading="eager"
-          unoptimized
-          className={styles.coralFooterAccent}
-        />
-      </div>
 
-      {/* Mobile Focused Event Detail Dialog (< 768px only) */}
+      <WeekCalendarPanel
+        open={calendarOpen}
+        state={calendarState}
+        today={today}
+        now={now}
+        onChange={setCalendarState}
+        onClose={() => setCalendarOpen(false)}
+        onSelect={(occurrence) => {
+          setSelectedKey(occurrence.key);
+          setSelectedSnapshot(occurrence);
+          setReaderOccurrence(occurrence);
+        }}
+      />
+
+      <EventReader
+        occurrence={readerOccurrence}
+        now={now}
+        onClose={() => setReaderOccurrence(null)}
+        onEdit={(occurrence) => {
+          setReaderOccurrence(null);
+          openEditFor(occurrence);
+        }}
+      />
+
       <Dialog
-        open={Boolean(selectedEvent) && !isDesktop && !editorOpen}
-        onClose={() => setSelectedEventId(null)}
-        title={selectedEvent?.title ?? 'Event details'}
+        open={Boolean(scopeAction)}
+        onClose={() => setScopeAction(null)}
         portal
-        className="max-w-[92%] max-h-[86dvh] overflow-y-auto"
+        title={scopeAction?.action === 'cancel' ? 'Cancel class' : 'Delete class'}
+        description={
+          scopeAction
+            ? `${scopeAction.occurrence.title} · ${formatDayHeader(localDateOf(scopeAction.occurrence.startAt))}${
+                scopeAction.action === 'cancel'
+                  ? '. Canceled classes stay visible, struck through, and free their timetable cell.'
+                  : '. Deleted occurrences disappear; earlier weeks and other classes are kept.'
+              }`
+            : undefined
+        }
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setScopeAction(null)}>
+              Keep class
+            </Button>
+            <Button
+              variant={scopeAction?.action === 'delete' ? 'destructive-solid' : 'primary'}
+              size="sm"
+              disabled={occurrenceMutation.isPending}
+              onClick={() => void confirmScopeAction()}
+            >
+              {scopeAction?.action === 'cancel' ? 'Cancel class' : 'Delete'}
+            </Button>
+          </>
+        }
       >
-        {selectedEvent
-          ? renderDetailContent(selectedEvent, () => setSelectedEventId(null), true)
-          : null}
+        {scopeAction?.occurrence.isRepeating ? (
+          <fieldset className="space-y-2">
+            <legend className="text-[length:var(--fs-small)] font-medium text-ws-text">
+              Apply to
+            </legend>
+            {(['this-week', 'this-week-onward'] as const).map((value) => (
+              <label
+                key={value}
+                className="flex items-center gap-2 text-[length:var(--fs-small)] text-ws-text"
+              >
+                <input
+                  type="radio"
+                  name="class-scope"
+                  checked={scopeChoice === value}
+                  onChange={() => setScopeChoice(value)}
+                />
+                {value === 'this-week' ? 'This week only' : 'This week onward'}
+              </label>
+            ))}
+          </fieldset>
+        ) : null}
       </Dialog>
 
-      {/* Shared Centered Two-Column Event Editor + Persisted Server Drafts */}
-      {(() => {
-        const isEditingMode = Boolean(editingRecord || activeDraft?.sourceEventId);
-        const isActiveDraftMissingSource = Boolean(
-          activeDraft?.sourceEventId && !editingRecord && !isLoading && !loadFailed,
-        );
-        const isActiveDraftStale = Boolean(
-          activeDraft?.sourceEventId &&
-            editingRecord &&
-            activeDraft.sourceUpdatedAt &&
-            activeDraft.sourceUpdatedAt !== editingRecord.updatedAt,
-        );
-
-        return (
-          <LargeEditorDialog
-            open={editorOpen}
-            onClose={() => {
-              setEditorOpen(false);
-              setEditingRecord(null);
-              setActiveDraft(null);
-              setLoadedDraft(null);
-              setStaleConflictPrompt(false);
-              setEditorError('');
-            }}
-            title={
-              isEditingMode ? 'Edit event' : activeDraft ? 'Resume event draft' : 'New event'
-            }
-            description="Dates and times use the 24-hour Asia/Saigon schedule."
-            formId="event-large-editor-form"
-            isDirty={isEditorDirty}
-            isSubmitting={isSubmitting}
-            submitLabel={isEditingMode ? 'Apply changes' : 'Add to schedule'}
-            submittingLabel={isEditingMode ? 'Applying…' : 'Adding…'}
-            closeAriaLabel="Close event editor"
-            initialFocusRef={editorTitleInputRef}
-            errorMessage={editorError}
-            footerActions={
-              staleConflictPrompt && activeDraft ? (
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  disabled={isSubmitting}
-                  onClick={() => void executeEditorSubmit(true)}
-                >
-                  Overwrite and apply
-                </Button>
-              ) : null
-            }
-            draftRecovery={
-              loadedDraft
-                ? {
-                    savedAtLabel: formatDraftTimestamp(loadedDraft.updatedAt),
-                    stale: Boolean(
-                      editingRecord &&
-                        loadedDraft.sourceUpdatedAt &&
-                        loadedDraft.sourceUpdatedAt !== editingRecord.updatedAt,
-                    ),
-                    staleMessage:
-                      'This event changed on disk after your draft was saved. Review changes carefully before applying.',
-                    onResume: () => {
-                      setActiveDraft(loadedDraft);
-                      setFormValues(loadedDraft.values);
-                      setInitialFormValues(loadedDraft.values);
-                      setLoadedDraft(null);
-                    },
-                    onDiscard: () => {
-                      const idToDelete = loadedDraft.id;
-                      setLoadedDraft(null);
-                      void deleteDraftMutation.mutateAsync(idToDelete).catch(() => {});
-                    },
-                  }
-                : null
-            }
-            onSaveDraft={handleSaveDraft}
-          >
-            <form id="event-large-editor-form" onSubmit={handleEditorSubmit} className="space-y-4">
-              {isActiveDraftStale && !staleConflictPrompt ? (
-                <div
-                  role="status"
-                  className="rounded-item border border-tint-due-soon-border bg-tint-due-soon-bg px-3.5 py-2.5 text-[length:var(--fs-small)] text-text-due-soon"
-                >
-                  This event changed on the server after this draft was saved. Review your changes before applying.
-                </div>
-              ) : null}
-
-              {isActiveDraftMissingSource ? (
-                <div
-                  role="status"
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-item border border-tint-overdue-border bg-tint-overdue-bg px-3.5 py-2.5 text-[length:var(--fs-small)] text-text-overdue"
-                >
-                  <span>The original event for this edit draft was deleted.</span>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={isSubmitting}
-                    onClick={() => {
-                      if (!activeDraft) return;
-                      const oldId = activeDraft.id;
-                      void saveDraftMutation
-                        .mutateAsync({
-                          sourceEventId: null,
-                          sourceUpdatedAt: null,
-                          values: formValues,
-                        })
-                        .then(async (saved) => {
-                          await deleteDraftMutation.mutateAsync(oldId).catch(() => {});
-                          setActiveDraft(saved.item);
-                          setEditingRecord(null);
-                          setEditorError('');
-                        })
-                        .catch((err) => {
-                          setEditorError(
-                            err instanceof Error ? err.message : 'Could not convert draft.',
-                          );
-                        });
-                    }}
-                  >
-                    Save as new draft
-                  </Button>
-                </div>
-              ) : null}
-
-              <LargeEditorTwoColumn
-                primary={
-                  <>
-                    <div className="space-y-1.5">
-                      <label
-                        htmlFor="event-editor-title"
-                        className="text-[length:var(--fs-small)] font-medium text-ws-text"
-                      >
-                        Title
-                      </label>
-                      <input
-                        ref={editorTitleInputRef}
-                        id="event-editor-title"
-                        type="text"
-                        value={formValues.title}
-                        onChange={(e) => {
-                          setFormValues((prev) => ({ ...prev, title: e.target.value }));
-                          if (editorError) setEditorError('');
-                        }}
-                        placeholder="e.g. Calculus I Midterm or Lab Critique"
-                        className="w-full h-11 rounded-item border border-ws-border bg-ws-surface px-3.5 text-[length:var(--fs-ui)] text-ws-text"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label
-                        id="event-editor-notes-label"
-                        htmlFor="event-editor-notes"
-                        className="text-[length:var(--fs-small)] font-medium text-ws-text"
-                      >
-                        Notes &amp; instructions
-                      </label>
-                      <RichNoteEditor
-                        id="event-editor-notes"
-                        ariaLabelledBy="event-editor-notes-label"
-                        value={formValues.notes}
-                        onChange={(notes) => setFormValues((prev) => ({ ...prev, notes }))}
-                        placeholder="Preparation steps, room details, materials, or talking points…"
-                      />
-                    </div>
-                  </>
-                }
-                metadata={
-                  <>
-                    <SelectField<EventCategory>
-                      id="event-editor-category"
-                      label="Category"
-                      value={formValues.category}
-                      onChange={(category) => setFormValues((prev) => ({ ...prev, category }))}
-                      options={EVENT_CATEGORY_OPTIONS}
-                    />
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <DatePickerField
-                        id="event-editor-date"
-                        label="Date"
-                        mode="iso"
-                        value={formValues.date}
-                        onChange={(date) => {
-                          setFormValues((prev) => ({ ...prev, date }));
-                          if (editorError) setEditorError('');
-                        }}
-                        error={Boolean(editorError && !isValidScheduledDate(formValues.date.trim()))}
-                      />
-                      <TimeFieldControl
-                        id="event-editor-time"
-                        label="Time"
-                        value={formValues.time}
-                        onChange={(time) => {
-                          setFormValues((prev) => ({ ...prev, time }));
-                          if (editorError) setEditorError('');
-                        }}
-                        placeholder="HH:mm"
-                        error={Boolean(editorError && !isValidEventTimeHm(formValues.time))}
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label
-                        htmlFor="event-editor-location"
-                        className="text-[length:var(--fs-small)] font-medium text-ws-text"
-                      >
-                        Location
-                      </label>
-                      <input
-                        id="event-editor-location"
-                        type="text"
-                        value={formValues.location}
-                        onChange={(e) =>
-                          setFormValues((prev) => ({ ...prev, location: e.target.value }))
-                        }
-                        placeholder="Room, hall, or meeting link"
-                        className="w-full h-11 rounded-item border border-ws-border bg-ws-surface px-3 text-[length:var(--fs-ui)] text-ws-text"
-                      />
-                    </div>
-
-                    <div className="space-y-1 pt-1">
-                      <Checkbox
-                        id="event-editor-online"
-                        checked={formValues.isOnline}
-                        onCheckedChange={(isOnline) =>
-                          setFormValues((prev) => ({ ...prev, isOnline }))
-                        }
-                        label="Online meeting"
-                      />
-                      <Checkbox
-                        id="event-editor-exam"
-                        checked={formValues.isExam}
-                        onCheckedChange={(isExam) => setFormValues((prev) => ({ ...prev, isExam }))}
-                        label="Mark as examination"
-                      />
-                    </div>
-                  </>
-                }
-              />
-            </form>
-          </LargeEditorDialog>
-        );
-      })()}
+      {editorRequest ? (
+        <EventEditorDialog
+          key={editorKey}
+          request={editorRequest}
+          drafts={drafts}
+          sourceLoaded={!eventsQuery.isLoading && !eventsQuery.isError}
+          onClose={() => setEditorRequest(null)}
+          onSaved={handleSaved}
+        />
+      ) : null}
     </div>
   );
 }

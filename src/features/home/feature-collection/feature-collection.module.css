@@ -103,6 +103,129 @@
   }
 }
 
+/* ─── Layout Toggle (v3.2 single morphing cosmos-glass pill) ─── */
+.layoutToggle {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0 1.15rem 0 0.95rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--cosmos-text) 16%, transparent);
+  background: color-mix(in srgb, var(--cosmos-text) 6%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--cosmos-text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  transition:
+    border-color var(--dur-base) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+/* Pre-painted accent glow; hover only fades its opacity. */
+.layoutToggle::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  opacity: 0;
+  background: color-mix(in srgb, var(--cosmos-accent) 12%, transparent);
+  box-shadow:
+    0 0 22px color-mix(in srgb, var(--cosmos-accent) 28%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--cosmos-text) 14%, transparent);
+  transition: opacity var(--dur-base) var(--ease);
+  will-change: opacity;
+}
+
+@media (hover: hover) {
+  .layoutToggle:hover {
+    border-color: color-mix(in srgb, var(--cosmos-accent) 60%, transparent);
+  }
+
+  .layoutToggle:hover::before {
+    opacity: 1;
+  }
+}
+
+.layoutToggle:focus-visible {
+  outline: 2px solid var(--cosmos-focus);
+  outline-offset: 3px;
+  border-color: color-mix(in srgb, var(--cosmos-accent) 60%, transparent);
+}
+
+.layoutToggle:focus-visible::before {
+  opacity: 1;
+}
+
+.layoutToggle:active {
+  transform: scale(0.97);
+  transition-duration: var(--dur-instant);
+}
+
+.layoutToggleIcons,
+.layoutToggleLabels {
+  display: grid;
+  align-items: center;
+  justify-items: start;
+}
+
+.layoutToggleIcons {
+  color: var(--cosmos-accent);
+}
+
+.layoutToggleIcon,
+.layoutToggleLabel {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
+}
+
+.layoutToggleIcon[data-active='false'] {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.6);
+}
+
+.layoutToggleIcon[data-active='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+.layoutToggleLabel[data-active='false'] {
+  opacity: 0;
+  transform: translate3d(0, 6px, 0);
+}
+
+.layoutToggleLabel[data-active='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layoutToggle,
+  .layoutToggle::before,
+  .layoutToggleIcon,
+  .layoutToggleLabel {
+    transition-duration: 0ms !important;
+  }
+
+  .layoutToggle:active,
+  .layoutToggleIcon[data-active='false'],
+  .layoutToggleLabel[data-active='false'] {
+    transform: none;
+  }
+}
+
 /* ─── Expressive Feature Cards (compositor-safe, stationary hit box) ─── */
 .featureCard {
   display: block;
@@ -149,8 +272,8 @@
       transparent 56%
     );
   transition:
-    opacity 220ms var(--ease),
-    transform 260ms var(--ease);
+    opacity var(--dur-slow) var(--ease),
+    transform var(--dur-slow) var(--ease);
   will-change: opacity, transform;
 }
 
@@ -175,6 +298,54 @@
   justify-content: center;
   pointer-events: none;
   user-select: none;
+}
+
+/*
+ * Static zodiac thumbnails (v3.1 §4): artwork is fully drawn and illuminated at rest.
+ * Hover or keyboard focus only raises a gentle glow — no drawing, scaling, lifting, or sweep.
+ * Returning to rest restores the stable base brightness.
+ *
+ * v3.2: the glow lives on a pre-glowed copy behind the artwork. Its drop-shadow never changes,
+ * so it is rasterized once; hover animates opacity only (compositor), starting on the first frame.
+ * Rest carries the slower settle; the raised state carries the quicker rise.
+ */
+.zodiacHalo {
+  opacity: 0;
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--zodiac-rose-gold) 42%, transparent));
+  transition: opacity var(--dur-slow) var(--ease);
+  will-change: opacity;
+}
+
+[data-zodiac-thumb='static'] .thumbArtwork {
+  opacity: 1;
+}
+
+.featureCard:is(:hover, :focus-visible, :active) [data-zodiac-thumb='static'] .thumbArtwork {
+  transform: none;
+}
+
+.featureCard:is(:focus-visible, :active) .zodiacHalo {
+  opacity: 1;
+  transition-duration: var(--dur-base);
+}
+
+@media (hover: hover) {
+  .featureCard:hover .zodiacHalo {
+    opacity: 1;
+    transition-duration: var(--dur-base);
+  }
+
+  .featureCard:hover :is(.thumbGlow, .thumbHairlineAccent) {
+    transition-duration: var(--dur-base);
+  }
+}
+
+.featureCard:focus-visible :is(.thumbGlow, .thumbHairlineAccent) {
+  transition-duration: var(--dur-base);
+}
+
+.featureCard:is(:hover, :focus-visible, :active) [data-zodiac-thumb='static'] .thumbGlow {
+  transform: scale(0.96);
 }
 
 /* A small pre-painted light moves on the compositor, clipped by the thumbnail. */
@@ -217,7 +388,7 @@
   opacity: 0;
   box-shadow: inset 0 0 0 1px
     color-mix(in srgb, var(--card-accent, var(--cosmos-lavender)) 62%, var(--cosmos-text));
-  transition: opacity 220ms var(--ease);
+  transition: opacity var(--dur-slow) var(--ease);
   will-change: opacity;
 }
 
@@ -388,6 +559,7 @@
 
   .thumbGlow,
   .thumbArtwork,
+  .zodiacHalo,
   .thumbHairlineAccent,
   .categoryPill,
   .cardTitle,

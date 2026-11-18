@@ -1,5 +1,6 @@
 'use client';
 
+import { usePageReady } from '@/features/transitions/TransitionProvider';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Image from 'next/image';
 import { Award, Bell, Plus, RotateCcw } from 'lucide-react';
@@ -137,6 +138,7 @@ export function AchievementsView() {
     isError: loadFailed,
     refetch,
   } = useAchievements(selectedEra !== 'all' ? selectedEra : undefined);
+  usePageReady(!isLoading);
   const createAchievement = useCreateAchievement();
   const updateAchievement = useUpdateAchievement();
   const deleteAchievement = useDeleteAchievement();

@@ -113,7 +113,7 @@ All colors, typography scales, spacing steps, radii, shadows, z-layers, and moti
 | Token | Value | Typical Usage |
 | :--- | :--- | :--- |
 | `--text-hero` | `clamp(2.75rem, 6vw, 5.25rem)` | Hero display headlines |
-| `--text-2xl` | `clamp(1.75rem, 2.6vw, 2.375rem)` | Workspace page titles (`Daily Task Management`, `Tasks Hub`) |
+| `--text-2xl` | `clamp(1.75rem, 2.6vw, 2.375rem)` | Workspace page titles (`Task Management`, `Tasks Hub`) |
 | `--text-xl` | `1.375rem` (`22px`) | Section headings (`My collection`, `Overdue`, Drawer titles) |
 | `--text-lg` | `1.125rem` (`18px`) | Card titles, prominent controls |
 | `--text-md` | `1rem` (`16px`) | Primary body copy, task titles, form inputs |
@@ -218,7 +218,7 @@ Two automated test suites in `tests/design/` enforce design-system integrity:
 ## 8. Accessibility Baseline
 
 1. **Semantic Landmarks:** Every route provides a keyboard skip link (`Skip to content` targeting `#main-content`), a `<header>` landmark (in workspace routes), and a `<main id="main-content">` landmark.
-2. **Immediate Focus Indicators:** Keyboard indicators appear instantaneously. Workspace text inputs, textareas, and selects use a subtle `--ws-focus`-derived focus border and a rounded two-pixel keyboard ring with a two-pixel surface gap. Invalid field borders remain intact. Checkbox/radio/range/file controls retain their existing indicators. Other controls and Cosmos retain the existing outline treatment. Shared dialog/drawer panels explicitly identify their workspace scope so portaled inputs receive the same treatment.
+2. **Immediate Focus Indicators (Confirmed requirement, v3.1 — supersedes the earlier ring styling):** Form controls (text inputs, textareas, selects, contenteditable rich-text, checkbox/radio/switch roles, date/time segments, search rows, and rich-text toolbar buttons marked `data-focus-tint`) show **no** focus ring, outline, border-colour change, or focus shadow. Instead they receive an immediate theme-derived background tint (`--focus-tint`, from `--ws-focus-tint` / `--cosmos-focus-tint`); selected controls use the stronger `--focus-tint-selected` so focus stays distinguishable from selection. Composite fields mark their wrapper with `data-focus-field` and tint as one surface. Static borders, invalid styling, and selection states are unchanged. Buttons, links, and other interactive elements keep the outline treatment. Non-interactive programmatic focus targets (`main#main-content`, route-arrival headings, dialog containers with `tabindex="-1"`) keep semantic focus but draw no frame — this removes the full-page frame that appeared after Win + Shift + S and window refocus (img35). Rules live in `src/app/globals.css`; tokens in `src/design/tokens.css`.
 3. **Stacked Modal Focus Trapping ([`src/ui/use-focus-trap.ts`](../../../src/ui/use-focus-trap.ts)):**
    - Supports nested overlays (e.g., opening a `Dialog` or `TransferDialog` on top of a `Drawer`) via a module-level `activeTrapStack`.
    - Only the topmost trap intercepts `Tab`, `Shift+Tab`, and `Escape`.
@@ -227,6 +227,7 @@ Two automated test suites in `tests/design/` enforce design-system integrity:
 5. **Global Keyboard Shortcuts:**
    - `Ctrl+K` / `Cmd+K`: Toggle `UniverseMenu` in any workspace route.
    - `Escape`: Close the topmost active `Dialog`, `Drawer`, `Popover`, or `UniverseMenu`.
+   - `UniverseMenu` destinations are real anchors (`TransitionLink`, v3.2): plain click navigates with the route transition; Ctrl/Cmd/Shift/middle-click and `Ctrl/Cmd+Enter` in the search box open a new tab.
    - `ArrowLeft` / `ArrowRight`: Rotate the 3D Earth on `/` or switch active days in `/tasks/daily` `DayCarousel`.
 
 ---
@@ -241,7 +242,7 @@ All reusable primitives live in [`src/ui/`](../../../src/ui/):
 | **`IconButton`** | [`src/ui/IconButton.tsx`](../../../src/ui/IconButton.tsx) | Accessible icon-only button requiring `label` (`aria-label` + `title`). |
 | **`Chip`** | [`src/ui/Chip.tsx`](../../../src/ui/Chip.tsx) | Toggleable filter pill (`aria-pressed`) used for priority/status filters in Tasks Hub. |
 | **`Badge`** | [`src/ui/Badge.tsx`](../../../src/ui/Badge.tsx) | Semantic status pill (`urgent`, `normal`, `optional`, `done`, `warn`, `neutral`, `cosmos`). |
-| **`SegmentedControl`** | [`src/ui/SegmentedControl.tsx`](../../../src/ui/SegmentedControl.tsx) | Accessible radiogroup/tab switcher used for `Horizontal / Vertical` gallery mode and `Day / Week / Month` views. |
+| **`SegmentedControl`** | [`src/ui/SegmentedControl.tsx`](../../../src/ui/SegmentedControl.tsx) | Accessible radiogroup/tab switcher used for `Day / Week / Month` views and task forms. The homepage collection uses its own single-button `LayoutToggle` since v3.2 (see [`../homepage/readme.md`](../homepage/readme.md)). |
 | **`Checkbox`** | [`src/ui/Checkbox.tsx`](../../../src/ui/Checkbox.tsx) | Animated SVG checkmark control with optional visible label and strikethrough coordination; pairs `useReducedMotion()` with `motion-reduce:transition-none motion-reduce:duration-0` so both box `<span>` (`transitionProperty: none`, `transitionDuration: 0s`) and SVG `<path>` (`transition: none`) suppress transitions under reduced motion. |
 | **`Dialog`** | [`src/ui/Dialog.tsx`](../../../src/ui/Dialog.tsx) | Portal-rendered modal dialog (`role="dialog"`, `aria-modal="true"`) with backdrop blur and focus trap. |
 | **`LargeEditorDialog` & `DraftRecovery`** | [`src/ui/LargeEditorDialog.tsx`](../../../src/ui/LargeEditorDialog.tsx) | Centered desktop (`min(75vw, 1140px)`), single-column tablet, and `100dvh` phone modal editor with pinned header/footer, focused-field `scrollIntoView`, `beforeunload` + `useNavigationGuard` dirty-close protection, 3-choice close prompt (`Save draft and close`, `Discard changes`, `Continue editing`), explicit local draft recovery (`src/client/editor-drafts.ts`), and inline `role="alert"` save-error retention. |
@@ -252,7 +253,26 @@ All reusable primitives live in [`src/ui/`](../../../src/ui/):
 
 ---
 
-## 10. Cosmic Launch Route Transition (`src/features/transitions/`)
+## 10. Route Loading Transition (`src/features/transitions/`)
+
+> **v3.1 (Confirmed requirement):** The destination zodiac loader below supersedes the Cosmic Launch sequence (archived original: [`md/archive/v3.1-pre-update/agents/shared/uiux.md`](../../archive/v3.1-pre-update/agents/shared/uiux.md)). `CosmicLaunchOverlay.tsx` was removed.
+
+### 10.0 Destination Zodiac Loader (v3.1)
+- Navigation starts immediately. `TransitionProvider` shows one overlay: the destination's canonical zodiac drawing (`ZodiacIllumination presentation="loader"`), or text only for routes without a mapped sign (v3.2; was a neutral spinner). Daily and Tasks Hub use Aries, Events uses Taurus, other features keep their registry sign (`route-zodiac.ts`); the registry itself is unchanged.
+- There is **no minimum display time** and no wait for the drawing to finish. The overlay ends as soon as the destination pathname is reached **and** that destination signals `PageReady` (a usable primary surface or a visible error/retry state). Slow destinations keep drawing, then hold with the completed-glow loop.
+- Readiness is collected per navigation (cleared at each start), so stale signals from the origin or an earlier visit cannot complete a later navigation. Scroll and interaction are released at readiness; the overlay then fades out over `--dur-fast` (150ms) with `pointer-events: none`.
+- Reduced motion shows a static symbol and loading text with no drawing, travel, or hold. Loading is announced once through a polite `role="status"` region.
+- A 10-second failsafe reveals the page. Back/Forward keeps the lightweight quick fade and abandons any pending loader. Same-path query/hash changes never show the loader. A failing zodiac renderer falls back to the neutral indicator.
+- Views gate readiness on their primary query (`usePageReady(!isLoading)`), not on route-shell mount.
+
+### 10.0.1 Loader v2 (v3.2)
+- **Estimate-paced drawing:** `load-estimate.ts` keeps a per-route moving average of measured navigation-to-`PageReady` durations (localStorage via `preferences.ts`, key `hts.routeLoadHistory`), separately for the first ("cold") and repeat ("warm") visit in a session. Defaults without history: cold `1200ms`, warm `250ms` (+`300ms` for a warm route whose zodiac data is not cached). The estimate chooses the path: **fast** (`<= 300ms`) shows only the fully drawn static artwork; **draw** paces the drawing to `clamp(estimate, 700ms, 4800ms)` through `forwardSpeed` on `ZodiacIllumination presentation="loader"`. A fast-path route still loading after `450ms` upgrades to a `1500ms` drawing.
+- **Ready early:** when the page is ready mid-drawing (progress `> 5%`) the remainder is fast-forwarded in `~300ms` and the overlay then fades; if drawing has not started the overlay dismisses immediately. Ready late: the drawing completes and the glow holds until ready (10s failsafe unchanged).
+- **Hard load / refresh:** feature routes and `/notifications` server-render the overlay (dim static art + label, `noscript` guard) and dismiss on `PageReady` after hydration; Home and unknown routes are excluded. Hard-load dismissals do not move focus to the heading.
+- **Look:** background mirrors the collection card (`thumbSurface` gradient plus accent radial glows from `getFeatureAccentVar`). Label "Loading {title}" in Cormorant italic 500 with three looping dots (`.` → `..` → `...`): `clamp(1.75rem, 3.2vw, 2.6rem)` beneath artwork, `clamp(2.25rem, 4.4vw, 3.4rem)` centred when a route has no zodiac (text only; the ring spinner was removed). Reduced motion keeps the static artwork and static dots.
+- `TransitionLink` warms the destination's zodiac JSON on pointer-enter/focus.
+
+### Historical: Cosmic Launch (superseded in v3.1)
 
 Defined in [`src/features/transitions/TransitionProvider.tsx`](../../../src/features/transitions/TransitionProvider.tsx), [`TransitionLink.tsx`](../../../src/features/transitions/TransitionLink.tsx), [`CosmicLaunchOverlay.tsx`](../../../src/features/transitions/CosmicLaunchOverlay.tsx), and [`transition-rules.ts`](../../../src/features/transitions/transition-rules.ts).
 

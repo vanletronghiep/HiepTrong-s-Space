@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { EventItem } from '@/contracts/event';
+import { eventItemSchema, type EventItem } from '@/contracts/event';
 import type { EventDraftPublicationReceipt, EventDraftRecord } from '@/contracts/event-draft';
 import { EventDraftService } from '@/services/event-draft-service';
 import { JsonFileStore } from '@/services/storage/json-store';
@@ -371,7 +371,7 @@ describe('EventDraftService', () => {
   it('recovers cleanly if receipt creation succeeds without throwing while mock delete fails or retries', async () => {
     const dir = await makeTempDir();
     const eventsStore = new JsonFileStore<EventItem>('events.json', undefined, dir);
-    const seedEvent: EventItem = {
+    const seedEvent: EventItem = eventItemSchema.parse({
       id: 'evt-retry',
       title: 'Initial',
       description: null,
@@ -387,7 +387,7 @@ describe('EventDraftService', () => {
       notes: null,
       createdAt: '2026-11-01T00:00:00.000Z',
       updatedAt: '2026-11-01T00:00:00.000Z',
-    };
+    });
     await eventsStore.save(seedEvent);
 
     const createEventSpy = vi.fn(async () => seedEvent);
@@ -402,6 +402,7 @@ describe('EventDraftService', () => {
         getEvent: (id) => eventsStore.getById(id),
         createEvent: createEventSpy,
         updateEvent: updateEventSpy,
+        mutateOccurrence: vi.fn(),
       },
     });
 

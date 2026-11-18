@@ -119,8 +119,15 @@
   opacity: 0.35;
 }
 
-@media (hover: none), (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce) {
   .staticImageDim {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+@media (hover: none) {
+  .root:not([data-zodiac-presentation='loader']) .staticImageDim {
     opacity: 1;
     filter: none;
   }

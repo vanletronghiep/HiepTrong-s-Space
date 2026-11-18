@@ -398,10 +398,6 @@
   color: var(--ws-text-muted);
 }
 
-.intentionInput:focus {
-  border-color: var(--ws-accent);
-}
-
 .intentionInput:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -733,10 +729,6 @@
 
 .textarea::placeholder {
   color: var(--ws-text-muted);
-}
-
-.textarea:focus {
-  border-color: var(--ws-accent);
 }
 
 @media (max-width: 767px) {

@@ -30,7 +30,7 @@ import { EmptyState } from '@/ui/EmptyState';
 import { SegmentedControl, type SegmentedOption } from '@/ui/SegmentedControl';
 import { Skeleton } from '@/ui/Skeleton';
 import { useToast } from '@/ui/Toast';
-import { WorkspacePageHeader } from '@/ui/WorkspaceShell';
+import masthead from './task-masthead.module.css';
 import { TaskCard } from './TaskCard';
 import noteStyles from './task-note.module.css';
 import { TaskForm } from './TaskForm';
@@ -84,6 +84,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
 
   const [inspectedTaskId, setInspectedTaskId] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<TaskDto | null>(null);
+  const [transferInitialDate, setTransferInitialDate] = useState<string | null>(null);
   const [scheduleTarget, setScheduleTarget] = useState<TaskDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskDto | null>(null);
   const [recentlyCreatedId, setRecentlyCreatedId] = useState<string | null>(null);
@@ -312,10 +313,17 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
     <div className="flex flex-col flex-1">
       <PageReady ready={!tasksQuery.isLoading} />
 
-      <WorkspacePageHeader
-        title="Tasks hub"
-        description="Every task across your universe, grouped by urgency and kept in sync with Daily tasks."
-      />
+      <header data-feature-heading className={masthead.masthead}>
+        <div className={masthead.mastheadText}>
+          <h1 className={masthead.title}>
+            Tasks <span className={masthead.titleEmphasis}>hub</span>
+          </h1>
+          <p className={masthead.subtitle}>
+            Every task across your universe, gathered in one calm place and sorted by what needs
+            you first.
+          </p>
+        </div>
+      </header>
 
       {/* Search & filter controls */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center pb-6 mb-2 border-b border-ws-border">
@@ -523,7 +531,10 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
         }
         onScheduleDate={handleScheduleDate}
         onOpenPickDate={(target) => setScheduleTarget(target)}
-        onOpenTransfer={(target) => setTransferTarget(target)}
+        onOpenTransfer={(target, initialDate) => {
+          setTransferInitialDate(initialDate ?? null);
+          setTransferTarget(target);
+        }}
         onRequestDelete={(target) => setDeleteTarget(target)}
       />
 
@@ -548,7 +559,11 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
         portal
         task={transferTarget}
         open={transferTarget !== null}
-        onClose={() => setTransferTarget(null)}
+        onClose={() => {
+          setTransferTarget(null);
+          setTransferInitialDate(null);
+        }}
+        initialDate={transferInitialDate}
         onSubmitTransfer={handleTransferSubmit}
         now={now}
         timeZone={timeZone}

@@ -49,4 +49,19 @@
   - Added regression coverage in [`starfield-and-home.test.tsx`](../../../tests/features/home/starfield-and-home.test.tsx) and stubbed `HTMLCanvasElement.prototype.getContext` in [`cosmic-launch.test.tsx`](../../../tests/features/transitions/cosmic-launch.test.tsx) (`D09`) to eliminate jsdom canvas stderr noise.
 - **Verification:** `npm run check` passed across all 25 test files (`104` tests).
 
+---
+
+## 6. v3.2 Feature Collection Polish (18 November 2026)
+
+- **Scope:**
+  - Renamed the first feature from "Daily Task Management" to **Task Management** in [`registry.ts`](../../../src/features/registry.ts) (card, `/tasks/daily` metadata, route loader), the Daily board `<h1>`, and the workspace shell shortcut tooltip. The route `/tasks/daily` and id `daily-tasks` are unchanged; the homepage pilot preview fixtures were left as-is.
+  - Smoothed the zodiac hover glow in [`FeatureThumbnail.tsx`](../../../src/features/home/feature-collection/FeatureThumbnail.tsx) / [`feature-collection.module.css`](../../../src/features/home/feature-collection/feature-collection.module.css): the animated `filter: drop-shadow` on `.zodiacInset` (re-rasterized every frame, causing a late start and choppy fade) was replaced by a pre-glowed `.zodiacHalo` copy whose `opacity` alone animates (rise `--dur-base`, settle `--dur-slow`). Ambient glow and accent hairline now share that timing.
+  - Replaced the collection's `SegmentedControl` with a single morphing [`LayoutToggle.tsx`](../../../src/features/home/feature-collection/LayoutToggle.tsx) (Gallery / Grid), designed with the ui-ux-pro-max guidance (glass pill, 44px target, visible focus, decorative icons hidden, reduced motion). The shared `SegmentedControl` is untouched.
+- **Verification:** `npm run check` passed (`77` files, `433` tests), including new tests for the toggle's label/icon/accessible-name flip and the halo layer. Live dev-server check at `1024px` and `320px`: halo opacity `1` on hover with `0.25s` rise and `0.4s` settle and no filter on the base artwork; toggle switches to Grid, persists `hts.featureCollection.layout`, keeps focus, and fits at `320px` without horizontal overflow; `/tasks/daily` shows "Task Management" in the tab title and header.
+
+## 7. v3.2 Loader v2 (18 November 2026)
+
+- **Scope:** estimate-paced route loader (`load-estimate.ts`, cold/warm history, fast vs draw path, fast-forward when ready early), per-feature background matching the collection card, "Loading {title}" in Cormorant italic with looping dots, text-only loader for routes without a zodiac, hard-load/refresh coverage with a server-rendered overlay, and zodiac-data warming on link hover/focus. See `md/agents/shared/uiux.md` §10.0.1.
+- **Not implemented:** reading TanStack Query cache state into the estimate (the loader cannot know which queries a route uses); the moving average already reflects cached repeat visits.
+- **Verification:** `npm run check` and `npm run build` pass. Live dev and production checks: cold visit draws and records a cold sample, repeat visit takes the fast path (~230ms), an early-ready page dismisses without waiting, server HTML contains the overlay on feature routes but not on Home, and a production hard load of `/tasks/hub` dismissed after ~350ms. In `next dev`, first-compile delays can exceed the 10s failsafe on a hard load; production is unaffected.
 

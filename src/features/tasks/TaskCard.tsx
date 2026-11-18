@@ -23,6 +23,7 @@ import { DueSoonDot } from './DueSoonDot';
 import { PriorityBadge } from './PriorityBadge';
 import { TaskMenu } from './TaskMenu';
 import dailyStyles from './daily-task-card.module.css';
+import brief from './task-brief.module.css';
 
 export interface TaskCardProps {
   ref?: Ref<HTMLElement>;
@@ -133,7 +134,7 @@ export function TaskCard({
         handleInspect();
       }}
       className={cn(
-        'w-full text-left bg-transparent border-0 p-0 font-inherit text-inherit cursor-pointer rounded-sm',
+        'w-full text-left bg-transparent border-0 p-0 font-inherit text-inherit leading-[inherit] cursor-pointer rounded-sm',
         (carousel || context === 'hub') && 'block truncate',
       )}
     >
@@ -144,7 +145,7 @@ export function TaskCard({
   );
 
   const checkboxNode = (
-    <div className="pt-0.5 shrink-0">
+    <div className={brief.check}>
       <Checkbox
         checked={isCompleted}
         onCheckedChange={() => onToggleComplete(task)}
@@ -154,20 +155,31 @@ export function TaskCard({
   );
 
   const menuNode = (
-    <TaskMenu
-      task={task}
-      isOverdue={derived.isOverdue}
-      now={now}
-      timeZone={timeZone}
-      context={context}
-      portal={carousel || context === 'hub'}
-      onEdit={onEdit}
-      onScheduleDate={onScheduleDate}
-      onOpenPickDate={onOpenPickDate}
-      onOpenTransfer={onOpenTransfer}
-      onRequestDelete={onRequestDelete}
-    />
+    <div className={brief.menu}>
+      <TaskMenu
+        task={task}
+        isOverdue={derived.isOverdue}
+        now={now}
+        timeZone={timeZone}
+        context={context}
+        portal={carousel || context === 'hub'}
+        onEdit={onEdit}
+        onScheduleDate={onScheduleDate}
+        onOpenPickDate={onOpenPickDate}
+        onOpenTransfer={onOpenTransfer}
+        onRequestDelete={onRequestDelete}
+      />
+    </div>
   );
+
+  const descriptionNode = hasDescription ? (
+    <p
+      title={carousel || context === 'hub' ? plainDescription : undefined}
+      className={cn(brief.desc, isCompleted ? 'text-text-completed' : 'text-ws-text-muted')}
+    >
+      {plainDescription}
+    </p>
+  ) : null;
 
   return (
     <motion.article
@@ -210,12 +222,9 @@ export function TaskCard({
       }
       className={cn(
         'group/card relative flex flex-col rounded-task border select-none',
+        brief.anatomy,
         handleInspect && 'cursor-pointer',
-        carousel
-          ? dailyStyles.compact
-          : dense
-            ? 'p-3.5 gap-2'
-            : 'px-[18px] py-4 gap-2.5',
+        carousel ? dailyStyles.compact : dense ? 'p-3.5 gap-2' : 'px-[18px] py-4 gap-2.5',
         'transition-[border-color,box-shadow,background-color] duration-200 ease-[var(--ease)] motion-reduce:transition-none motion-reduce:duration-0',
         context === 'overdue' && dailyStyles.overdue,
         derived.isOverdue
@@ -235,12 +244,14 @@ export function TaskCard({
     >
       {context === 'hub' ? (
         <>
-          <div className={noteStyles.noteHeader}>
+          <div className={cn(noteStyles.noteHeader, brief.header)}>
             {checkboxNode}
             <h3
               title={task.title}
               className={cn(
-                'min-w-0 flex-1 text-[length:var(--fs-body)] font-semibold leading-snug line-clamp-1 truncate',
+                brief.title,
+                brief.titleSingle,
+                'font-semibold',
                 isCompleted
                   ? 'italic line-through decoration-text-completed decoration-1 text-text-completed font-normal'
                   : 'text-ws-text',
@@ -251,18 +262,9 @@ export function TaskCard({
             {menuNode}
           </div>
 
-          <div className={noteStyles.descriptionSlot}>
-            {hasDescription ? (
-              <p
-                className={cn(
-                  'm-0 text-[length:var(--fs-ui)] leading-[1.4] line-clamp-2 break-words',
-                  isCompleted ? 'text-text-completed' : 'text-ws-text-muted',
-                )}
-              >
-                {plainDescription}
-              </p>
-            ) : null}
-          </div>
+          {hasDescription ? (
+            <div className={cn(noteStyles.descriptionSlot, brief.descSlot)}>{descriptionNode}</div>
+          ) : null}
 
           <div className={noteStyles.metadata}>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -287,51 +289,37 @@ export function TaskCard({
           </div>
         </>
       ) : (
-        <div className="flex items-start gap-3 min-w-0">
-          {checkboxNode}
+        <>
+          <div className={brief.header}>
+            {checkboxNode}
+            <h3
+              title={carousel ? task.title : undefined}
+              className={cn(
+                brief.title,
+                carousel ? brief.titleSingle : brief.titleDouble,
+                'font-semibold',
+                isCompleted
+                  ? 'italic line-through decoration-text-completed decoration-1 text-text-completed font-normal'
+                  : 'text-ws-text',
+              )}
+            >
+              {titleNode}
+            </h3>
+            {menuNode}
+          </div>
+
           <div
             className={cn(
-              'min-w-0 flex-1 flex flex-col',
-              carousel ? 'gap-1' : dense ? 'gap-1.5' : 'gap-2',
+              brief.indent,
+              'flex flex-col',
+              carousel ? dailyStyles.compactBody : dense ? 'gap-1.5' : 'gap-2',
             )}
           >
-            <div className="flex items-start gap-2 min-w-0">
-              <h3
-                title={carousel ? task.title : undefined}
-                className={cn(
-                  'min-w-0 flex-1 text-[length:var(--fs-body)] font-semibold leading-snug break-words',
-                  carousel ? 'truncate' : 'line-clamp-2',
-                  isCompleted
-                    ? 'italic line-through decoration-text-completed decoration-1 text-text-completed font-normal'
-                    : 'text-ws-text',
-                )}
-              >
-                {titleNode}
-              </h3>
-              {menuNode}
-            </div>
-
-            {hasDescription ? (
-              <p
-                title={carousel ? plainDescription : undefined}
-                className={cn(
-                  'text-[length:var(--fs-ui)] leading-[1.55] whitespace-pre-line break-words',
-                  isCompleted ? 'text-text-completed' : 'text-ws-text-muted',
-                  carousel
-                    ? dailyStyles.compactDescription
-                    : dense
-                      ? 'line-clamp-1'
-                      : 'line-clamp-2',
-                )}
-              >
-                {plainDescription}
-              </p>
-            ) : carousel ? (
-              <div className={dailyStyles.compactDescription} aria-hidden="true" />
-            ) : null}
+            {carousel ? <div className={brief.descSlot}>{descriptionNode}</div> : descriptionNode}
 
             <div
               className={cn(
+                brief.meta,
                 'flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[length:var(--fs-small)]',
                 carousel && dailyStyles.compactMetadata,
               )}
@@ -379,7 +367,7 @@ export function TaskCard({
               </div>
             ) : null}
           </div>
-        </div>
+        </>
       )}
     </motion.article>
   );

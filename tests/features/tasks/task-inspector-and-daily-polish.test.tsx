@@ -38,6 +38,8 @@ vi.mock('@/client/preferences', () => ({
   setDailyViewPreference: (next: 'day' | 'week' | 'month') => {
     dailyPrefState.mode = next;
   },
+  getRouteLoadHistoryRaw: () => null,
+  setRouteLoadHistoryRaw: () => {},
 }));
 
 vi.mock('@/client/queries/tasks', () => ({
@@ -126,14 +128,18 @@ describe('TaskInspector modal behavior and nested Escape layering', () => {
 
     expect(within(dialog).getByText('19:00 · Sun · 15 Nov 2026')).toBeInTheDocument();
     expect(within(dialog).getByText('Sun · 15 Nov 2026')).toBeInTheDocument();
-    expect(within(dialog).getByText('Daily calendar placement')).toBeInTheDocument();
-    expect(
-      within(dialog).getByText(
-        'Changes which Daily column this task appears on without changing its deadline.',
-      ),
-    ).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Remove from Daily' })).toBeInTheDocument();
+    // v3.2: no Active badge, no placement box, no divider above the footer buttons.
+    expect(within(dialog).queryByText('Active')).toBeNull();
+    expect(within(dialog).queryByText('Daily calendar placement')).toBeNull();
     expect(within(dialog).queryByText('Overdue deadline reschedule')).toBeNull();
+    expect(dialog.querySelector('.border-t')).toBeNull();
+    const chooseDay = within(dialog).getByRole('button', { name: 'Choose day' });
+    fireEvent.click(chooseDay);
+    expect(within(dialog).getByRole('menuitem', { name: 'Today' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('menuitem', { name: 'Tomorrow' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('menuitem', { name: 'Specific date…' })).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('menuitem', { name: 'Remove from Daily' }));
+    expect(onScheduleDate).toHaveBeenLastCalledWith(activeTask, null);
 
     const overdueTask = makeTask({
       deadlineAt: '2026-11-14T12:00:00.000Z',
@@ -160,10 +166,23 @@ describe('TaskInspector modal behavior and nested Escape layering', () => {
 
     expect(within(dialog).getByText('No description added.')).toBeInTheDocument();
     expect(within(dialog).getByText('Not scheduled on Daily')).toBeInTheDocument();
-    expect(within(dialog).queryByRole('button', { name: 'Remove from Daily' })).toBeNull();
-    expect(within(dialog).getByText('Overdue deadline reschedule')).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Reschedule overdue task…' }));
-    expect(onOpenTransfer).toHaveBeenCalledWith(overdueTask);
+    expect(within(dialog).getByText('Overdue')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Choose day' }));
+    expect(within(dialog).getByText('Moves the day and the deadline.')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('menuitem', { name: 'Remove from Daily' })).toBeNull();
+    fireEvent.click(within(dialog).getByRole('menuitem', { name: 'Today' }));
+    expect(onOpenTransfer).toHaveBeenLastCalledWith(overdueTask, '2026-11-15');
+    expect(onScheduleDate).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Choose day' }));
+    fireEvent.click(within(dialog).getByRole('menuitem', { name: 'Specific date…' }));
+    expect(onOpenTransfer).toHaveBeenLastCalledWith(overdueTask);
+
+    // Escape closes only the menu; the dialog stays open
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Choose day' }));
+    fireEvent.keyDown(within(dialog).getByRole('menu'), { key: 'Escape' });
+    expect(within(dialog).queryByRole('menu')).toBeNull();
+    expect(screen.getByRole('dialog', { name: overdueTask.title })).toBeInTheDocument();
   });
 
   it('closes nested ScheduleDateDialog on first Escape before closing TaskInspector', async () => {
@@ -203,7 +222,8 @@ describe('TaskInspector modal behavior and nested Escape layering', () => {
 
     render(<LayeredInspector />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Choose day…' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose day' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Specific date…' }));
     expect(screen.getByRole('dialog', { name: 'Schedule for a day' })).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: task.title })).toBeInTheDocument();
 
@@ -221,6 +241,22 @@ describe('TaskInspector modal behavior and nested Escape layering', () => {
 });
 
 describe('DailyBoard visual asset retirement, stable Week/Month navigation, and Daily card inspection', () => {
+  it('renders the two-word masthead with an italic second word, a subtitle, and no title star or arc deadline star (v3.2)', () => {
+    queryState.tasks = [];
+    const { container } = render(
+      <ToastProvider>
+        <DailyBoard timeZone="Asia/Saigon" />
+      </ToastProvider>,
+    );
+
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveTextContent('Task management');
+    expect(heading.querySelector('span')).toHaveTextContent('management');
+    expect(heading.querySelector('svg')).toBeNull();
+    expect(heading.parentElement?.querySelector('p')).not.toBeNull();
+    expect(container.querySelector('[class*="deadlineStar"]')).toBeNull();
+  });
+
   it('retires galaxy, glint shooting-star, and forecast planet from Daily sky & dashboard', () => {
     const { container } = render(
       <ToastProvider>
@@ -307,7 +343,7 @@ describe('DailyBoard visual asset retirement, stable Week/Month navigation, and 
     expect(container.querySelector('[class*="dateNavLabel"]')).toBeInTheDocument();
   });
 
-  it('publishes night-bloom-corner and starlit-thread-divider, deletes retired Daily SVGs, and enforces 240px Hub cards', async () => {
+  it('publishes night-bloom-corner and starlit-thread-divider, deletes retired Daily SVGs, and sizes Hub cards to their content (v3.1)', async () => {
     const publicDir = path.resolve(process.cwd(), 'public', 'visuals', 'daily-v2');
     const publishedFiles = await fs.readdir(publicDir);
 
@@ -329,7 +365,8 @@ describe('DailyBoard visual asset retirement, stable Week/Month navigation, and 
       path.resolve(process.cwd(), 'src/features/tasks/task-note.module.css'),
       'utf8',
     );
-    expect(noteCss).toContain('height: 240px');
+    // v3.1 §5.3: Hub cards no longer reserve a fixed 240px body.
+    expect(noteCss).not.toContain('height: 240px');
     expect(noteCss).not.toContain('aspect-ratio: 4 / 5');
   });
 });

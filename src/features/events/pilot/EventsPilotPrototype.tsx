@@ -24,10 +24,14 @@ import {
   Video,
   X,
 } from 'lucide-react';
-import type { EventCategory, EventItem } from '@/contracts/event';
+import { eventItemSchema, type EventCategory, type EventItem } from '@/contracts/event';
 import { computeEventStats, formatRelativeEventTime, getUpcomingExams } from '@/domain/event-domain';
 import { buildZonedInstant, DEFAULT_APP_TIMEZONE, formatScheduledDate, shiftScheduledDate } from '@/domain/time';
-import { eventEditorPatch, eventEditorValues } from '@/features/events/event-editor';
+import {
+  blankEditorValues,
+  eventEditorPatch,
+  eventEditorValues,
+} from '@/features/events/event-editor';
 
 type EventEditorValues = ReturnType<typeof eventEditorValues>;
 import { TransitionLink } from '@/features/transitions/TransitionLink';
@@ -62,6 +66,7 @@ const CATEGORY_LABELS: Record<'all' | EventCategory, string> = {
   school: 'School',
   meeting: 'Meetings',
   deadline: 'Deadlines',
+  contest: 'Contests',
 };
 
 const DATASET_LABELS: Record<PilotDatasetMode, string> = {
@@ -151,16 +156,7 @@ function formatZonedFullDateTime(iso: string): string {
 }
 
 function defaultEditorValues(selectedDate: string | null): EventEditorValues {
-  return {
-    title: '',
-    category: 'school',
-    date: selectedDate ?? '2026-11-15',
-    time: '09:00',
-    location: '',
-    isOnline: false,
-    isExam: false,
-    notes: '',
-  };
+  return blankEditorValues(selectedDate ?? '2026-11-15', { category: 'school' });
 }
 
 function sameEditorValues(a: EventEditorValues, b: EventEditorValues): boolean {
@@ -462,7 +458,7 @@ export function EventsPilotPrototype() {
       setEventsState((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       setSelectedEventId(updated.id);
     } else {
-      const created: EventItem = {
+      const created: EventItem = eventItemSchema.parse({
         id: `evt-pilot-${Date.now()}`,
         title: formValues.title.trim(),
         description: formValues.notes.trim() || null,
@@ -478,7 +474,7 @@ export function EventsPilotPrototype() {
         notes: formValues.notes.trim() || null,
         createdAt: PILOT_NOW.toISOString(),
         updatedAt: PILOT_NOW.toISOString(),
-      };
+      });
       setEventsState((prev) => [created, ...prev]);
       setSelectedEventId(created.id);
     }
@@ -675,7 +671,7 @@ export function EventsPilotPrototype() {
       <div className="space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <CategoryBadge category={evt.category} isExam={evt.isExam} />
+            <CategoryBadge category={evt.category ?? 'school'} isExam={evt.isExam} />
             <span className="text-[length:var(--fs-micro)] font-medium text-ws-text-muted tabular-nums">
               {formatRelativeEventTime(evt.startAt, PILOT_NOW)}
             </span>
@@ -1178,7 +1174,7 @@ export function EventsPilotPrototype() {
                         className={cn(styles.eventRow, isSelected && styles.eventRowSelected)}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                          <CategoryBadge category={evt.category} isExam={evt.isExam} />
+                          <CategoryBadge category={evt.category ?? 'school'} isExam={evt.isExam} />
                           <span className="text-[length:var(--fs-micro)] font-medium text-ws-text-muted tabular-nums">
                             {formatRelativeEventTime(evt.startAt, PILOT_NOW)}
                           </span>
@@ -1423,7 +1419,7 @@ export function EventsPilotPrototype() {
                     </label>
                     <select
                       id="pilot-event-category"
-                      value={formValues.category}
+                      value={formValues.category ?? ''}
                       onChange={(e) =>
                         setFormValues((prev) => ({
                           ...prev,

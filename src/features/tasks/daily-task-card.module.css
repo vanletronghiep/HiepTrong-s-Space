@@ -35,11 +35,10 @@
   opacity: 0.42;
 }
 
-.compactDescription {
-  min-height: 19px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.compactBody {
+  flex: 1;
+  gap: 6px;
+  min-height: 0;
 }
 
 .compactMetadata {

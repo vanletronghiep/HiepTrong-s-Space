@@ -205,11 +205,10 @@ export function RichNoteEditor({
 
   return (
     <div
+      data-focus-field
       className={cn(
-        'rounded-item border bg-ws-surface transition-[border-color,box-shadow] duration-[var(--dur-fast)]',
-        error || overLimit
-          ? 'border-tint-overdue-border focus-within:ring-2 focus-within:ring-[var(--status-overdue)]'
-          : 'border-ws-border focus-within:border-ws-accent',
+        'rounded-item border bg-ws-surface',
+        error || overLimit ? 'border-tint-overdue-border' : 'border-ws-border',
         disabled && 'opacity-60 pointer-events-none',
         className,
       )}
@@ -223,6 +222,7 @@ export function RichNoteEditor({
           <button
             type="button"
             disabled={disabled || !editor}
+            data-focus-tint
             aria-label="Bold"
             aria-pressed={formatState.bold}
             title="Bold (Ctrl/Cmd+B)"
@@ -242,6 +242,7 @@ export function RichNoteEditor({
           <button
             type="button"
             disabled={disabled || !editor}
+            data-focus-tint
             aria-label="Bullet list"
             aria-pressed={formatState.bulletList}
             title="Bullet list (- )"

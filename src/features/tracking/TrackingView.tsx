@@ -1,5 +1,6 @@
 'use client';
 
+import { usePageReady } from '@/features/transitions/TransitionProvider';
 import React, { useId, useRef, useState } from 'react';
 import { Leaf, Plus, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
@@ -107,6 +108,7 @@ export function TrackingView() {
 
   // Queries & Mutations
   const { data, isLoading, isError: loadFailed, refetch } = useTrackingData();
+  usePageReady(!isLoading);
   const toggleHabit = useToggleHabit();
   const createHabit = useCreateHabit();
   const logSleep = useLogSleep();

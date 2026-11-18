@@ -71,3 +71,21 @@
 - **Verification:** `npm run check` passed across 25 test files (`104` tests).
 
 
+
+## 2026-11-17 — v3.1 Task work (partial)
+
+- Shared brief-card anatomy implemented for Daily and Hub (`task-brief.module.css`): aligned header row, two-line description clamp, content-sized Hub cards (fixed 240px body removed). Responsive mockups approved by the owner; the broader Daily/Hub layout renovation beyond these card rules is not yet implemented.
+- Verification: `npm run check` and `npm run build` pass; live production check confirmed checkbox/title/menu share one vertical centre. See `md/v3.1-suggestions.md` for open proposals.
+
+## 2026-11-18 — v3.2 Task pages polish (part 2)
+
+- **Titles:** Daily and Hub share `task-masthead.module.css`: sentence-case "Task *management*" / "Tasks *hub*" (Cormorant 500, italic 400 second word in `--daily-heading-accent`), placeholder subtitle, title star removed. Spacing below the masthead raised (24-32px) and between dashboard, carousel and Overdue lane (~24px).
+- **Hub layout:** `tasks-hub` is now a full-page feature theme (no bordered `FeatureTheme` frame, no header art) with the Daily frame width and a soft lavender canvas in `globals.css`. `WorkspacePageHeader` was removed (no remaining users).
+- **Day arc:** the coral end-of-arc `deadlineStar` was removed so it no longer overlaps the moon near 23:59.
+- **Scrollbar:** the Daily custom scrollbar was removed; scrolling is unchanged.
+- **Task detail (`TaskInspector`):** no "Active" badge (Overdue / Due soon / Completed / Pinned stay; "Mark active" button kept), the "Daily calendar placement" and "Overdue deadline reschedule" sections and the footer divider were removed, and a **Choose day** menu was added (`ChooseDayMenu.tsx`): Today / Tomorrow / Specific date… / Remove from Daily for normal tasks; for overdue tasks Today / Tomorrow / Specific date open the Transfer dialog (day + deadline) with the day preselected via the new `TransferDialog initialDate`.
+- **Task form:** gap between the title field (with reserved validation line) and Deadline reduced from ~45px to ~38px.
+- **Universe menu:** options are real links (`TransitionLink`), so Ctrl/Cmd/middle-click open a new tab; Ctrl/Cmd+Enter in the search box does too.
+- **Not in this entry:** loader v2 and the asset report / Hub card proposals are tracked separately.
+- **Verification:** `npm run check` passed (77 files, 435 tests).
+

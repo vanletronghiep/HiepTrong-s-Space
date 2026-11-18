@@ -15,11 +15,12 @@ export async function GET(): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await parseJsonBody(request);
+    // The legacy-category escape hatch is reserved for server-side draft publication.
     const input = createEventInputSchema.parse(body);
+    delete input.allowLegacyCategory;
     const item = await eventService.createEvent(input);
     return NextResponse.json({ item }, { status: 201 });
   } catch (error: unknown) {
     return handleApiError(error);
   }
 }
-

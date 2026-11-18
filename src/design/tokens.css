@@ -69,6 +69,11 @@
   /* ─── Derived (computed via color-mix, not new colours) ─── */
   --ws-focus: color-mix(in srgb, var(--ws-accent) 55%, var(--ws-text));
   --cosmos-focus: var(--cosmos-lavender);
+  /* Borderless form-control focus tints (v3.1): background feedback replaces rings. */
+  --ws-focus-tint: color-mix(in srgb, var(--ws-accent) 16%, var(--ws-surface));
+  --ws-focus-tint-selected: color-mix(in srgb, var(--ws-accent) 34%, var(--ws-surface));
+  --cosmos-focus-tint: color-mix(in srgb, var(--cosmos-lavender) 22%, transparent);
+  --cosmos-focus-tint-selected: color-mix(in srgb, var(--cosmos-lavender) 40%, transparent);
   --ws-scrim: color-mix(in srgb, var(--ws-text) 28%, transparent);
   --tint-overdue-bg: color-mix(in srgb, var(--status-overdue) 8%, var(--ws-surface));
   --tint-overdue-border: color-mix(in srgb, var(--status-overdue) 45%, var(--ws-border));
@@ -96,6 +101,11 @@
   --fs-micro: 0.75rem;
 
   --lh-tight: 1.05;
+  /* Task brief-card text metrics (v3.1 §5.3); reserved areas derive from these. */
+  --brief-title-lh: calc(var(--fs-body) * 1.375);
+  --brief-desc-lh: calc(var(--fs-ui) * 1.45);
+  --brief-desc-area: calc(2 * var(--brief-desc-lh));
+  --brief-meta-row: 24px;
   --lh-heading: 1.15;
   --lh-body: 1.6;
   --lh-relaxed: 1.7;
@@ -275,6 +285,8 @@
   --ws-border: color-mix(in srgb, var(--feature-soft) 85%, var(--feature-muted));
   --ws-focus: var(--ws-accent);
   --text-accent: var(--ws-accent);
+  --ws-focus-tint: color-mix(in srgb, var(--ws-accent) 16%, var(--ws-surface));
+  --ws-focus-tint-selected: color-mix(in srgb, var(--ws-accent) 34%, var(--ws-surface));
 }
 [data-note-tone='lavender'] { --note-header: #d2c4ee; --note-body: #f3edfc; --note-ink: #3e315d; }
 [data-note-tone='blush'] { --note-header: #edc6d3; --note-body: #fcf0f4; --note-ink: #65394b; }

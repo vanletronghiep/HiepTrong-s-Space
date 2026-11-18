@@ -1,0 +1,184 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=18mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{url}
+
+\DeclareRobustCommand{\file}[1]{{\ttfamily\small\url{#1}}}
+
+\title{Font usage report}
+\author{Hiep Trong Space}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+Source scan of \file{src/}. This report covers font families and where each one is applied.
+Font weights, sizes and line heights are not listed individually.
+
+\section{Summary}
+
+The project uses two web fonts, both loaded through \file{next/font/google} in \file{src/design/fonts.ts}.
+No monospace or other font families are used in \file{src/}.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}p{2.8cm}p{3.6cm}p{3.2cm}p{4.4cm}@{}}
+\toprule
+Role & Font & CSS variable & Fallback stack \\
+\midrule
+Display (headings, wordmark) & Cormorant Garamond (normal and italic; latin and vietnamese subsets) & \file{--font-cormorant} $\rightarrow$ \file{--font-display} & Georgia, serif \\
+UI and body text & Inter (latin and vietnamese subsets) & \file{--font-inter} $\rightarrow$ \file{--font-ui} & system-ui, -apple-system, Segoe UI, sans-serif \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Font definitions}
+
+\begin{longtable}{@{}p{5.2cm}p{1.6cm}p{8.6cm}@{}}
+\toprule
+File & Line & Definition \\
+\midrule
+\endhead
+\file{src/design/fonts.ts} & 1, 3--9 & Cormorant Garamond: \texttt{display: 'swap'}, \texttt{variable: '--font-cormorant'}, styles normal and italic. \\
+\file{src/design/fonts.ts} & 1, 11--16 & Inter: \texttt{display: 'swap'}, \texttt{variable: '--font-inter'}. \\
+\file{src/design/tokens.css} & 89 & \texttt{--font-display: var(--font-cormorant, 'Cormorant Garamond'), ui-serif, Georgia, serif} \\
+\file{src/design/tokens.css} & 90 & \texttt{--font-ui: var(--font-inter, 'Inter'), system-ui, -apple-system, 'Segoe UI', sans-serif} \\
+\file{src/app/globals.css} & 45--46 & Tailwind theme mapping: \texttt{--font-display} and \texttt{--font-sans: var(--font-ui)}. \\
+\file{src/app/globals.css} & 256--262 & Utility classes \texttt{.font-display} and \texttt{.font-ui}. \\
+\bottomrule
+\end{longtable}
+
+\section{Where each font is applied}
+
+\subsection{Cormorant Garamond (\texttt{--font-display})}
+
+\paragraph{Global and shared components}
+
+\begin{longtable}{@{}p{5.4cm}p{1.8cm}p{7.6cm}@{}}
+\toprule
+File & Line & Element or use \\
+\midrule
+\endhead
+\file{src/ui/WorkspaceShell.tsx} & 160 & Italic wordmark ``Hiep Trong'' in the workspace header \\
+\file{src/ui/WorkspaceShell.tsx} & 253 & Page heading (h1) \\
+\file{src/ui/Dialog.tsx} & 91 & Dialog title \\
+\file{src/ui/Drawer.tsx} & 171 & Drawer title \\
+\file{src/ui/LargeEditorDialog.tsx} & 363 & Editor dialog title \\
+\file{src/ui/feature-theme.module.css} & 19 & Feature theme font-family rule \\
+\file{src/app/error.tsx} & 19 & Error page heading \\
+\file{src/app/(workspace)/error.tsx} & 18 & Workspace error heading \\
+\file{src/app/not-found.tsx} & 10 & 404 heading \\
+\file{src/features/blank/BlankPage.tsx} & 25 & Blank page heading \\
+\file{src/features/home/HomeFooter.tsx} & 7 & Italic footer text \\
+\bottomrule
+\end{longtable}
+
+\paragraph{Feature pages (TSX)}
+
+\begin{longtable}{@{}p{6.2cm}p{3.2cm}p{4.2cm}@{}}
+\toprule
+File & Lines & Element or use \\
+\midrule
+\endhead
+\file{src/features/events/EventsView.tsx} & 599, 811, 966, 1126 & Section and card headings \\
+\file{src/features/events/HighlightsSection.tsx} & 47 & Highlights heading \\
+\file{src/features/events/SchoolTimetable.tsx} & 78 & Timetable heading \\
+\file{src/features/events/WeekCalendarPanel.tsx} & 138, 287 & Calendar heading and day heading \\
+\file{src/features/events/pilot/EventsPilotPrototype.tsx} & 507, 691, 794, 938, 1026, 1129, 1183, 1299 & Pilot prototype headings; italic wordmark (794) \\
+\file{src/features/tasks/DailyBoard.tsx} & 450 & Daily board heading \\
+\file{src/features/tasks/HubList.tsx} & 293, 480 & Hub list headings \\
+\file{src/features/tasks/OverdueList.tsx} & 61 & Overdue list heading \\
+\bottomrule
+\end{longtable}
+
+\paragraph{CSS modules (\texttt{font-family: var(--font-display)})}
+
+\begin{longtable}{@{}p{10.2cm}p{4.2cm}@{}}
+\toprule
+File & Lines \\
+\midrule
+\endhead
+\file{src/features/learning-room/learning-room.module.css} & 99 \\
+\file{src/features/blogs/writing-room.module.css} & 69, 256, 451, 557, 607 \\
+\file{src/features/flashcards/flashcards.module.css} & 89, 131, 178, 232, 335, 401, 450 \\
+\file{src/features/milestones/milestones.module.css} & 107, 333 \\
+\file{src/features/apcs/apcs.module.css} & 75, 175, 831 \\
+\file{src/features/ai-engineering/ai-engineering.module.css} & 101, 253, 286, 637 \\
+\file{src/features/notifications/notifications-hub.module.css} & 96, 204, 483, 548 \\
+\file{src/features/achievements/achievements.module.css} & 106, 382 \\
+\file{src/features/events/events.module.css} & 86, 382 \\
+\file{src/features/events/pilot/events-pilot.module.css} & 164 \\
+\file{src/features/home/feature-collection/feature-collection.module.css} & 4, 278 \\
+\file{src/features/home/home-journey.module.css} & 267, 338, 369, 404, 947 \\
+\file{src/features/tracking/tracking.module.css} & 98, 219, 351 \\
+\file{src/features/entertainment/entertainment.module.css} & 100, 188, 218, 368 \\
+\file{src/features/projects/projects.module.css} & 107 \\
+\file{src/features/tasks/daily-foundation.module.css} & 193 \\
+\bottomrule
+\end{longtable}
+
+\paragraph{Preview routes only (\file{src/app/preview/})}
+
+\begin{longtable}{@{}p{8.2cm}p{2.6cm}p{3.6cm}@{}}
+\toprule
+File & Lines & Use \\
+\midrule
+\endhead
+\file{src/app/preview/shared-pilot/SharedPilotView.tsx} & 63, 94, 165 & Headings \\
+\file{src/app/preview/zodiac-illumination/zodiac-preview.module.css} & 74 & Heading style \\
+\file{src/app/preview/homepage-pilot/homepage-pilot.module.css} & 258, 280, 301, 313, 467 & Homepage pilot styles \\
+\bottomrule
+\end{longtable}
+
+\subsection{Inter (\texttt{--font-ui})}
+
+\paragraph{Global base}
+
+\begin{longtable}{@{}p{6.4cm}p{2.6cm}p{5.4cm}@{}}
+\toprule
+File & Line(s) & Use \\
+\midrule
+\endhead
+\file{src/app/globals.css} & 71 & \texttt{html, body} base font; default for all text with no other font set \\
+\file{src/app/globals.css} & 46, 260--262 & \texttt{--font-sans} Tailwind mapping and the \texttt{.font-ui} utility class \\
+\bottomrule
+\end{longtable}
+
+\paragraph{Explicit uses}
+
+\begin{longtable}{@{}p{8.2cm}p{2.6cm}p{3.6cm}@{}}
+\toprule
+File & Line(s) & Use \\
+\midrule
+\endhead
+\file{src/features/events/WeekCalendarPanel.tsx} & 290 & Inline \texttt{font-ui} class on a small accent label \\
+\file{src/features/transitions/zodiac-loader.module.css} & 48 & Route loader styles \\
+\file{src/features/tasks/week-view.module.css} & 98 & Week view \\
+\file{src/features/home/home-journey.module.css} & 8, 320, 346, 385, 394, 456, 500, 743 & Home journey text \\
+\file{src/features/home/feature-collection/feature-collection.module.css} & 22 & Feature collection text \\
+\file{src/features/projects/projects.module.css} & 165, 274 & Project text \\
+\file{src/features/achievements/achievements.module.css} & 151 & Achievement text \\
+\file{src/features/milestones/milestones.module.css} & 161 & Milestone text \\
+\file{src/features/blogs/writing-room.module.css} & 544 & Writing room text \\
+\file{src/app/preview/zodiac-illumination/zodiac-preview.module.css} & 6, 121 & Preview text \\
+\file{src/app/preview/homepage-pilot/homepage-pilot.module.css} & 8, 292 & Preview text \\
+\bottomrule
+\end{longtable}
+
+\section{Notes and limits}
+
+\begin{itemize}
+  \item Components that set no font-family inherit Inter from \texttt{html, body}. They are not listed above.
+  \item \file{src/features/blogs/writing-room.module.css:270} uses \texttt{font: inherit}, which takes the parent's font and adds no new family.
+  \item Font weights (for example 400, 500, 600, 700) are set on many elements and are not catalogued here.
+  \item Only \file{src/} was scanned. Files outside it, such as the archived docs under \file{md/archive/}, were not checked.
+  \item Line numbers match the current working tree and may shift after edits.
+\end{itemize}
+
+\end{document}

@@ -1,4 +1,3 @@
-import { PageReady } from '@/features/transitions/TransitionProvider';
 import type { Metadata } from 'next';
 import { EventsView } from '@/features/events/EventsView';
 import { getFeatureById } from '@/features/registry';
@@ -10,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function EventsPage() {
-  return <><PageReady /><EventsView /></>;
+  return <EventsView />;
 }

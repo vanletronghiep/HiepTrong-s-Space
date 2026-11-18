@@ -98,6 +98,7 @@ export function SegmentedControl<TValue extends string>({
               <motion.span
                 layoutId={`segment-pill-${layoutGroupId}`}
                 aria-hidden="true"
+                data-segment-pill
                 transition={
                   reducedMotion
                     ? { duration: 0 }

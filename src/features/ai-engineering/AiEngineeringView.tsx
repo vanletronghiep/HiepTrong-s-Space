@@ -1,5 +1,6 @@
 'use client';
 
+import { usePageReady } from '@/features/transitions/TransitionProvider';
 import React, { useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
@@ -111,6 +112,7 @@ export function AiEngineeringView() {
   const [activeNote, setActiveNote] = useState<AiNotionNote | null>(null);
 
   const { data, isLoading, isError: loadFailed, refetch } = useAiEngineeringData();
+  usePageReady(!isLoading);
   const toggleTopic = useToggleAiTopic();
 
   const handleToggle = (stageId: string, topicId: string) => {

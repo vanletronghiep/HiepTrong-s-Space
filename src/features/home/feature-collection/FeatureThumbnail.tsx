@@ -371,8 +371,12 @@ export function FeatureThumbnail({
     };
   }, []);
 
+  // Zodiac artwork rests fully drawn; hover only raises its glow, so no moving light follows
+  // the pointer across it (v3.1 §4). Preview controls keep the interactive drawing mode.
+  const isStaticZodiac = Boolean(thumbnail.zodiacSign) && !zodiacControl;
+
   const moveGlow = (event: PointerEvent<HTMLDivElement>) => {
-    if (!enabled.current || event.pointerType !== 'mouse') return;
+    if (isStaticZodiac || !enabled.current || event.pointerType !== 'mouse') return;
     pointer.current = { x: event.clientX, y: event.clientY };
     if (frame.current) return;
     const surface = event.currentTarget;
@@ -394,6 +398,7 @@ export function FeatureThumbnail({
 
   return (
     <div
+      data-zodiac-thumb={isStaticZodiac ? 'static' : undefined}
       onPointerEnter={moveGlow}
       onPointerMove={moveGlow}
       onPointerLeave={hideGlow}
@@ -410,10 +415,22 @@ export function FeatureThumbnail({
 
       {/* Composited SVG vector reveal strictly inside overflow-hidden bounds */}
       <div className={styles.thumbArtwork}>
+        {thumbnail.zodiacSign && isStaticZodiac ? (
+          // Pre-glowed copy painted once and faded by opacity only, so hover never re-rasterizes
+          // a filter per frame (v3.2).
+          <div aria-hidden="true" className={cn(styles.zodiacInset, styles.zodiacHalo)}>
+            <ZodiacIllumination
+              sign={thumbnail.zodiacSign}
+              presentation="static"
+              enabled={illuminationEnabled}
+            />
+          </div>
+        ) : null}
         {thumbnail.zodiacSign ? (
           <div className={styles.zodiacInset}>
             <ZodiacIllumination
               sign={thumbnail.zodiacSign}
+              presentation={isStaticZodiac ? 'static' : 'hover'}
               active={zodiacControl?.activeOverride ?? active}
               enabled={illuminationEnabled}
               manualProgress={zodiacControl?.manualProgress}

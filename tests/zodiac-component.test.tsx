@@ -470,71 +470,25 @@ describe('ZodiacIllumination component lifecycle, fallback & SVG ID isolation', 
     expect(lifecycle.container.querySelector('svg[data-zodiac-part="emblem"]')).toBeNull();
   });
 
-  it('keeps zodiac illumination active across simultaneous hover + :focus-visible when mouse leaves while focused', async () => {
+  it('renders production collection zodiac artwork fully drawn at rest; hover and focus never start drawing', () => {
     setupMediaQueries({ noHover: false, reducedMotion: false });
     setupIntersectionObserver();
 
     const aquariusFeature = ZODIAC_PREVIEW_FEATURES.find((f) => f.id === 'learning-room')!;
     expect(aquariusFeature.thumbnail.zodiacSign).toBe('aquarius');
-
-    const snapshots: Array<{ p: number; target: number }> = [];
-    render(
-      <FeatureCard
-        feature={aquariusFeature}
-        revealComplete={true}
-        zodiacControl={{
-          onFrame: (snap) => snapshots.push({ p: snap.p, target: snap.target }),
-        }}
-      />,
-    );
+    render(<FeatureCard feature={aquariusFeature} revealComplete={true} />);
 
     const link = screen.getByRole('link', { name: /Learning Room/i });
-    const origMatches = link.matches.bind(link);
-    let focusVisibleMock = false;
-    vi.spyOn(link, 'matches').mockImplementation((selector) =>
-      selector === ':focus-visible' ? focusVisibleMock : origMatches(selector),
-    );
+    const root = document.querySelector('[data-zodiac-sign="aquarius"]');
+    expect(root).toHaveAttribute('data-zodiac-mode', 'static-full');
+    expect(root).toHaveAttribute('data-zodiac-presentation', 'static');
+    expect(document.querySelector('[data-zodiac-thumb="static"]')).toBeInTheDocument();
 
-    // Activate via mouse hover first
     fireEvent.pointerEnter(link, { pointerType: 'mouse' });
     fireEvent.mouseEnter(link);
-
-    await waitFor(() => {
-      expect(document.querySelector('[data-zodiac-mode="enhanced"]')).toBeInTheDocument();
-    });
-
-    // Advance one frame and verify target = 1
-    const stepFrames = (count: number, startTimeMs = 16.67) => {
-      let t = startTimeMs;
-      for (let i = 0; i < count; i += 1) {
-        const entries = Array.from(rafQueue.entries());
-        rafQueue.clear();
-        for (const [, cb] of entries) cb(t);
-        t += 16.67;
-      }
-      return t;
-    };
-
-    let t = stepFrames(4);
-    expect(snapshots[snapshots.length - 1]?.target).toBe(1);
-
-    // Also focus with keyboard (:focus-visible) while hovered
-    focusVisibleMock = true;
     fireEvent.focus(link);
-    t = stepFrames(2, t);
-    expect(snapshots[snapshots.length - 1]?.target).toBe(1);
-
-    // Mouse leaves while :focus-visible remains -> MUST stay active (target stays 1, no reversal)
-    fireEvent.pointerLeave(link, { pointerType: 'mouse' });
-    fireEvent.mouseLeave(link);
-    t = stepFrames(2, t);
-    expect(snapshots[snapshots.length - 1]?.target).toBe(1);
-
-    // Blur -> now target becomes 0 and illumination reverses
-    focusVisibleMock = false;
-    fireEvent.blur(link);
-    stepFrames(2, t);
-    expect(snapshots[snapshots.length - 1]?.target).toBe(0);
+    expect(document.querySelector('[data-zodiac-mode="enhanced"]')).not.toBeInTheDocument();
+    expect(root).toHaveAttribute('data-zodiac-mode', 'static-full');
   });
 
   it('keeps production registry untouched and isolates preview layout state from localStorage preferences', async () => {

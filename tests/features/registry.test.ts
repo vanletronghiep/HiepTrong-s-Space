@@ -9,7 +9,7 @@ describe('FEATURE_REGISTRY and route coverage', () => {
 
     const titles = FEATURE_REGISTRY.map((f) => f.title);
     expect(titles).toEqual([
-      'Daily Task Management',
+      'Task Management',
       'Tasks Hub',
       'Events',
       'AI Engineering',

@@ -81,7 +81,7 @@ export function TaskMenu({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={handleTriggerClick}
-        className="inline-flex items-center justify-center h-9 w-9 -mr-1.5 -mt-1 rounded-pill text-ws-text-muted hover:text-ws-text hover:bg-ws-accent-soft transition-colors duration-[var(--dur-fast)] motion-reduce:transition-none motion-reduce:duration-0 cursor-pointer"
+        className="inline-flex items-center justify-center h-9 w-9 rounded-pill text-ws-text-muted hover:text-ws-text hover:bg-ws-accent-soft transition-colors duration-[var(--dur-fast)] motion-reduce:transition-none motion-reduce:duration-0 cursor-pointer"
       >
         <MoreHorizontal size={18} strokeWidth={1.5} />
       </button>

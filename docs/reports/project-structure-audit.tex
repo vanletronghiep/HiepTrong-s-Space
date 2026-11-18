@@ -1,0 +1,286 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{url}
+\urlstyle{tt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\renewcommand{\arraystretch}{1.18}
+\newcommand{\f}[1]{\path{#1}}
+\newcommand{\sev}[1]{\textbf{[#1]}}
+
+\begin{document}
+
+\begin{center}
+{\LARGE\bfseries Project Folder Investigation\\[2pt] and Reconstruction Proposal}\\[8pt]
+{\large Hiep Trong Space (Next.js, TypeScript, SQLite)}\\[4pt]
+Snapshot taken 18 November 2026, branch \texttt{main}
+\end{center}
+\vspace{0.5em}
+\hrule
+\vspace{0.8em}
+
+\section*{1. Summary}
+
+The application source is in good shape. The folder around it is not. The \f{src/} tree follows the layer rules in \f{AGENTS.md}, the tests mirror it, and the dependency set is small. The mess comes from everything that has accumulated beside the source:
+
+\begin{itemize}
+\item The repository root holds \textbf{60 entries}. Only about 20 of them are things a tool requires to sit there.
+\item Roughly \textbf{1.9\,GB} of the 2.2\,GB outside \f{node_modules/} is regenerable output or scratch: \f{.next/} (946\,MB), \f{build/} (520\,MB) and \f{tmp/} (469\,MB). \f{tmp/perf-baseline/} is a complete second copy of the project.
+\item \textbf{16 empty tool folders} (\f{.cursor/}, \f{.windsurf/}, \f{.kiro/}, and so on) sit in the root. Each contains no regular files.
+\item Reports and notes are spread over \textbf{seven locations}, and one of them is the file that \f{AGENTS.md} calls the canonical engineering reference, which no longer exists at the path it names.
+\item Git has \textbf{6 commits and 181 uncommitted entries}. The v3.1 and v3.2 work, including new source files and tests, has no commit behind it.
+\end{itemize}
+
+The proposal in Section~4 reduces the root to about 30 entries, gives every kind of file exactly one home, and is staged so that nothing irreplaceable is touched before a backup and a commit exist. \textbf{No file in the project was changed to produce this report.}
+
+\section*{2. How the folder is constructed today}
+
+\subsection*{2.1 The application}
+
+\f{package.json} defines Next.js 15 (App Router), React 19, Tailwind 4, TanStack Query, Drizzle ORM with better-sqlite3, Three.js for the homepage Earth and zodiac scenes, and Vitest with Testing Library. \f{src/} holds 294 files:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Folder & Role \\
+\midrule
+\f{src/app} & Routes: \f{(workspace)} pages, \f{api} handlers, \f{preview} prototypes \\
+\f{src/features} & 17 feature folders (tasks 30 files, events 16, home 16, others 1--8) \\
+\f{src/ui} & Shared components (Button, Dialog, WorkspaceShell, \ldots) \\
+\f{src/client} & Query hooks and the only \texttt{localStorage} access \\
+\f{src/services} & Business logic and \f{storage/} adapter (SQLite, JSON, media) \\
+\f{src/domain}, \f{src/contracts} & Pure rules and zod schemas \\
+\f{src/design} & Tokens and motion \\
+\f{tests/} & Mirrors \f{src/} one to one (80 files) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This part is consistent with the documented rule \emph{UI $\rightarrow$ Client $\rightarrow$ API $\rightarrow$ Services $\rightarrow$ Storage}, and it should be left alone by the reconstruction except for the items in Finding F6.
+
+\subsection*{2.2 Measured inventory of the root}
+
+Counts are regular files. ``Git'' says whether the folder is ignored by \f{.gitignore} or tracked.
+
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{3.2cm}rr>{\raggedright\arraybackslash}p{2.1cm}>{\raggedright\arraybackslash}p{6.1cm}@{}}
+\toprule
+Path & Files & Size & Git & What it is \\
+\midrule
+\endhead
+\f{.next/} & 691 & 946\,MB & ignored & Next.js build output \\
+\f{build/} & 475 & 520\,MB & ignored & Second build output; \f{next.config.ts} switches \texttt{distDir} to it when \texttt{HOME\_PREVIEW\_BUILD=1} \\
+\f{tmp/} & 1350 & 469\,MB & ignored & \f{perf-baseline/} (full project copy), \f{perf-harness/}, \f{codebase-detox-audit/} \\
+\f{sources/} & 313 & 116\,MB & ignored & Reference media plus \f{generate-assets.py} and \f{index.html} \\
+\f{review/} & 680 & 80\,MB & ignored & Epic review reports, JSON evidence, logs, a baseline copy of \f{src} and \f{tests} \\
+\f{public/} & 139 & 18\,MB & tracked & Runtime images and Earth textures \\
+\f{.agents/} & 176 & 4.7\,MB & ignored & Seven skill packs (design, brand, slides, \ldots) \\
+\f{data/} & 15 & 4.1\,MB & ignored & Runtime JSON, five \texttt{.bak} files, one \texttt{pre-v3.1} backup \\
+\f{md/} & 49 & 3.8\,MB & mostly tracked & Specs, ledgers, two archives, v3.1 report \\
+\f{src/}, \f{tests/} & 374 & 3.4\,MB & tracked & The application and its tests \\
+\f{docs/} & 6 & 264\,KB & tracked, except \f{reports/} & Four audit files, v3.2 report (\texttt{.tex}, \texttt{.pdf}) \\
+\f{reports/} & 4 & 68\,KB & tracked & \f{codebase-detox/} audit and changelog \\
+\f{scripts/} & 5 & 80\,KB & tracked & \f{phase01/} (review capture), \f{zodiac/} (asset generators) \\
+16 tool folders & 0 & 4\,KB each & ignored & \f{.augment}, \f{.codebuddy}, \f{.codewhale}, \f{.continue}, \f{.cursor}, \f{.factory}, \f{.gemini}, \f{.github}, \f{.kilocode}, \f{.kiro}, \f{.opencode}, \f{.qoder}, \f{.roo}, \f{.trae}, \f{.warp}, \f{.windsurf} \\
+\bottomrule
+\end{longtable}
+
+Loose files at the root, besides configuration:
+
+\begin{center}
+\begin{tabular}{@{}ll>{\raggedright\arraybackslash}p{7.8cm}@{}}
+\toprule
+File & Size & Note \\
+\midrule
+\f{report.md} & 210\,KB & Tracked. \f{AGENTS.md} says it is updated only on request \\
+\f{desc.md} & 96\,KB & Untracked \\
+\f{review.md} & 10\,KB & Tracked \\
+\f{exp.md} & 7\,KB & Untracked \\
+\f{font-usage.tex}, \f{font-usage.pdf} & 8\,KB, 210\,KB & Untracked, a one-off report \\
+\f{sources.txt} & 0.3\,KB & Ten inspiration URLs \\
+\f{antigravity-install.ps1} & 7\,KB & Tracked installer for an editor tool, unrelated to the app \\
+\f{debug.log} & 1\,KB & Browser engine warnings, ignored \\
+\f{tsconfig.tsbuildinfo} & 501\,KB & TypeScript cache written into the root, ignored \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{3. Findings}
+
+Severity: \sev{High} blocks safe work, \sev{Medium} causes confusion or waste, \sev{Low} is cosmetic.
+
+\subsection*{F1 \sev{High}: Work is not saved in version control}
+There are 6 commits (the latest is titled ``v2.1''). The working tree has 100 changed tracked files (3 of them deleted) and about 40 untracked entries. The untracked entries include real source (\f{event-occurrence.ts}, \f{ZodiacLoaderOverlay.tsx}, \f{WeekCalendarPanel.tsx}, three API routes) and six new test files. Documents already describe v3.1 and v3.2 while history stops at v2.1. A disk problem or a stray \texttt{git checkout} would lose the only copy. Any restructuring done on top of this state cannot be undone cleanly.
+
+\subsection*{F2 \sev{High}: A canonical document is missing}
+\f{AGENTS.md} names \f{PROJECT_DESCRIPTION.md} as the engineering reference and the home of the ``Open decisions register''. The file does not exist at the root. The only copy is in \f{md/archive/pre-reorganization/}, a folder the same \f{AGENTS.md} labels inactive. \f{md/progress.md} likewise refers to a \texttt{blueprint.md} that is not in the tree. Agents and people following the reading map hit dead links, and there is no authority to settle conflicts.
+
+\subsection*{F3 \sev{Medium}: 1.9\,GB of regenerable output lives in the project}
+\f{.next/} and \f{build/} are two build outputs of the same app. \f{tmp/perf-baseline/} duplicates the project, including its own tool folders and a \f{.next/}. All are ignored by git, so they cause no history damage, but they slow editors and search, inflate backups, and make it hard to tell what is source. \f{tsconfig.tsbuildinfo} and \f{debug.log} add noise to the root.
+
+\subsection*{F4 \sev{Medium}: Sixteen empty tool folders}
+Sixteen dotted folders were created within one minute on 12 November (19:43--19:44) and contain no regular files. They look like leftovers of a skills installer that targets many editors. Only \f{.agents/} (real content) and \f{.claude/} (\f{launch.json}) have a purpose here. The empties add 16 lines to every directory listing.
+
+\subsection*{F5 \sev{Medium}: Reports and notes have no single home}
+The same kind of content is written to seven places:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Location & Contents \\
+\midrule
+root & \f{report.md}, \f{review.md}, \f{desc.md}, \f{exp.md}, \f{font-usage.*} \\
+\f{reports/} & codebase-detox audit (4 files) \\
+\f{docs/audit/} & architecture audit, bug inventory, debt, stabilization plan \\
+\f{docs/reports/} & v3.2 report \\
+\f{md/} & specs, ledger, v3.1 report with images, two archive trees, plans \\
+\f{review/} & 47 entries, including nine epic reports (ignored) \\
+\f{tmp/} & audit snapshots (ignored) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+There is no naming rule: some reports are dated by version, some by topic, some by neither. \f{md/} also holds a full pre-reorganization copy of the old docs and a second \texttt{v3.1-pre-update} copy of the agent specs, so the same spec exists in up to three versions.
+
+\subsection*{F6 \sev{Medium}: Prototype code ships inside \f{src/}}
+\f{src/app/preview/} contains four prototype routes (homepage, events, zodiac, shared). \f{src/features/events/pilot/EventsPilotPrototype.tsx} has 1\,601 lines and is the largest source file in the project. Five other files exceed 1\,000 lines (\f{EventsView}, \f{MilestonesView}, \f{WritingRoomView}, \f{AchievementsView}, \f{ProjectsView}). \f{src/features/tasks/} has 30 files in one flat folder that mixes Daily, Hub and shared pieces.
+
+\subsection*{F7 \sev{Low}: Runtime data and backups beside source}
+\f{data/} sits next to \f{src/} and collects \texttt{.bak} files and a timestamped pre-migration backup. It is correctly ignored, but a backup next to live data is not a backup. \f{drizzle.config.ts} points at \f{data/hiep-trong-space.db} while the runtime reads \texttt{DATA\_DIR} from \f{.env}; \f{AGENTS.md} already warns about this mismatch.
+
+\subsection*{F8 \sev{Low}: Local-only reference material has no boundary}
+\f{sources/} and \f{review/} are ignored because they are local-only, as \f{AGENTS.md} says. Nothing in their names tells a reader that. \f{sources/assets/} mixes media with its generator script, and \f{scripts/} holds two more generators, so asset tooling is split over two places.
+
+\section*{4. Proposed reconstruction}
+
+\subsection*{4.1 Principles}
+\begin{enumerate}
+\item \textbf{One home per kind of file.} Source, specs, human-facing reports, local-only material, generated output.
+\item \textbf{The root contains only what tools require.} Config files and the top-level folders.
+\item \textbf{Generated means disposable.} Anything regenerable lives in one ignored place and can be deleted without thought.
+\item \textbf{Respect the ownership rules.} \f{md/user/user_desc.md} and \f{md/user/user_notes.md} must not be moved, edited or reformatted. The \f{md/} paths are linked from \f{AGENTS.md}. Hence \f{md/} stays where it is.
+\end{enumerate}
+
+\subsection*{4.2 Target layout}
+
+\begin{verbatim}
+HiepTrong's Space/
+|-- AGENTS.md              agent rules (existing)
+|-- README.md              NEW, 20 lines: what it is, how to run, where things are
+|-- package.json, package-lock.json, tsconfig.json, next.config.ts,
+|   eslint.config.mjs, postcss.config.mjs, vitest.config.ts,
+|   drizzle.config.ts, .prettierrc, .gitignore, .gitattributes,
+|   .env, .env.example, next-env.d.ts
+|-- src/                   application (unchanged except F6)
+|-- tests/                 mirrors src/
+|-- public/                runtime assets
+|-- drizzle/               migrations
+|-- scripts/               ALL tooling: review/, zodiac/, assets/
+|-- md/                    specs that agents READ (rules, epics, ledger)
+|   |-- agents/  user/ (protected)  task.md  readme.md
+|   `-- archive/           one dated folder per retired spec set
+|-- docs/                  outputs that people READ
+|   |-- README.md          index of everything below
+|   |-- engineering/       PROJECT_DESCRIPTION.md (restored), decisions
+|   |-- audit/             architecture, bugs, debt, stabilization
+|   `-- reports/           YYYY-MM-DD-topic.tex and .pdf, one per report
+|-- .agents/  .claude/     only the tool folders actually in use
+`-- .local/                IGNORED: sources/ review/ data-backups/ scratch/
+\end{verbatim}
+
+Outside \f{node_modules/}, \f{.git/} and \f{.next/}, the root drops from 60 entries to about 30. Section~4.4 lists where each current item goes.
+
+\subsection*{4.3 The rule that keeps it clean}
+\begin{center}
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{9.5cm}@{}}
+\toprule
+If it is\ldots & It goes to\ldots \\
+\midrule
+Instructions an agent must follow & \f{md/} \\
+A report, audit or note a person reads & \f{docs/} (reports named \texttt{YYYY-MM-DD-topic}) \\
+Evidence, screenshots, reference media & \f{.local/} (never committed) \\
+A copy, experiment or measurement & \f{.local/scratch/}, deleted when done \\
+A script & \f{scripts/<purpose>/} \\
+Build output & \f{.next/} only \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{4.4 Item-by-item destinations}
+
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{4.3cm}>{\raggedright\arraybackslash}p{3.1cm}>{\raggedright\arraybackslash}p{7.1cm}@{}}
+\toprule
+Current & Action & Destination or reason \\
+\midrule
+\endhead
+\f{build/} & Delete, then rename & Preview builds use \texttt{distDir} \f{.next-preview}; add it to \f{.gitignore} \\
+\f{tmp/perf-baseline/} & Delete & Keep only the numbers worth keeping, as a short note in \f{docs/reports/} \\
+\f{tmp/} rest & Move & \f{.local/scratch/} \\
+\f{tsconfig.tsbuildinfo}, \f{debug.log} & Delete & Set \texttt{tsBuildInfoFile} into \f{.next/cache/} \\
+16 empty tool folders & Delete & Re-create one only if that tool is adopted \\
+\f{report.md} & Move & \f{docs/reports/} with a date; its 210\,KB size needs owner review first \\
+\f{review.md}, \f{exp.md}, \f{desc.md} & Owner decides & Contents not read here; each goes to \f{docs/} or \f{md/archive/} \\
+\f{font-usage.*} & Move & \f{docs/reports/2026-11-17-font-usage.*} \\
+\f{reports/codebase-detox/} & Move & \f{docs/audit/codebase-detox/} \\
+\f{md/v3.1-change-report/} & Move & \f{docs/reports/2026-11-v3.1-change-report/} \\
+\f{md/v3.1-*.md} plans & Move & \f{md/archive/v3.1/} once v3.1 ships \\
+\f{md/archive/pre-reorganization/} and \f{v3.1-pre-update/} & Keep one, compress the other & Both are historical; git history already holds the older state \\
+\f{md/archive/.../PROJECT_DESCRIPTION.md} & Restore & \f{docs/engineering/}, then fix links in \f{AGENTS.md} and \f{md/readme.md} \\
+\f{sources/}, \f{review/} & Move & \f{.local/sources/}, \f{.local/review/}; update \f{scripts/phase01/} paths \\
+\f{sources.txt} & Move & \f{docs/inspiration.md} \\
+\f{antigravity-install.ps1} & Move or delete & \f{scripts/tools/}, or delete if the tool is not used \\
+\f{data/*.bak} & Move & \f{.local/data-backups/}; keep live JSON in \f{data/} until config is verified \\
+\f{src/app/preview/}, \f{events/pilot/} & Owner decides & Delete if superseded, otherwise gate behind a dev-only flag \\
+\f{src/features/tasks/} & Split & \f{daily/}, \f{hub/}, \f{shared/} subfolders \\
+\bottomrule
+\end{longtable}
+
+\subsection*{4.5 Staged plan}
+
+Each phase ends with a check, and a phase does not start until the previous check passes.
+
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{1.5cm}>{\raggedright\arraybackslash}p{6.0cm}>{\raggedright\arraybackslash}p{3.5cm}>{\raggedright\arraybackslash}p{3.5cm}@{}}
+\toprule
+Phase & Work & Risk & Check \\
+\midrule
+\endhead
+0 Safety & Commit current work on a branch (needs owner approval), tag it, copy \f{sources/}, \f{review/}, \f{data/} to a folder outside the repo & None & Tree clean, copy opened and spot-checked \\
+1 Purge & Delete \f{.next/}, \f{build/}, \f{tmp/perf-baseline/}, caches, \f{debug.log}, 16 empty folders & Low, all regenerable & \texttt{npm run build} succeeds; about 1.9\,GB freed \\
+2 Docs & Create \f{docs/README.md}, restore the missing engineering reference, move reports per 4.4, fix links & Low, but links break if missed & Link check over \f{AGENTS.md}, \f{md/}, \f{docs/}; SHA-256 of protected user files unchanged \\
+3 Local zone & Create \f{.local/}, move \f{sources/}, \f{review/}, backups, update script paths and \f{.gitignore} & Medium, scripts use paths & Run each script in \f{scripts/} once \\
+4 Source & Decide on prototypes, split big files and \f{tasks/} folder & Medium, import paths change & \texttt{npm run check} and \texttt{npm run build} \\
+5 Guardrails & Short \f{README.md}, layout section in \f{AGENTS.md}, \texttt{npm run clean} script, \f{.local/} in \f{.gitignore} & Low & Fresh clone follows README and runs \\
+\bottomrule
+\end{longtable}
+
+Phases 1 to 3 are file moves and deletions with no logic change. Phase 4 is the only one that touches code. It can be skipped or postponed without harming the rest.
+
+\subsection*{4.6 Guardrails to stop it from getting messy again}
+\begin{itemize}
+\item \textbf{Naming:} reports are \texttt{YYYY-MM-DD-topic}, one \texttt{.tex} and one \texttt{.pdf} each, no versions in folder names.
+\item \textbf{Cleaning:} add \texttt{npm run clean} that removes \f{.next*}, \f{.local/scratch/} and cache files.
+\item \textbf{Layout rule in \f{AGENTS.md}:} a short ``where does this go'' table (Section~4.3) so agents stop inventing new top-level folders.
+\item \textbf{One build directory:} no second \texttt{distDir} at the root.
+\item \textbf{Commit rhythm:} commit when a version is declared done, so history matches the documents.
+\item \textbf{Optional check:} a small test that fails if the root gains an unknown entry.
+\end{itemize}
+
+\section*{5. Decisions needed from the owner}
+
+\begin{enumerate}
+\item May I commit the current uncommitted work on a branch as Phase 0? (\f{AGENTS.md} requires explicit permission.)
+\item What are \f{desc.md}, \f{exp.md}, \f{review.md} and the 210\,KB \f{report.md}? Keep, archive or delete?
+\item Are the four \f{src/app/preview/} routes and the events pilot still needed?
+\item Should \f{PROJECT_DESCRIPTION.md} be restored from the archive as the canonical reference, or should another file take that role?
+\item Is the editor-tool installer \f{antigravity-install.ps1} still in use?
+\end{enumerate}
+
+\section*{6. Limits of this investigation}
+
+The survey used directory listings, sizes, \texttt{git status} and \f{.gitignore} checks. I did not read the contents of \f{desc.md}, \f{exp.md}, \f{report.md}, \f{review.md} or the files under \f{review/} and \f{tmp/}, so their proposed destinations are suggestions. I did not check whether the 16 empty tool folders are links or plain folders, and I did not measure \f{node_modules/}. I did not run the tests, the build, or any script, so statements about what would break after a move are expectations to confirm at each phase check.
+
+\end{document}

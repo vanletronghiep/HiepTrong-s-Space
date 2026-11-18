@@ -12,25 +12,40 @@ import {
   type ReactNode,
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { getRouteLoadHistoryRaw, setRouteLoadHistoryRaw } from '@/client/preferences';
+import { getCachedZodiacAsset } from '@/features/zodiac/loader';
+import type { ZodiacSign } from '@/features/zodiac/types';
 import { useToast } from '@/ui/Toast';
 import {
-  CosmicLaunchOverlay,
-  type CosmicLaunchPhase,
-  type TransitionOverlayMode,
-} from './CosmicLaunchOverlay';
+  FAST_UPGRADE_DRAW_MS,
+  FAST_UPGRADE_MS,
+  FINISH_NOW_MS,
+  decideLoadPath,
+  estimateLoadMs,
+  parseLoadHistory,
+  recordLoadMs,
+  type LoadKind,
+} from './load-estimate';
 import {
-  normalizePathname,
-  parseInternalHref,
-  shouldTriggerCosmicLaunch,
-} from './transition-rules';
+  getRouteAccent,
+  getRouteLoadingLabel,
+  getRouteZodiacSign,
+  isHardLoadRoute,
+} from './route-zodiac';
+import { normalizePathname, parseInternalHref, shouldTriggerRouteLoader } from './transition-rules';
+import {
+  ZodiacLoaderOverlay,
+  type RouteLoaderMode,
+  type RouteLoaderPath,
+  type RouteLoaderPhase,
+} from './ZodiacLoaderOverlay';
 
-const IGNITION_AT_MS = 500;
-const ACCELERATION_AT_MS = 1300;
-const ARRIVAL_GATE_MS = 2300;
-const ARRIVAL_DURATION_MS = 700;
-const FAILSAFE_REVEAL_MS = 10_000;
-const QUICK_FADE_HOLD_MS = 120;
-const QUICK_FADE_TOTAL_MS = 280;
+/** Safety net: reveal whatever the destination has rendered instead of trapping the user. */
+export const FAILSAFE_REVEAL_MS = 10_000;
+/** Opacity dismissal uses the --dur-fast motion token; interaction is released before it starts. */
+export const LOADER_DISMISS_MS = 150;
+const QUICK_FADE_HOLD_MS = 60;
+const QUICK_FADE_TOTAL_MS = 260;
 
 export interface TransitionContextValue {
   isTransitioning: boolean;
@@ -78,38 +93,90 @@ function focusDestinationHeading(): void {
     return;
   }
 
-  const hadTabIndex = heading.hasAttribute('tabindex');
-  if (!hadTabIndex) {
+  if (!heading.hasAttribute('tabindex')) {
     heading.setAttribute('tabindex', '-1');
   }
   heading.focus({ preventScroll: true });
 }
 
-interface ActiveOverlayState {
-  mode: TransitionOverlayMode;
-  phase: CosmicLaunchPhase;
-  fadingOutQuick: boolean;
+interface OverlayState {
+  /** Navigation that owns this overlay; stale timers and signals compare against it. */
+  navigationId: number;
+  mode: RouteLoaderMode;
+  phase: RouteLoaderPhase;
+  sign: ZodiacSign | null;
+  label: string;
+  accent: string;
+  reducedMotion: boolean;
+  path: RouteLoaderPath;
+  drawMs?: number;
+  finishNow: boolean;
+  /** Hard load / refresh: rendered visible from the server's first paint. */
+  initiallyVisible: boolean;
 }
 
+function planLoad(pathname: string, sign: ZodiacSign | null, kind: LoadKind) {
+  const history = parseLoadHistory(getRouteLoadHistoryRaw());
+  const estimate = estimateLoadMs({
+    history,
+    pathname,
+    kind,
+    assetCached: sign === null || getCachedZodiacAsset(sign) !== null,
+  });
+  return decideLoadPath(estimate);
+}
+
+/** Overlay that is part of the server render for hard loads and refreshes (estimate applied after mount). */
+function buildHardLoadOverlay(pathname: string): OverlayState | null {
+  if (!isHardLoadRoute(pathname)) return null;
+  const sign = getRouteZodiacSign(pathname);
+  return {
+    navigationId: 1,
+    mode: sign ? 'zodiac' : 'text',
+    phase: 'loading',
+    sign,
+    label: getRouteLoadingLabel(pathname),
+    accent: getRouteAccent(pathname),
+    reducedMotion: false,
+    path: 'pending',
+    finishNow: false,
+    initiallyVisible: true,
+  };
+}
+
+/**
+ * Readiness-driven route transitions (v3.1 §3.2).
+ * Navigation starts immediately; the destination zodiac (or a neutral loader) covers the
+ * route until that destination signals a usable surface. There is no minimum display time.
+ */
 export function TransitionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const rawPathname = usePathname() ?? '/';
   const currentPathname = normalizePathname(rawPathname);
   const { pushToast } = useToast();
 
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [overlayState, setOverlayState] = useState<ActiveOverlayState | null>(null);
+  const [initialOverlay] = useState(() => buildHardLoadOverlay(currentPathname));
+  const [isTransitioning, setIsTransitioning] = useState(initialOverlay !== null);
+  const [overlay, setOverlay] = useState<OverlayState | null>(initialOverlay);
 
-  const isTransitioningRef = useRef(false);
-  const targetPathnameRef = useRef<string | null>(null);
+  const isTransitioningRef = useRef(initialOverlay !== null);
+  const navigationIdRef = useRef(initialOverlay ? 1 : 0);
+  const targetPathnameRef = useRef<string | null>(initialOverlay ? currentPathname : null);
+  const hardLoadRef = useRef(initialOverlay !== null);
+  const overlayRef = useRef<OverlayState | null>(overlay);
+  const navStartRef = useRef(0);
+  const kindRef = useRef<LoadKind>('cold');
+  const visitedRef = useRef<Set<string>>(new Set());
+  const drawProgressRef = useRef(0);
+  const pendingFinishRef = useRef<{ navigationId: number; restoreFocus: boolean } | null>(null);
+  /** Readiness collected for the active navigation only; cleared when a navigation starts. */
   const readyPathnamesRef = useRef<Set<string>>(new Set());
-  const gatePassedRef = useRef(false);
-  const arrivalStartedRef = useRef(false);
   const currentPathnameRef = useRef(currentPathname);
   const timersRef = useRef<number[]>([]);
   const navigationGuardRef = useRef<((proceed: () => void) => boolean) | null>(null);
 
   currentPathnameRef.current = currentPathname;
+  overlayRef.current = overlay;
 
   const registerNavigationGuard = useCallback(
     (guard: ((proceed: () => void) => boolean) | null) => {
@@ -133,16 +200,26 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
     return id;
   }, []);
 
-  const finishTransition = useCallback(
-    (restoreHeadingFocus: boolean) => {
+  /** Releases scroll and interaction immediately, then fades the overlay out. */
+  const completeNavigation = useCallback(
+    (navigationId: number, restoreHeadingFocus: boolean) => {
+      if (navigationId !== navigationIdRef.current || !isTransitioningRef.current) {
+        return;
+      }
       clearAllTimers();
       isTransitioningRef.current = false;
       targetPathnameRef.current = null;
-      gatePassedRef.current = false;
-      arrivalStartedRef.current = false;
+      readyPathnamesRef.current = new Set();
+      pendingFinishRef.current = null;
+      drawProgressRef.current = 0;
       unlockDocumentScroll();
       setIsTransitioning(false);
-      setOverlayState(null);
+      setOverlay((prev) =>
+        prev && prev.navigationId === navigationId ? { ...prev, phase: 'leaving' } : prev,
+      );
+      scheduleTimer(() => {
+        setOverlay((prev) => (prev && prev.navigationId === navigationId ? null : prev));
+      }, LOADER_DISMISS_MS);
 
       if (restoreHeadingFocus && typeof window !== 'undefined') {
         window.requestAnimationFrame(() => {
@@ -150,53 +227,91 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [clearAllTimers],
+    [clearAllTimers, scheduleTimer],
   );
 
-  const beginArrivalPhase = useCallback(() => {
-    if (arrivalStartedRef.current || !isTransitioningRef.current) {
-      return;
-    }
-    arrivalStartedRef.current = true;
-    setOverlayState((prev) =>
-      prev
-        ? { ...prev, phase: 'arrival' }
-        : { mode: 'cosmic', phase: 'arrival', fadingOutQuick: false },
-    );
-    scheduleTimer(() => {
-      finishTransition(true);
-    }, ARRIVAL_DURATION_MS);
-  }, [finishTransition, scheduleTimer]);
+  /** Called as the drawing advances; finishes a pending (fast-forwarded) dismissal when drawn. */
+  const handleDrawProgress = useCallback(
+    (progress: number) => {
+      drawProgressRef.current = progress;
+      const pending = pendingFinishRef.current;
+      if (pending && progress >= 0.999) {
+        completeNavigation(pending.navigationId, pending.restoreFocus);
+      }
+    },
+    [completeNavigation],
+  );
 
-  const evaluateArrivalReadiness = useCallback(() => {
-    if (!isTransitioningRef.current || arrivalStartedRef.current || !gatePassedRef.current) {
+  /** Page is ready: record the duration, then dismiss (fast-forwarding a mid-flight drawing first). */
+  const finishNavigation = useCallback(
+    (navigationId: number, restoreFocus: boolean, pathname: string) => {
+      const duration = performance.now() - navStartRef.current;
+      setRouteLoadHistoryRaw(
+        JSON.stringify(
+          recordLoadMs(
+            parseLoadHistory(getRouteLoadHistoryRaw()),
+            pathname,
+            kindRef.current,
+            duration,
+          ),
+        ),
+      );
+      visitedRef.current.add(pathname);
+
+      const current = overlayRef.current;
+      const progress = drawProgressRef.current;
+      const midDrawing =
+        current?.mode === 'zodiac' &&
+        current.path === 'draw' &&
+        !current.reducedMotion &&
+        progress > 0.05 &&
+        progress < 0.999;
+      if (!midDrawing) {
+        completeNavigation(navigationId, restoreFocus);
+        return;
+      }
+      pendingFinishRef.current = { navigationId, restoreFocus };
+      setOverlay((prev) =>
+        prev && prev.navigationId === navigationId ? { ...prev, finishNow: true } : prev,
+      );
+      // Safety net: never wait longer than the fast-forward plus a small margin.
+      scheduleTimer(() => completeNavigation(navigationId, restoreFocus), FINISH_NOW_MS + 250);
+    },
+    [completeNavigation, scheduleTimer],
+  );
+
+  const evaluateReadiness = useCallback(() => {
+    if (!isTransitioningRef.current) {
       return;
     }
     const target = targetPathnameRef.current;
     if (!target) {
       return;
     }
-    const pathReached = currentPathnameRef.current === target;
-    const pageSignalled = readyPathnamesRef.current.has(target);
-    if (pathReached && pageSignalled) {
-      beginArrivalPhase();
+    if (currentPathnameRef.current === target && readyPathnamesRef.current.has(target)) {
+      if (pendingFinishRef.current) {
+        return;
+      }
+      finishNavigation(navigationIdRef.current, !hardLoadRef.current, target);
     }
-  }, [beginArrivalPhase]);
+  }, [finishNavigation]);
 
   useEffect(() => {
-    evaluateArrivalReadiness();
-  }, [currentPathname, evaluateArrivalReadiness]);
+    evaluateReadiness();
+  }, [currentPathname, evaluateReadiness]);
 
   const signalPageReady = useCallback(
     (pathname: string) => {
-      const normalized = normalizePathname(pathname);
-      readyPathnamesRef.current.add(normalized);
-      evaluateArrivalReadiness();
+      if (!isTransitioningRef.current) {
+        return;
+      }
+      readyPathnamesRef.current.add(normalizePathname(pathname));
+      evaluateReadiness();
     },
-    [evaluateArrivalReadiness],
+    [evaluateReadiness],
   );
 
-  // Browser Back/Forward (`popstate`) uses a quick <= 300ms plain fade per §9.10 & ui_readme.md §12
+  // Browser Back/Forward keeps a lightweight fade; it also abandons any pending loader.
   useEffect(() => {
     if (typeof window === 'undefined') {
       return undefined;
@@ -204,27 +319,38 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
 
     const handlePopState = () => {
       if (isTransitioningRef.current) {
+        completeNavigation(navigationIdRef.current, false);
         return;
       }
       clearAllTimers();
-      setOverlayState({
+      const navigationId = ++navigationIdRef.current;
+      setOverlay({
+        navigationId,
         mode: 'quick-fade',
-        phase: 'departure',
-        fadingOutQuick: false,
+        phase: 'loading',
+        sign: null,
+        label: '',
+        accent: '',
+        reducedMotion: isReducedMotionPreferred(),
+        path: 'fast',
+        finishNow: false,
+        initiallyVisible: false,
       });
       scheduleTimer(() => {
-        setOverlayState((prev) => (prev ? { ...prev, fadingOutQuick: true } : null));
-      }, 60);
+        setOverlay((prev) =>
+          prev && prev.navigationId === navigationId ? { ...prev, phase: 'leaving' } : prev,
+        );
+      }, QUICK_FADE_HOLD_MS);
       scheduleTimer(() => {
-        setOverlayState(null);
-      }, 260);
+        setOverlay((prev) => (prev && prev.navigationId === navigationId ? null : prev));
+      }, QUICK_FADE_TOTAL_MS);
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [clearAllTimers, scheduleTimer]);
+  }, [clearAllTimers, completeNavigation, scheduleTimer]);
 
   useEffect(() => {
     return () => {
@@ -248,17 +374,17 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
 
   const executeNavigate = useCallback(
     (href: string, options?: { replace?: boolean }) => {
-      const parsed = parseInternalHref(href);
-
-      // Ignore repeated clicks while Cosmic Launch is running (§9.10)
+      // Ignore repeated clicks while a route loader is pending.
       if (isTransitioningRef.current) {
         return;
       }
 
-      // Same-pathname (hash / query-only like /tasks/hub?task=...) or non-root href: navigate directly without Cosmic Launch
+      const parsed = parseInternalHref(href);
+
+      // Same-pathname query/hash changes and external hrefs navigate without a loader.
       if (
         !parsed ||
-        !shouldTriggerCosmicLaunch({
+        !shouldTriggerRouteLoader({
           href,
           currentPathname: currentPathnameRef.current,
           isTransitioning: isTransitioningRef.current,
@@ -268,104 +394,66 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Reduced motion: plain <= 300ms opacity crossfade, no spacecraft, no streaks (§9.10)
-      if (isReducedMotionPreferred()) {
-        try {
-          clearAllTimers();
-          isTransitioningRef.current = true;
-          setIsTransitioning(true);
-          setOverlayState({
-            mode: 'quick-fade',
-            phase: 'departure',
-            fadingOutQuick: false,
-          });
-          performRouterNavigation(href, options?.replace);
-
-          scheduleTimer(() => {
-            setOverlayState((prev) => (prev ? { ...prev, fadingOutQuick: true } : null));
-          }, QUICK_FADE_HOLD_MS);
-
-          scheduleTimer(() => {
-            finishTransition(true);
-          }, QUICK_FADE_TOTAL_MS);
-        } catch {
-          finishTransition(false);
-          performRouterNavigation(href, options?.replace);
-        }
-        return;
-      }
-
-      // Full ~3s 4-phase Cosmic Launch sequence
+      const navigationId = ++navigationIdRef.current;
       try {
         clearAllTimers();
         isTransitioningRef.current = true;
         targetPathnameRef.current = parsed.pathname;
-        readyPathnamesRef.current.delete(parsed.pathname);
-        gatePassedRef.current = false;
-        arrivalStartedRef.current = false;
+        readyPathnamesRef.current = new Set();
 
+        const sign = getRouteZodiacSign(parsed.pathname);
+        hardLoadRef.current = false;
+        navStartRef.current = performance.now();
+        kindRef.current = visitedRef.current.has(parsed.pathname) ? 'warm' : 'cold';
+        drawProgressRef.current = 0;
+        pendingFinishRef.current = null;
+        const plan = planLoad(parsed.pathname, sign, kindRef.current);
         lockDocumentScroll();
         setIsTransitioning(true);
-        setOverlayState({
-          mode: 'cosmic',
-          phase: 'departure',
-          fadingOutQuick: false,
+        setOverlay({
+          navigationId,
+          mode: sign ? 'zodiac' : 'text',
+          phase: 'loading',
+          sign,
+          label: getRouteLoadingLabel(parsed.pathname),
+          accent: getRouteAccent(parsed.pathname),
+          reducedMotion: isReducedMotionPreferred(),
+          path: plan.path,
+          drawMs: plan.path === 'draw' ? plan.drawMs : undefined,
+          finishNow: false,
+          initiallyVisible: false,
         });
 
+        // A "fast" route that is still loading shortly after starts drawing instead of sitting static.
+        if (sign && plan.path === 'fast') {
+          scheduleTimer(() => {
+            if (navigationId !== navigationIdRef.current || !isTransitioningRef.current) return;
+            setOverlay((prev) =>
+              prev && prev.navigationId === navigationId && prev.path === 'fast'
+                ? { ...prev, path: 'draw', drawMs: FAST_UPGRADE_DRAW_MS }
+                : prev,
+            );
+          }, FAST_UPGRADE_MS);
+        }
+
+        // Navigation starts immediately; the loader never delays it.
         performRouterNavigation(href, options?.replace);
 
-        // Phase 2: Ignition (500–1300ms)
         scheduleTimer(() => {
-          if (!isTransitioningRef.current || arrivalStartedRef.current) return;
-          setOverlayState((prev) => (prev ? { ...prev, phase: 'ignition' } : prev));
-        }, IGNITION_AT_MS);
-
-        // Phase 3: Acceleration (1300–2300ms)
-        scheduleTimer(() => {
-          if (!isTransitioningRef.current || arrivalStartedRef.current) return;
-          setOverlayState((prev) => (prev ? { ...prev, phase: 'acceleration' } : prev));
-        }, ACCELERATION_AT_MS);
-
-        // Phase 4 Gate (2300ms): enter Arrival if ready, else enter subtle idle Holding state
-        scheduleTimer(() => {
-          if (!isTransitioningRef.current || arrivalStartedRef.current) return;
-          gatePassedRef.current = true;
-          const target = targetPathnameRef.current;
-          const isReady =
-            target !== null &&
-            currentPathnameRef.current === target &&
-            readyPathnamesRef.current.has(target);
-
-          if (isReady) {
-            beginArrivalPhase();
-          } else {
-            setOverlayState((prev) => (prev ? { ...prev, phase: 'holding' } : prev));
-          }
-        }, ARRIVAL_GATE_MS);
-
-        // 10-second safety failsafe (§9.10.4): reveal destination anyway and log warning
-        scheduleTimer(() => {
-          if (!isTransitioningRef.current || arrivalStartedRef.current) return;
+          if (navigationId !== navigationIdRef.current || !isTransitioningRef.current) return;
           console.warn(
-            `[CosmicLaunch] Destination "${parsed.pathname}" did not signal readiness within 10s; revealing page.`,
+            `[RouteLoader] Destination "${parsed.pathname}" did not signal readiness within 10s; revealing page.`,
           );
-          beginArrivalPhase();
+          completeNavigation(navigationId, true);
         }, FAILSAFE_REVEAL_MS);
       } catch (error: unknown) {
-        console.error('[CosmicLaunch] Navigation error:', error);
-        finishTransition(false);
+        console.error('[RouteLoader] Navigation error:', error);
+        completeNavigation(navigationId, false);
         pushToast('Navigation encountered an issue.', 'error');
         performRouterNavigation(href, options?.replace);
       }
     },
-    [
-      beginArrivalPhase,
-      clearAllTimers,
-      finishTransition,
-      performRouterNavigation,
-      pushToast,
-      scheduleTimer,
-    ],
+    [clearAllTimers, completeNavigation, performRouterNavigation, pushToast, scheduleTimer],
   );
 
   const navigate = useCallback(
@@ -385,10 +473,41 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
   );
 
   const handleOverlayRuntimeError = useCallback(() => {
-    finishTransition(false);
-  }, [finishTransition]);
+    // The boundary already swapped in the text-only loader; nothing else to release.
+  }, []);
 
-  const isOverlayActive = overlayState !== null;
+  // Hard load / refresh: the server-rendered overlay gets its estimate and failsafe after mount.
+  useEffect(() => {
+    if (!hardLoadRef.current || !isTransitioningRef.current) {
+      return;
+    }
+    lockDocumentScroll();
+    const pathname = targetPathnameRef.current ?? currentPathnameRef.current;
+    const sign = getRouteZodiacSign(pathname);
+    const plan = planLoad(pathname, sign, 'cold');
+    setOverlay((prev) =>
+      prev
+        ? {
+            ...prev,
+            reducedMotion: isReducedMotionPreferred(),
+            path: plan.path,
+            drawMs: plan.path === 'draw' ? plan.drawMs : undefined,
+          }
+        : prev,
+    );
+    const navigationId = navigationIdRef.current;
+    scheduleTimer(() => {
+      if (navigationId !== navigationIdRef.current || !isTransitioningRef.current) return;
+      console.warn(
+        `[RouteLoader] Destination "${pathname}" did not signal readiness within 10s; revealing page.`,
+      );
+      completeNavigation(navigationId, false);
+    }, FAILSAFE_REVEAL_MS);
+    // Runs once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const isOverlayActive = overlay !== null;
 
   const value = useMemo<TransitionContextValue>(
     () => ({
@@ -404,11 +523,20 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
   return (
     <TransitionContext.Provider value={value}>
       {children}
-      {overlayState ? (
-        <CosmicLaunchOverlay
-          mode={overlayState.mode}
-          phase={overlayState.phase}
-          fadingOutQuick={overlayState.fadingOutQuick}
+      {overlay ? (
+        <ZodiacLoaderOverlay
+          key={overlay.navigationId}
+          mode={overlay.mode}
+          phase={overlay.phase}
+          sign={overlay.sign}
+          label={overlay.label}
+          accent={overlay.accent || undefined}
+          reducedMotion={overlay.reducedMotion}
+          path={overlay.path}
+          drawMs={overlay.drawMs}
+          finishNow={overlay.finishNow}
+          initiallyVisible={overlay.initiallyVisible}
+          onDrawProgress={handleDrawProgress}
           onRuntimeError={handleOverlayRuntimeError}
         />
       ) : null}
@@ -458,6 +586,10 @@ export function useTransitionRouter(): {
   };
 }
 
+/**
+ * Signals that the current route shows a usable primary surface (or a visible error/retry
+ * state). Destinations must not signal while their primary data is still loading.
+ */
 export function usePageReady(ready: boolean = true): void {
   const ctx = useContext(TransitionContext);
   const pathname = usePathname();

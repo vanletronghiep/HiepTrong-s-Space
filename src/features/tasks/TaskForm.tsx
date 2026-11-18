@@ -288,8 +288,8 @@ function TaskFormBody({
 
   return (
     <form id={formId} onSubmit={handleSubmit} noValidate className="space-y-5">
-      {/* Title */}
-      <div>
+      {/* Title (v3.2: reserved message line + 12px before Deadline, instead of 20px) */}
+      <div className="mb-3">
         <div className="flex items-center justify-between mb-1.5">
           <label
             htmlFor="task-title-input"

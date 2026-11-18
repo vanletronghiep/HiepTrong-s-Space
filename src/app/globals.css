@@ -118,87 +118,138 @@ body:has(> [data-home-journey]) {
   transition: none !important;
 }
 
-/* Workspace fields keep rounded keyboard rings without browser-default rectangles. */
-[data-theme='workspace']
-  :is(
-    input:not(
-      [type='checkbox'],
-      [type='radio'],
-      [type='range'],
-      [type='color'],
-      [type='file'],
-      [type='hidden'],
-      [type='button'],
-      [type='submit'],
-      [type='reset'],
-      [type='image'],
-      [data-frameless-search='true']
-    ),
-    textarea,
-    select
-  ):focus {
+/*
+ * Borderless form-control focus (v3.1 §3.1). Form controls drop every focus ring, outline,
+ * border-colour change, and focus shadow; they show an immediate theme-derived background
+ * tint instead. Static borders, invalid styling, and selection states are untouched.
+ * Buttons, links, and other interactive elements keep the outline rules above.
+ */
+:root {
+  --focus-tint: var(--ws-focus-tint);
+  --focus-tint-selected: var(--ws-focus-tint-selected);
+}
+
+[data-theme='workspace'],
+[data-feature-theme] {
+  --focus-tint: var(--ws-focus-tint);
+  --focus-tint-selected: var(--ws-focus-tint-selected);
+}
+
+[data-theme='cosmos'] {
+  --focus-tint: var(--cosmos-focus-tint);
+  --focus-tint-selected: var(--cosmos-focus-tint-selected);
+}
+
+[data-theme='cosmos'] [data-theme='workspace'] {
+  --focus-tint: var(--ws-focus-tint);
+  --focus-tint-selected: var(--ws-focus-tint-selected);
+}
+
+:is(
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='color'],
+    [type='file'],
+    [type='hidden'],
+    [type='button'],
+    [type='submit'],
+    [type='reset'],
+    [type='image']
+  ),
+  textarea,
+  select,
+  [contenteditable='true']
+):is(:focus, :focus-visible) {
   outline: none;
   box-shadow: none;
-}
-
-[data-theme='workspace']
-  :is(
-    input:not(
-      [type='checkbox'],
-      [type='radio'],
-      [type='range'],
-      [type='color'],
-      [type='file'],
-      [type='hidden'],
-      [type='button'],
-      [type='submit'],
-      [type='reset'],
-      [type='image'],
-      [data-frameless-search='true']
-    ),
-    textarea,
-    select
-  ):focus:not([aria-invalid='true']) {
-  border-color: color-mix(in srgb, var(--ws-focus) 45%, var(--ws-border));
-}
-
-[data-theme='workspace']
-  :is(
-    input:not(
-      [type='checkbox'],
-      [type='radio'],
-      [type='range'],
-      [type='color'],
-      [type='file'],
-      [type='hidden'],
-      [type='button'],
-      [type='submit'],
-      [type='reset'],
-      [type='image'],
-      [data-frameless-search='true']
-    ),
-    textarea,
-    select
-  ):focus-visible {
-  box-shadow:
-    0 0 0 2px var(--ws-surface),
-    0 0 0 4px var(--ws-focus);
   transition: none !important;
 }
 
-/* Frameless menu search stays continuous with its surface while keeping row focus clear. */
-[data-theme='workspace'] [data-frameless-search='true'],
-[data-theme='workspace'] [data-frameless-search='true']:focus,
-[data-theme='workspace'] [data-frameless-search='true']:focus-visible {
+:is(
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='color'],
+    [type='file'],
+    [type='hidden'],
+    [type='button'],
+    [type='submit'],
+    [type='reset'],
+    [type='image']
+  ),
+  textarea,
+  select,
+  [contenteditable='true']
+):focus-visible {
+  background-color: var(--focus-tint);
+}
+
+/* Composite fields (date/time/rich-text/search wrappers) tint as one surface. */
+[data-focus-field]:has(:focus-visible) {
+  background-color: var(--focus-tint);
+  transition: none !important;
+}
+
+[data-focus-field] :is(input, textarea, [contenteditable='true']):focus-visible {
+  background-color: transparent;
+}
+
+/* Choice controls and tint-only buttons (checkbox, radio, switch, segment, toolbar). */
+:is(
+    input[type='checkbox'],
+    input[type='radio'],
+    [role='checkbox'],
+    [role='radio'],
+    [role='switch'],
+    [data-focus-tint]
+  ):focus-visible:focus-visible {
+  outline: none;
+  box-shadow: none;
+  background-color: var(--focus-tint);
+  transition: none !important;
+}
+
+:is(
+  [role='checkbox'][aria-checked='true'],
+  [role='radio'][aria-checked='true'],
+  [role='switch'][aria-checked='true'],
+  [data-focus-tint][aria-pressed='true'],
+  [data-focus-tint][aria-selected='true'],
+  [data-focus-tint][data-selected='true']
+):focus-visible {
+  background-color: var(--focus-tint-selected);
+}
+
+/* Segmented controls paint their selected pill above the button background. */
+[role='radio']:focus-visible > [data-segment-pill] {
+  background-color: var(--focus-tint-selected);
+}
+
+/*
+ * Non-interactive programmatic focus targets (skip-link destination, route-arrival headings,
+ * dialog containers) keep semantic focus but never draw a frame. Chrome re-matches
+ * :focus-visible on such containers after keyboard input outside the page (for example
+ * Win + Shift + S) followed by window refocus, which produced the large frame in img35.
+ */
+:is(main, section, article, div, h1, h2, h3, ul, ol)[tabindex='-1']:focus-visible {
+  outline: none;
+}
+
+/* Frameless menu search stays continuous with its surface; its row carries the tint. */
+[data-frameless-search='true'],
+[data-frameless-search='true']:focus,
+[data-frameless-search='true']:focus-visible {
   border: 0;
   outline: none;
   box-shadow: none;
+  background-color: transparent;
 }
 
-[data-theme='workspace']
-  [data-frameless-search-row='true']:has([data-frameless-search='true']:focus-visible) {
-  background-color: color-mix(in srgb, var(--ws-accent) 6%, var(--ws-surface));
-  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ws-focus) 55%, transparent);
+[data-frameless-search-row='true']:has([data-frameless-search='true']:focus-visible) {
+  background-color: var(--focus-tint);
   transition: none !important;
 }
 
@@ -245,6 +296,26 @@ body:has(> [data-home-journey]) {
 /* Full-page feature canvases for redesigned non-Task routes */
 [data-theme='workspace'][data-fullpage-theme='true'] {
   background-color: var(--ws-bg);
+}
+
+[data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='tasks-hub'] {
+  background-image:
+    radial-gradient(
+      ellipse 78% 42% at 86% 6%,
+      color-mix(in srgb, var(--feature-soft) 52%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 68% 46% at 10% 88%,
+      color-mix(in srgb, var(--feature-soft) 44%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      var(--feature-canvas) 0%,
+      color-mix(in srgb, var(--feature-canvas) 82%, var(--feature-soft)) 100%
+    );
+  background-attachment: scroll;
 }
 
 [data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='events'] {

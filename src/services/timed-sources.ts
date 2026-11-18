@@ -31,7 +31,11 @@ export async function listTimedSources(): Promise<TimedSource[]> {
       targetUrl: `${route}?item=${encodeURIComponent(id)}`,
     });
   };
-  for (const e of events) add('event', e.id, e.title, e.startAt, '/events');
+  // Ordinary events keep their reminder; weekly class series are not expanded into
+  // per-occurrence reminders (new product behaviour would need owner approval).
+  for (const e of events)
+    if (e.kind !== 'class' && e.status !== 'canceled')
+      add('event', e.id, e.title, e.startAt, '/events');
   for (const p of projects)
     if (p.status !== 'completed' && p.status !== 'on_hold')
       add('project', p.id, p.title, p.deadlineAt, '/projects');

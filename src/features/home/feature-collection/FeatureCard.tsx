@@ -1,37 +1,15 @@
 'use client';
 
-import { useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent } from 'react';
+import type { CSSProperties } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { FeatureEntry } from '@/features/registry';
 import { TransitionLink } from '@/features/transitions/TransitionLink';
 import { cn } from '@/ui/cn';
+import { getFeatureAccentVar } from './feature-accent';
 import { FeatureThumbnail, type ZodiacThumbnailControl } from './FeatureThumbnail';
 import styles from './feature-collection.module.css';
 
-const FEATURE_ACCENT_VARS: Record<string, string> = {
-  'daily-tasks': 'var(--cosmos-lavender)',
-  'tasks-hub': 'var(--cosmos-star-blue)',
-  events: 'color-mix(in srgb, var(--cosmos-star-blue) 68%, var(--daily-planet-optional-light))',
-  'ai-engineering':
-    'color-mix(in srgb, var(--daily-planet-optional-light) 72%, var(--cosmos-star-pale))',
-  blogs: 'color-mix(in srgb, var(--journey-flare-gold) 74%, var(--cosmos-star-white))',
-  apcs: 'var(--cosmos-star-pale)',
-  flashcards: 'color-mix(in srgb, var(--journey-flare-gold) 58%, var(--cosmos-lavender))',
-  entertainment: 'color-mix(in srgb, var(--cosmos-lavender) 64%, var(--daily-planet-urgent-light))',
-  tracking: 'var(--status-notif-completed)',
-  projects: 'color-mix(in srgb, var(--daily-planet-urgent-light) 55%, var(--journey-flare-gold))',
-  milestones: 'var(--journey-flare-gold)',
-  'learning-room':
-    'color-mix(in srgb, var(--daily-planet-optional-light) 60%, var(--cosmos-lavender))',
-  achievements: 'color-mix(in srgb, var(--journey-flare-gold) 65%, var(--cosmos-star-white))',
-};
-
-export function getFeatureAccentVar(feature: FeatureEntry): string {
-  return (
-    FEATURE_ACCENT_VARS[feature.id] ??
-    (feature.thumbnail.accent === 'lavender' ? 'var(--cosmos-lavender)' : 'var(--cosmos-star-blue)')
-  );
-}
+export { getFeatureAccentVar };
 
 export interface FeatureCardProps {
   feature: FeatureEntry;
@@ -50,74 +28,15 @@ export function FeatureCard({
   zodiacControl,
   className,
 }: FeatureCardProps) {
-  const hasZodiac = Boolean(feature.thumbnail.zodiacSign);
-  const [isHovered, setIsHovered] = useState(false);
-  const [isFocusVisible, setIsFocusVisible] = useState(false);
-  const lastPointerTypeRef = useRef<string | null>(null);
-
-  const handlePointerEnter = (event: PointerEvent<HTMLAnchorElement>) => {
-    if (!hasZodiac) return;
-    lastPointerTypeRef.current = event.pointerType || null;
-    if (event.pointerType === 'touch' || event.pointerType === 'pen') return;
-    setIsHovered(true);
-  };
-
-  const handlePointerLeave = () => {
-    if (!hasZodiac) return;
-    setIsHovered(false);
-  };
-
-  const handlePointerCancel = () => {
-    if (!hasZodiac) return;
-    setIsHovered(false);
-  };
-
-  const handleMouseEnter = () => {
-    if (!hasZodiac) return;
-    if (lastPointerTypeRef.current === 'touch' || lastPointerTypeRef.current === 'pen') return;
-    setIsHovered(true);
-  };
-
-  const handleMouseLeave = () => {
-    if (!hasZodiac) return;
-    setIsHovered(false);
-  };
-
-  const handleFocus = (event: FocusEvent<HTMLAnchorElement>) => {
-    if (!hasZodiac) return;
-    let focusVisible = false;
-    try {
-      focusVisible = event.currentTarget.matches(':focus-visible');
-    } catch {
-      focusVisible = false;
-    }
-    setIsFocusVisible(focusVisible);
-  };
-
-  const handleBlur = () => {
-    if (!hasZodiac) return;
-    setIsFocusVisible(false);
-  };
-
-  const isActive = hasZodiac && (isHovered || isFocusVisible);
-
   return (
     <TransitionLink
       href={feature.href}
       data-feature-id={feature.id}
       style={{ '--card-accent': getFeatureAccentVar(feature) } as CSSProperties}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={handlePointerLeave}
-      onPointerCancel={handlePointerCancel}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
       className={cn(styles.featureCard, className)}
     >
       <FeatureThumbnail
         thumbnail={feature.thumbnail}
-        active={isActive}
         illuminationEnabled={revealComplete}
         zodiacControl={zodiacControl}
       />

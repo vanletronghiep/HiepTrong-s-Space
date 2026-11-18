@@ -114,11 +114,9 @@ export function FeatureCollection({
     if (!container) {
       return;
     }
-    const radioButtons = container.querySelectorAll<HTMLButtonElement>('button[role="radio"]');
-    const activeButton =
-      Array.from(radioButtons).find((btn) => btn.getAttribute('aria-checked') === 'true') ??
-      radioButtons[targetLayoutRef.current === 'horizontal' ? 0 : 1];
-    activeButton?.focus({ preventScroll: true });
+    container
+      .querySelector<HTMLButtonElement>('button[data-layout-toggle]')
+      ?.focus({ preventScroll: true });
   }, [renderedLayout, focusRestoreTick]);
 
   const handleLayoutChange = (next: FeatureCollectionLayout) => {

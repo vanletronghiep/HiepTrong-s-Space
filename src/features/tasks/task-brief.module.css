@@ -1,0 +1,86 @@
+/*
+ * Shared brief-card anatomy for Daily and Tasks Hub (v3.1 §5.3).
+ * Every reserved height derives from the same font-size and line-height the text uses,
+ * so the two-line description area, its ellipsis, and descenders always agree.
+ */
+.anatomy {
+  --brief-check-size: 20px;
+  --brief-menu-size: 36px;
+  --brief-column-gap: 10px;
+}
+
+/* Checkbox · title · menu share one header row, optically centred on the first title line. */
+.header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--brief-column-gap);
+  min-width: 0;
+}
+
+.check {
+  display: flex;
+  margin-top: calc((var(--brief-title-lh) - var(--brief-check-size)) / 2);
+}
+
+.title {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--brief-title-lh);
+  overflow-wrap: anywhere;
+}
+
+.titleSingle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.titleDouble {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.menu {
+  display: flex;
+  margin-block: calc((var(--brief-title-lh) - var(--brief-menu-size)) / 2);
+  margin-inline-end: -8px;
+}
+
+/* Body content lines up with the title text, not with the checkbox. */
+.indent {
+  padding-inline-start: calc(var(--brief-check-size) + var(--brief-column-gap));
+  min-width: 0;
+}
+
+/* Fixed-anatomy slot: exactly two description lines tall, one-line text sits balanced. */
+.descSlot {
+  display: flex;
+  align-items: center;
+  height: var(--brief-desc-area);
+  min-width: 0;
+}
+
+.desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  width: 100%;
+  max-height: var(--brief-desc-area);
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--fs-ui);
+  line-height: var(--brief-desc-lh);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.meta {
+  min-width: 0;
+}

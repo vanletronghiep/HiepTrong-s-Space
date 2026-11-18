@@ -4,6 +4,7 @@ export type FeatureCollectionLayout = 'horizontal' | 'vertical';
 const STORAGE_KEYS = {
   dailyView: 'hts.daily.view',
   featureCollectionLayout: 'hts.featureCollection.layout',
+  loadHistory: 'hts.routeLoadHistory',
 } as const;
 
 function safeGetItem(key: string): string | null {
@@ -52,9 +53,17 @@ export function setFeatureCollectionLayoutPreference(layout: FeatureCollectionLa
   safeSetItem(STORAGE_KEYS.featureCollectionLayout, layout);
 }
 
+/** Raw JSON of measured route load durations used by the route loader's estimate (v3.2). */
+export function getRouteLoadHistoryRaw(): string | null {
+  return safeGetItem(STORAGE_KEYS.loadHistory);
+}
+
+export function setRouteLoadHistoryRaw(value: string): void {
+  safeSetItem(STORAGE_KEYS.loadHistory, value);
+}
+
 export type DraftStorageReadResult =
-  | { ok: true; raw: string | null }
-  | { ok: false; error: string };
+  { ok: true; raw: string | null } | { ok: false; error: string };
 
 export type DraftStorageWriteResult = { ok: true } | { ok: false; error: string };
 
@@ -79,7 +88,10 @@ export function readDraftStorageRaw(key: string): DraftStorageReadResult {
   try {
     return { ok: true, raw: window.localStorage.getItem(key) };
   } catch (error) {
-    return { ok: false, error: formatStorageError(error, 'Could not read saved draft from local storage.') };
+    return {
+      ok: false,
+      error: formatStorageError(error, 'Could not read saved draft from local storage.'),
+    };
   }
 }
 
@@ -91,7 +103,10 @@ export function writeDraftStorageRaw(key: string, value: string): DraftStorageWr
     window.localStorage.setItem(key, value);
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: formatStorageError(error, 'Could not save draft to local storage.') };
+    return {
+      ok: false,
+      error: formatStorageError(error, 'Could not save draft to local storage.'),
+    };
   }
 }
 
@@ -103,11 +118,16 @@ export function removeDraftStorageRaw(key: string): DraftStorageWriteResult {
     window.localStorage.removeItem(key);
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: formatStorageError(error, 'Could not remove saved draft from local storage.') };
+    return {
+      ok: false,
+      error: formatStorageError(error, 'Could not remove saved draft from local storage.'),
+    };
   }
 }
 
-export function listDraftStorageKeys(prefix: string): { ok: true; keys: string[] } | { ok: false; error: string } {
+export function listDraftStorageKeys(
+  prefix: string,
+): { ok: true; keys: string[] } | { ok: false; error: string } {
   if (!hasLocalStorage()) {
     return { ok: false, error: 'Browser storage is unavailable outside a client session.' };
   }
@@ -119,6 +139,9 @@ export function listDraftStorageKeys(prefix: string): { ok: true; keys: string[]
     }
     return { ok: true, keys };
   } catch (error) {
-    return { ok: false, error: formatStorageError(error, 'Could not inspect saved drafts in local storage.') };
+    return {
+      ok: false,
+      error: formatStorageError(error, 'Could not inspect saved drafts in local storage.'),
+    };
   }
 }

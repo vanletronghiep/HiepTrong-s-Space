@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TransitionLink } from '@/features/transitions/TransitionLink';
-import { TransitionProvider } from '@/features/transitions/TransitionProvider';
+import { PageReady, TransitionProvider } from '@/features/transitions/TransitionProvider';
 import { FeatureThemeProvider } from '@/ui/FeatureTheme';
 import { LargeEditorDialog, type DraftSaveOutcome } from '@/ui/LargeEditorDialog';
 import { ToastProvider } from '@/ui/Toast';
@@ -35,6 +35,7 @@ function renderEditor(props: {
   const rendered = render(
     <ToastProvider>
       <TransitionProvider>
+        <PageReady />
         <TransitionLink href="/tasks/hub">Go to Hub</TransitionLink>
         <FeatureThemeProvider name="events">
           <LargeEditorDialog
@@ -174,4 +175,3 @@ describe('LargeEditorDialog closing, draft saving, and navigation guard', () => 
     expect(onDiscard).toHaveBeenCalledTimes(1);
   });
 });
-

@@ -26,6 +26,7 @@ const FULL_PAGE_FEATURE_THEMES = new Set<FeatureThemeName>([
   'flashcards',
   'learning-room',
   'entertainment-hub',
+  'tasks-hub',
 ]);
 
 export interface WorkspaceShellProps {
@@ -166,7 +167,7 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
               <TransitionLink
                 href={daily ? '/tasks/hub' : '/tasks/daily'}
                 data-task-shortcut
-                title={daily ? 'Go to Tasks Hub' : 'Go to Daily Task Management'}
+                title={daily ? 'Go to Tasks Hub' : 'Go to Task Management'}
                 className="inline-flex items-center justify-center gap-2 min-h-[36px] px-3.5 rounded-pill bg-ws-accent-soft text-ws-text border border-ws-border text-[length:var(--fs-small)] font-medium whitespace-nowrap hover:bg-[color-mix(in_srgb,var(--ws-accent)_35%,var(--ws-surface))] transition-colors duration-[var(--dur-fast)] motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-ws-focus focus-visible:outline-offset-2 max-[479px]:size-9 max-[479px]:p-0"
               >
                 {daily ? (
@@ -214,7 +215,7 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
         style={{ zIndex: 'var(--z-content)' }}
         className={cn(
           'relative flex-1 mx-auto flex flex-col w-full max-w-[var(--max-content)] px-[var(--gutter)] lg:px-[var(--gutter-lg)] py-8',
-          daily && dailyStyles.frame,
+          (daily || tasksHub) && dailyStyles.frame,
           daily && dailyStyles.main,
         )}
       >
@@ -232,36 +233,6 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
         onClose={() => setUniverseOpen(false)}
         featureTheme={fullPageTheme}
       />
-    </div>
-  );
-}
-
-export interface WorkspacePageHeaderProps {
-  title: string;
-  description?: string;
-  actions?: ReactNode;
-}
-
-export function WorkspacePageHeader({ title, description, actions }: WorkspacePageHeaderProps) {
-  return (
-    <div
-      data-feature-heading
-      className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pb-6"
-    >
-      <div className="space-y-1">
-        <div className="flex items-center gap-2.5">
-          <h1 className="font-display text-[length:var(--fs-h1)] leading-[var(--lh-heading)] font-normal text-ws-text">
-            {title}
-          </h1>
-          <StarIcon size={12} className="text-ws-accent" />
-        </div>
-        {description ? (
-          <p className="text-[length:var(--fs-ui)] text-ws-text-muted max-w-[var(--max-narrow)]">
-            {description}
-          </p>
-        ) : null}
-      </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2.5">{actions}</div> : null}
     </div>
   );
 }

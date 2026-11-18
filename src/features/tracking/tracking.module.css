@@ -646,11 +646,6 @@
   transition: border-color var(--dur-fast) var(--ease);
 }
 
-.inputField:focus,
-.selectField:focus {
-  border-color: var(--ws-accent);
-}
-
 .modalFooter {
   display: flex;
   flex-wrap: wrap;

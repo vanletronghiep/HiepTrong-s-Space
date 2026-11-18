@@ -7,17 +7,12 @@
 .note {
   padding: 0;
   gap: 0;
-  height: 240px;
-  min-height: 240px;
-  max-height: 240px;
+  min-height: 0;
   overflow: hidden;
   background: var(--note-body);
   border-color: color-mix(in srgb, var(--note-header) 85%, var(--note-ink));
 }
 .noteHeader {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
   padding: 12px 14px;
   background: var(--note-header);
   border-radius: var(--radius-task) var(--radius-task) 0 0;
@@ -28,9 +23,6 @@
 .descriptionSlot {
   margin: 10px 14px 0;
   padding: 0;
-  min-height: 2.8em;
-  height: 2.8em;
-  overflow: hidden;
 }
 .metadata {
   padding: 10px 14px 12px;

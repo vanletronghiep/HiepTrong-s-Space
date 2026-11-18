@@ -16,7 +16,7 @@
 ### 1.1 Epic Purpose
 The Tasks epic provides a cohesive, two-surface personal task operating system backed by a single SQLite task model (`tasks`, `task_media`) and an automated deadline notification engine (`notifications`):
 
-1. **Daily Task Management (`/tasks/daily`):** A calm, dark-sky observatory workspace ("Celestial Luxury V2") dedicated to daily execution across **Day** (active-board carousel for Yesterday / Today / Tomorrow), **Week** (7-day summary cards), and **Month** (42-cell calendar grid) views, plus a dedicated **Overdue** recovery lane.
+1. **Task management (`/tasks/daily`, formerly "Daily Task Management"):** A calm, dark-sky observatory workspace ("Celestial Luxury V2") dedicated to daily execution across **Day** (active-board carousel for Yesterday / Today / Tomorrow), **Week** (7-day summary cards), and **Month** (42-cell calendar grid) views, plus a dedicated **Overdue** recovery lane.
 2. **Tasks Hub (`/tasks/hub`):** A high-clarity, light-lavender master backlog and planning workspace for capturing unscheduled tasks, searching/filtering/sorting across all tasks, managing media attachments (`<= 50 MiB`), and scheduling tasks onto specific calendar days.
 3. **Notification Center (Topbar Bell):** An automated reminder system that evaluates approaching deadlines (`24h` and `1/4` remaining time window), overdue transitions, and task completions in `Asia/Ho_Chi_Minh` (`UTC+07:00`).
 
@@ -58,11 +58,11 @@ Three glass summary cards sit above the main stage:
    - Switching active boards: Users can click neighboring preview boards, use the mobile day selector, drag horizontally (`>= 54px` threshold), scroll horizontally with a trackpad wheel, or press `ArrowLeft` / `ArrowRight` while focused inside the carousel.
 2. **Board Header & Quick Creation:**
    - Each board header displays the relative label (`Yesterday`, `Today`, `Tomorrow`), the formatted date, task count badge, and a `+ New task` button that opens `TaskForm` pre-filled with that board's `scheduledDate`.
-3. **Measured 3.5-Card Scroll Viewport & Custom Constellation Scrollbar (`DayTaskList.tsx`):**
+3. **Measured 3.5-Card Scroll Viewport (`DayTaskList.tsx`, no visible scrollbar since v3.2):**
    - When a board has `<= 3` tasks, the list expands naturally without internal scrolling.
    - When a board has `>= 4` tasks (`count > 3`), `ResizeObserver` (decoupled from JSX `children` identity using `count` and a `childList` `MutationObserver`) measures the rendered `<article>` cards (`fourth.offsetTop + fourth.offsetHeight / 2`) so the scroll viewport clips cleanly at **3.5 visible cards** regardless of whether individual cards have descriptions or media attachments.
    - Displays a bottom gradient fade and a `Scroll for more` pill while more content remains below.
-   - Renders a custom interactive constellation scrollbar (`role="scrollbar"`, `aria-valuenow`, pointer-draggable `.thumb` positioned via GPU `transform: translateY(...)` instead of layout `top` using `celestial-scroll-thumb.svg`) along the right edge while native scrollbars remain hidden.
+   - v3.2: the custom constellation scrollbar was removed. Scrolling stays native (wheel, touch, keyboard Arrow/Page/Home/End on the focused viewport) with hidden native scrollbars; only the end fade and `data-list-end` mask remain. `celestial-scroll-thumb.svg` is no longer referenced.
 
 #### D. Week Mode (`WeekView.tsx`)
 - Displays a 7-column grid (Monday through Sunday of the current week in `Asia/Ho_Chi_Minh`), with Today highlighted by a golden border and `Today` pill.
@@ -161,6 +161,13 @@ All 11 vector assets designed for the Celestial V2 upgrade are archived in [`sou
 
 ---
 
+### 3.3 v3.1 Shared Brief-Card Anatomy (Confirmed requirement; full renovation pending mockup review)
+
+- Daily and Hub cards share `task-brief.module.css`: checkbox · title · menu sit in one grid header row, each control offset so its visual centre aligns with the first title line (`--brief-title-lh`), independent of the 36px menu hit area.
+- Descriptions use one two-line clamp everywhere (`-webkit-line-clamp: 2`, ellipsis on line two, `overflow-wrap: anywhere` for long tokens/URLs, explicit newlines preserved). Reserved areas derive from the same tokens the text uses (`--brief-desc-lh`, `--brief-desc-area` in `tokens.css`); a one-line description is vertically balanced inside the fixed-anatomy slot used by Daily carousel and Hub note cards. Cards without fixed anatomy (overdue lane, week/month drawers) reserve no blank space.
+- The Daily carousel card height is derived (`padding + title line + two description lines + metadata row`, plus a wrapped metadata row on phones) instead of the former fixed 104/132px, and the 3.5-card viewport is still measured from the rendered fourth card.
+- The substantial Daily/Hub layout renovation (plan §5.1–§5.2) is not implemented until the owner reviews the responsive mockups.
+
 ## 4. Current Implementation and Relevant Code Locations
 
 ### 4.1 Code Map
@@ -193,7 +200,7 @@ Because the 7 November 2026 reconstruction strictly forbade modifying applicatio
 
 1. **Shared Task State:** Creating, completing, editing, scheduling, or deleting a task in `/tasks/daily` or `/tasks/hub` persists to SQLite and reflects across both views without manual page reload.
 2. **Celestial V2 Scoping:** `/tasks/daily` renders the dark Celestial V2 sky (`DailySky`), frosted glass dashboard, and ornamented cards, while `/tasks/hub` renders the light-lavender Workspace theme without dark V2 styles leaking across routes.
-3. **Active-Board Day Carousel & 3.5-Card Scroller:** Day mode centers the active board (`Today` by default) with scaled/dimmed `Yesterday` and `Tomorrow` neighbor boards, supports arrow/drag/wheel/keyboard switching, clips lists of `>= 4` tasks to `3.5` measured cards, and provides an interactive constellation scrollbar.
+3. **Active-Board Day Carousel & 3.5-Card Scroller:** Day mode centers the active board (`Today` by default) with scaled/dimmed `Yesterday` and `Tomorrow` neighbor boards, supports arrow/drag/wheel/keyboard switching, clips lists of `>= 4` tasks to `3.5` measured cards, and scrolls natively without a visible scrollbar.
 4. **Week & Month Summaries + Drawers:** Week mode displays 7 day cards with circular progress, priority planet counts, and independent `due this day` counts; Month mode displays a 42-cell Monday-first calendar grid; clicking any day in either mode opens its inspection `Drawer`.
 5. **Overdue Lane & Modal Transfer:** Incomplete tasks past their `deadline` (or past `scheduledDate` when `deadline === null`) appear in the Overdue lane and can be transferred via the modal `TransferDialog` to a valid future schedule and deadline.
 6. **Notification Lifecycle:** `due_24h` (only when total duration `>= 24h`), `due_quarter` (final 25% of duration), and `overdue` notifications are deduplicated, replaced by a single `completed` notification when a task is marked done, and purged after 7 days.

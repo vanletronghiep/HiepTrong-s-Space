@@ -5,7 +5,7 @@ import { DailyBoard } from '@/features/tasks/DailyBoard';
 const feature = getFeatureById('daily-tasks');
 
 export const metadata: Metadata = {
-  title: feature?.title ?? 'Daily Task Management',
+  title: feature?.title ?? 'Task Management',
 };
 
 export default function DailyTasksPage() {

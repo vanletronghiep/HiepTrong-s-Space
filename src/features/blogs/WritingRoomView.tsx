@@ -1,5 +1,6 @@
 'use client';
 
+import { usePageReady } from '@/features/transitions/TransitionProvider';
 import React, { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
@@ -283,6 +284,7 @@ export function WritingRoomView() {
     selectedAuthorship !== 'all' ? selectedAuthorship : undefined,
     selectedTag !== 'all' ? selectedTag : undefined,
   );
+  usePageReady(!isLoading);
   const createArticle = useCreateBlogArticle();
   const updateArticle = useUpdateBlogArticle();
 

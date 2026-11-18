@@ -3,14 +3,9 @@
 import type { Ref } from 'react';
 import type { FeatureCollectionLayout } from '@/client/preferences';
 import { COLLECTION_SUBTITLE_COPY } from '@/features/home/home-journey';
-import { SegmentedControl, type SegmentedOption } from '@/ui/SegmentedControl';
 import { cn } from '@/ui/cn';
+import { LayoutToggle } from './LayoutToggle';
 import styles from './feature-collection.module.css';
-
-const LAYOUT_OPTIONS: readonly SegmentedOption<FeatureCollectionLayout>[] = [
-  { value: 'horizontal', label: 'Horizontal' },
-  { value: 'vertical', label: 'Vertical' },
-];
 
 export interface CollectionHeaderProps {
   layout: FeatureCollectionLayout;
@@ -40,13 +35,7 @@ export function CollectionHeader({
       </div>
 
       <div ref={controlsRef} data-collection-controls data-layout-mode={layout}>
-        <SegmentedControl
-          tone="cosmos"
-          aria-label="Feature collection layout"
-          options={LAYOUT_OPTIONS}
-          value={layout}
-          onChange={onLayoutChange}
-        />
+        <LayoutToggle layout={layout} onLayoutChange={onLayoutChange} />
       </div>
     </div>
   );

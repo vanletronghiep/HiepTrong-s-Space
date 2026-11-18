@@ -1,0 +1,134 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{url}
+\setlength{\parindent}{0pt}
+\sloppy
+\setlength{\emergencystretch}{3em}
+\def\UrlBreaks{\do\/\do\-\do\.}
+\setlength{\parskip}{0.55em}
+\renewcommand{\arraystretch}{1.25}
+
+\title{\textbf{Hiep Trong Space --- v3.2 Enhancement Report}\\[0.3em]\large Task pages, task detail, page loader, new-tab links and asset review}
+\author{Working report for the project owner}
+\date{18 November 2026}
+
+\begin{document}
+\maketitle
+
+\section{Summary}
+Version 3.2 was delivered in two rounds. Round one covered the feature collection on the homepage (rename, hover glow, layout toggle). Round two covered the Task Management and Tasks hub pages, the task detail dialog, the edit form, a new page loader and new-tab support. All code items are implemented, tested and documented. Two decisions remain with the owner: which asset removals to apply, and which Hub task-card variant to build.
+
+\textbf{Verification status.} The full check (lint, typecheck and 453 tests) passes and the production build succeeds. The loader was verified in the browser against a production build; a hard load of the Tasks hub became ready in about 351\,ms. Nothing is committed.
+
+\section{Owner decisions applied}
+\begin{tabular}{@{}p{4.5cm}p{10.3cm}@{}}
+\toprule
+Topic & Decision \\
+\midrule
+Page titles & Sentence case: ``Task \emph{management}'' and ``Tasks \emph{hub}'' \\
+Overdue ``Choose day'' & Acts as a Transfer (moves the day and the deadline) \\
+Page ready early & Fast-forward the drawing (at most 300\,ms), then fade \\
+Loader scope & Also covers hard loads and refreshes \\
+Hub loader artwork & Keeps Aries \\
+``Active'' & Remove only the badge; keep the ``Mark active'' button \\
+Asset report and card ideas & One private visual artifact page \\
+Card concept & Paper sticky note, three variants \\
+\bottomrule
+\end{tabular}
+
+\section{Round one: feature collection}
+\begin{itemize}
+\item \textbf{Rename.} ``Daily Task Management'' became ``Task Management'' everywhere (registry, page, board, shell, tests).
+\item \textbf{Hover glow.} Each static zodiac gets a hidden duplicate layer with a permanent glow. Hover and focus animate only its opacity, so the transition is smooth and compositor-only; reduced motion is respected.
+\item \textbf{Layout toggle.} The two Gallery/Grid buttons became one morphing button in the cosmos theme (\texttt{LayoutToggle.tsx}). Focus is restored to it after a layout swap. Other code was left untouched.
+\end{itemize}
+
+\section{Round two: Task Management (Daily page)}
+\begin{itemize}
+\item Two-word masthead with the second word in italic, a placeholder subtitle and more balanced vertical spacing. The masthead styles are shared with the Hub (\texttt{task-masthead.module.css}).
+\item The star next to the title and the coral star at the end of the day arc were removed.
+\item The custom scrollbar on the task list was removed; native scrolling, keyboard handling and the end fade are kept.
+\end{itemize}
+
+\section{Round two: Tasks hub}
+\begin{itemize}
+\item The Hub now uses the open, full-width layout without the bordered container, with a matching soft lavender background.
+\item It uses the same masthead as the Daily page. The old page-header component had no remaining users and was deleted.
+\end{itemize}
+
+\section{Round two: task detail dialog and edit form}
+\begin{itemize}
+\item The Active badge is gone; Overdue, Due soon, Completed and Pinned stay.
+\item The ``Daily calendar placement'' box, the overdue reschedule box and the line above the bottom buttons were removed.
+\item New \textbf{Choose day} button (shared by Daily and Hub) with Today, Tomorrow, Specific date and Remove from Daily. For overdue tasks the first three open the Transfer dialog with the chosen day preselected. The menu is rendered inline so it stays above the dialog, and the first Escape closes only the menu.
+\item The gap between the title field and the Deadline label is now 38\,px. The reserved line for the title warning is kept, so the warning never shifts the layout.
+\end{itemize}
+
+\section{Round two: page loader v2}
+\begin{longtable}{@{}p{3.2cm}p{11.6cm}@{}}
+\toprule
+Aspect & Behaviour \\
+\midrule
+\endhead
+Estimate & Per-route moving average of measured navigation-to-ready time, kept separately for the first (cold) and repeat (warm) visit; stored through \texttt{preferences.ts}. Defaults: cold 1200\,ms, warm 250\,ms; an uncached zodiac asset adds 300\,ms. \\
+Fast path & Estimate of 300\,ms or less: static, fully drawn artwork with no drawing. \\
+Loading path & Drawing duration is the estimate clamped between 700\,ms and 4800\,ms. A fast route still loading after 450\,ms switches to a 1.5\,s drawing. \\
+Ready early & The remaining drawing is finished within 300\,ms, then the overlay fades. A safety timer prevents any longer wait. \\
+Ready late & The drawing completes and a glow loop holds until the page is ready; a 10\,s failsafe reveals the page. \\
+Hard loads & The overlay is part of the server render for feature routes, so a refresh is covered from the first paint; a \texttt{noscript} rule hides it without JavaScript. Home and unknown routes are excluded. \\
+Label & ``Loading'' plus the page title in Cormorant italic medium, with a looping three-dot animation. Text-only routes show it centred and larger. \\
+Background & Per-feature accent matching the collection card. \\
+\bottomrule
+\end{longtable}
+
+\section{Round two: new-tab support}
+Internal links were already real anchors. The Universe menu was the only navigation without a link, so each option is now a link; Ctrl or Cmd click, middle click and Ctrl/Cmd+Enter open a new tab while keyboard behaviour is preserved.
+
+\section{Asset review (owner decision pending)}
+A separate session audited the Daily and Hub assets and published a private artifact with previews. Its verdicts:
+
+\begin{longtable}{@{}p{5.6cm}p{1.9cm}p{7.3cm}@{}}
+\toprule
+Asset & Verdict & Reason \\
+\midrule
+\endhead
+\texttt{celestial-scroll-thumb.svg} & Remove & Unused since the scrollbar was removed \\
+\texttt{day-arc-decoration.svg} & Replace & Barely visible; \texttt{celestial-coordinate-rule.svg} suggested \\
+\texttt{constellation-sprinkles.svg} & Replace & Reads as smudges; use \texttt{meteor-rain-edge.svg} or drop \\
+\texttt{nebula-clouds.svg} & Modify & Flat band used three times; soften the top edge \\
+\texttt{card-celestial-corner.svg} & Modify & Strokes too thin \\
+\texttt{starlight-hourglass.svg} & Decide & Never rendered on the Hub; show beside the title or delete \\
+Ringed planet, orbiting moon, dividers, zodiac wheel, night bloom corner, quiet telescope & Keep & Working as intended \\
+\bottomrule
+\end{longtable}
+
+\textbf{Site-wide findings.} The 4k earth textures (about 3.9\,MB), the twelve \texttt{*-symbol.svg} files and \texttt{zodiac/manifest.json} (2.46\,MB) are unused at runtime, but one script and \texttt{tests/zodiac-aquarius-atlas.test.ts} still use the manifest. The copy in \texttt{public/preview/events-pilot} is still referenced by the events pilot, and the unused second art entry in eight themes is drawn by the empty state, so neither can be removed.
+
+\textbf{Caveat.} The audit could not screenshot the live pages (the dev server was erroring during edits), so faint assets should be checked live before deletion.
+
+\section{Hub task-card proposals (owner decision pending)}
+Three paper sticky-note variants, visual only and limited to the Hub: (a) rounded paper with a folded corner, (b) a washi-tape priority tab, (c) soft lined paper with a pin dot. The artifact shows urgent, overdue, completed, scheduled, long-title and no-description states.
+
+\section{Tests and documentation}
+New or updated tests cover the load estimate, loader pacing and hard loads, the Universe menu, the inspector and Choose day, the task form gap, the Hub shell theme and the feature collection. Documentation was updated in \texttt{md/agents/homepage}, \texttt{md/agents/shared/uiux.md} (including section 10.0.1, Loader v2) and \texttt{md/agents/tasks}.
+
+\section{Known limitations}
+\begin{itemize}
+\item The load estimate does not yet use the TanStack Query cache state (documented).
+\item In \texttt{next dev}, the first compile of a route can exceed the 10\,s failsafe; production behaves as designed.
+\item Three files that this work did not touch fail the Prettier check and were left alone: \texttt{symbol-data.ts}, \texttt{ZodiacSymbol.tsx}, \texttt{HorizontalGallery.tsx}.
+\end{itemize}
+
+\section{Next steps}
+\begin{enumerate}
+\item Choose the asset removals, replacements and modifications to apply.
+\item Choose the sticky-note variant (a, b or c) for the Hub task card.
+\item Say when to commit; no commit has been made.
+\end{enumerate}
+
+\end{document}

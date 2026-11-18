@@ -1,10 +1,23 @@
-import type { EventItem } from '@/contracts/event';
+import type { EventItem, EventItemInput } from '@/contracts/event';
+
+/** Preview fixtures predate v3.1; fill the new defaults without re-validating old samples. */
+function withV31Defaults(item: EventItemInput): EventItem {
+  return {
+    kind: 'event',
+    highlighted: false,
+    status: 'active',
+    revision: 0,
+    originalCategory: null,
+    classSchedule: null,
+    ...item,
+  } as EventItem;
+}
 
 export const PILOT_NOW = new Date('2026-11-13T05:50:00.000Z'); // 12:50 Asia/Saigon, Fri 13 Nov 2026
 
 export type PilotDatasetMode = 'populated' | 'empty' | 'long' | 'error';
 
-export const POPULATED_PILOT_EVENTS: EventItem[] = [
+const POPULATED_PILOT_EVENT_INPUTS: EventItemInput[] = [
   {
     id: 'evt-study-sync',
     title: 'AI Study Sync',
@@ -35,7 +48,8 @@ export const POPULATED_PILOT_EVENTS: EventItem[] = [
     isExam: true,
     preparationTaskId: 'task-calc-review',
     recurrence: null,
-    notes: 'Bring student ID, two black pens, and non-programmable calculator. Seating opens at 08:10.',
+    notes:
+      'Bring student ID, two black pens, and non-programmable calculator. Seating opens at 08:10.',
     createdAt: '2026-10-20T03:00:00.000Z',
     updatedAt: '2026-11-08T09:00:00.000Z',
   },
@@ -160,7 +174,10 @@ export const POPULATED_PILOT_EVENTS: EventItem[] = [
   },
 ];
 
-export const LONG_CONTENT_PILOT_EVENTS: EventItem[] = [
+export const POPULATED_PILOT_EVENTS: EventItem[] =
+  POPULATED_PILOT_EVENT_INPUTS.map(withV31Defaults);
+
+const LONG_CONTENT_PILOT_EVENT_INPUTS: EventItemInput[] = [
   {
     id: 'evt-long-1',
     title:
@@ -171,8 +188,7 @@ export const LONG_CONTENT_PILOT_EVENTS: EventItem[] = [
     startAt: '2026-11-17T09:00:00+07:00',
     endAt: '2026-11-17T12:00:00+07:00',
     locationType: 'in_person',
-    location:
-      'Science & Engineering Complex North Wing Auditorium Level 3 · Seminar Wing B-312',
+    location: 'Science & Engineering Complex North Wing Auditorium Level 3 · Seminar Wing B-312',
     url: 'https://conference.university-research-Consortium.example.edu/rooms/distributed-systems-colloquium-session-2026-autumn-track',
     isExam: true,
     preparationTaskId: 'task-long-prep',
@@ -188,3 +204,5 @@ export const LONG_CONTENT_PILOT_EVENTS: EventItem[] = [
   ...POPULATED_PILOT_EVENTS.slice(0, 3),
 ];
 
+export const LONG_CONTENT_PILOT_EVENTS: EventItem[] =
+  LONG_CONTENT_PILOT_EVENT_INPUTS.map(withV31Defaults);

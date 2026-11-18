@@ -1,5 +1,6 @@
 'use client';
 
+import { usePageReady } from '@/features/transitions/TransitionProvider';
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowLeft, BookOpen, Plus, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
@@ -120,6 +121,7 @@ export function FlashcardsView() {
 
   // Queries & Mutations
   const { data, isLoading, isError: loadFailed, refetch } = useFlashcardsData();
+  usePageReady(!isLoading);
   const createCard = useCreateCard();
   const createDeck = useCreateDeck();
   const reviewCard = useReviewCard();

@@ -84,7 +84,7 @@
 
 .displayTitle {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   font-size: clamp(2.15rem, 4.4vw, 3.4rem);
   line-height: 1.02;
   letter-spacing: -0.02em;
@@ -93,7 +93,7 @@
 
 .displayTitleEmphasis {
   font-style: italic;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--ws-accent);
 }
 
@@ -372,4 +372,30 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
+}
+
+/* Event titles: heavier than the thin display default for readability (v3.1 §6.1, §8.4). */
+.eventTitle,
+.eventTitleLarge,
+.eventTitleCompact {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  color: var(--ws-text);
+  overflow-wrap: anywhere;
+}
+
+.eventTitle {
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.eventTitleLarge {
+  font-size: 1.7rem;
+  line-height: 1.2;
+}
+
+.eventTitleCompact {
+  font-size: 1.15rem;
+  line-height: 1.25;
 }
