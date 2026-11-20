@@ -94,17 +94,6 @@
   border-bottom: 1px solid var(--daily-arc-line);
 }
 
-.dayHeader::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 -13px;
-  height: 26px;
-  background: url('/visuals/daily-v2/moon-phase-divider.svg') center 42% / min(270px, 63%) auto
-    no-repeat;
-  opacity: 0.82;
-  pointer-events: none;
-}
-
 .daySelector {
   display: none;
 }

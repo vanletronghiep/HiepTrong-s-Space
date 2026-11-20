@@ -5,6 +5,11 @@ const STORAGE_KEYS = {
   dailyView: 'hts.daily.view',
   featureCollectionLayout: 'hts.featureCollection.layout',
   loadHistory: 'hts.routeLoadHistory',
+  activeStudySession: 'hts.learning.activeSession',
+  studyPlanConfig: 'hts.learning.planConfig',
+  focusSoundMuted: 'hts.focus.soundMuted',
+  focusRitualDay: 'hts.focus.ritualDay',
+  activeTask: 'hts.daily.activeTask',
 } as const;
 
 function safeGetItem(key: string): string | null {
@@ -60,6 +65,50 @@ export function getRouteLoadHistoryRaw(): string | null {
 
 export function setRouteLoadHistoryRaw(value: string): void {
   safeSetItem(STORAGE_KEYS.loadHistory, value);
+}
+
+/** Raw JSON of the running Focus Room session, so a refresh resumes it (v4.0). */
+export function getActiveStudySessionRaw(): string | null {
+  return safeGetItem(STORAGE_KEYS.activeStudySession);
+}
+
+export function setActiveStudySessionRaw(value: string | null): void {
+  if (value === null) {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.removeItem(STORAGE_KEYS.activeStudySession);
+    } catch {
+      // Ignore storage failures.
+    }
+    return;
+  }
+  safeSetItem(STORAGE_KEYS.activeStudySession, value);
+}
+
+export function getStudyPlanConfigRaw(): string | null {
+  return safeGetItem(STORAGE_KEYS.studyPlanConfig);
+}
+
+export function setStudyPlanConfigRaw(value: string): void {
+  safeSetItem(STORAGE_KEYS.studyPlanConfig, value);
+}
+
+/** The day ('YYYY-MM-DD') the four focus commitments were last confirmed. */
+export function getFocusRitualDay(): string | null {
+  return safeGetItem(STORAGE_KEYS.focusRitualDay);
+}
+
+export function setFocusRitualDay(day: string): void {
+  safeSetItem(STORAGE_KEYS.focusRitualDay, day);
+}
+
+/** Whether the Focus Room phase chimes are muted. */
+export function getFocusSoundMuted(): boolean {
+  return safeGetItem(STORAGE_KEYS.focusSoundMuted) === '1';
+}
+
+export function setFocusSoundMuted(muted: boolean): void {
+  safeSetItem(STORAGE_KEYS.focusSoundMuted, muted ? '1' : '0');
 }
 
 export type DraftStorageReadResult =
@@ -144,4 +193,22 @@ export function listDraftStorageKeys(
       error: formatStorageError(error, 'Could not inspect saved drafts in local storage.'),
     };
   }
+}
+
+/** Raw JSON of the Daily "Active task" focus state (v3.4). */
+export function getActiveTaskRaw(): string | null {
+  return safeGetItem(STORAGE_KEYS.activeTask);
+}
+
+export function setActiveTaskRaw(value: string | null): void {
+  if (value === null) {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.removeItem(STORAGE_KEYS.activeTask);
+    } catch {
+      // Ignore storage failures.
+    }
+    return;
+  }
+  safeSetItem(STORAGE_KEYS.activeTask, value);
 }

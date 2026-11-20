@@ -36,6 +36,21 @@ export const isoInstantSchema = z
   .datetime({ offset: true })
   .transform((value) => new Date(value).toISOString());
 
+export const subtaskSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().trim().min(1, 'Subtask title is required.').max(80),
+  priority: prioritySchema,
+  done: z.boolean(),
+  createdAt: isoInstantSchema,
+});
+
+export type Subtask = z.infer<typeof subtaskSchema>;
+
+/** Hard cap so a task card stays a short checklist. */
+export const MAX_SUBTASKS = 20;
+
+export const subtasksSchema = z.array(subtaskSchema).max(MAX_SUBTASKS);
+
 export const taskRecordSchema = z.object({
   id: z.string().uuid(),
   title: z
@@ -51,6 +66,14 @@ export const taskRecordSchema = z.object({
   status: taskStatusSchema,
   completedAt: isoInstantSchema.nullable(),
   reminderAt: isoInstantSchema.nullable(),
+  /** Weekly repeat (v3.3): completing the task creates next week's copy. */
+  repeatWeekly: z.boolean().optional(),
+  /** Optional inclusive last date (YYYY-MM-DD) for the weekly repeat. */
+  repeatUntil: scheduledDateSchema.nullable().optional(),
+  /** Short checklist (v3.4), stored with the task. */
+  subtasks: subtasksSchema.optional(),
+  /** How many times an overdue task was moved with Transfer (v3.4, feeds Observatory). */
+  transferCount: z.number().int().min(0).optional(),
   createdAt: isoInstantSchema,
   updatedAt: isoInstantSchema,
 });
@@ -80,6 +103,9 @@ export const createTaskInputSchema = z.object({
   pinned: z.boolean().optional().default(false),
   deadlineAt: isoInstantSchema,
   scheduledDate: scheduledDateSchema.nullable().optional().default(null),
+  repeatWeekly: z.boolean().optional().default(false),
+  repeatUntil: scheduledDateSchema.nullable().optional().default(null),
+  subtasks: subtasksSchema.optional().default([]),
 });
 
 export type CreateTaskInput = z.input<typeof createTaskInputSchema>;
@@ -97,6 +123,9 @@ export const updateTaskInputSchema = z
     pinned: z.boolean().optional(),
     deadlineAt: isoInstantSchema.optional(),
     scheduledDate: scheduledDateSchema.nullable().optional(),
+    repeatWeekly: z.boolean().optional(),
+    repeatUntil: scheduledDateSchema.nullable().optional(),
+    subtasks: subtasksSchema.optional(),
   })
   .refine((obj) => Object.keys(obj).length > 0, {
     message: 'At least one field must be provided for update.',

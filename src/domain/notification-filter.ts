@@ -151,4 +151,3 @@ export function groupNotificationsByDate(
 
   return Array.from(groupsByKey.values()).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
 }
-

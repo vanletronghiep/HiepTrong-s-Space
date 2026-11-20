@@ -18,6 +18,7 @@ export interface ZodiacLoaderOverlayProps {
   mode: RouteLoaderMode;
   phase: RouteLoaderPhase;
   sign: ZodiacSign | null;
+  /** Destination title shown on screen; the announcement reads "Loading {label}…". */
   label: string;
   /** Feature accent (CSS color) for the background glow, matching its collection card. */
   accent?: string;
@@ -58,6 +59,24 @@ class LoaderErrorBoundary extends Component<BoundaryProps, { hasError: boolean }
   override render(): ReactNode {
     return this.state.hasError ? this.props.fallback : this.props.children;
   }
+}
+
+/**
+ * Destination title in the artwork's rose gold with three twinkling stars (v3.4). The stars
+ * are pure CSS, so nothing re-renders while the page loads; the "Loading <title>…" wording
+ * is announced once by the status region instead.
+ */
+function LoaderTitle({ title }: { title: string }) {
+  return (
+    <div className={styles.label} data-testid="route-loader-label">
+      <p className={styles.title}>{title}</p>
+      <span className={styles.stars} aria-hidden="true">
+        <b />
+        <b />
+        <b />
+      </span>
+    </div>
+  );
 }
 
 /**
@@ -145,20 +164,11 @@ export function ZodiacLoaderOverlay({
       ) : null}
       <div className={styles.stage}>
         {art}
-        <p className={styles.label}>
-          <span className={styles.labelText}>
-            {label}
-            <span aria-hidden="true" className={styles.dots} data-testid="route-loader-dots">
-              <span>.</span>
-              <span>.</span>
-              <span>.</span>
-            </span>
-          </span>
-        </p>
+        <LoaderTitle title={label} />
       </div>
       {/* Announced once per navigation; animation frames never touch this node. */}
       <span role="status" aria-live="polite" className="sr-only">
-        {phase === 'loading' ? `${label}…` : ''}
+        {phase === 'loading' ? `Loading ${label}…` : ''}
       </span>
     </div>
   );

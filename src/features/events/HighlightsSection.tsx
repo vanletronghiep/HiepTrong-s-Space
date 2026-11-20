@@ -15,7 +15,6 @@ const COMPACT_COUNT = 3;
 
 export interface HighlightsSectionProps {
   highlights: EventOccurrence[];
-  rangeLabel: string;
   now: Date;
   selectedKey: string | null;
   isLoading: boolean;
@@ -28,7 +27,6 @@ export interface HighlightsSectionProps {
  */
 export function HighlightsSection({
   highlights,
-  rangeLabel,
   now,
   selectedKey,
   isLoading,
@@ -44,13 +42,13 @@ export function HighlightsSection({
         <div>
           <h2
             id="events-highlights-heading"
-            className="inline-flex items-center gap-1.5 font-display text-[1.35rem] font-medium leading-tight text-ws-text"
+            className="inline-flex items-center gap-1.5 font-display text-[1.35rem] font-semibold leading-tight text-ws-text"
           >
             <Sparkles size={16} className="text-ws-accent" aria-hidden="true" />
             Highlights
           </h2>
           <p className="text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums">
-            {pluralize(highlights.length, 'highlight')} · {rangeLabel}
+            {pluralize(highlights.length, 'highlight')} · next 14 days
           </p>
         </div>
         {hiddenCount > 0 ? (
@@ -70,7 +68,7 @@ export function HighlightsSection({
         <p className="text-[length:var(--fs-small)] text-ws-text-muted">Loading highlights…</p>
       ) : highlights.length === 0 ? (
         <p className="text-[length:var(--fs-small)] text-ws-text-muted">
-          Nothing highlighted in this range. Turn on “Highlight this event” in any event or class to
+          Nothing highlighted in the next 14 days. Turn on “Highlight this event” in any event to
           pin it here.
         </p>
       ) : (
@@ -94,8 +92,15 @@ export function HighlightsSection({
                   <KindBadge occurrence={occurrence} />
                   <StatusBadges occurrence={{ ...occurrence, highlighted: false }} now={now} />
                 </span>
-                <span className={styles.eventTitleCompact}>{occurrence.title}</span>
-                <span className="text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums">
+                <span className={cn(styles.eventTitleCompact, overlays.highlightTitle)}>
+                  {occurrence.title}
+                </span>
+                <span
+                  className={cn(
+                    overlays.highlightMeta,
+                    'text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums',
+                  )}
+                >
                   {formatShortDay(localDateOf(occurrence.startAt))} ·{' '}
                   {formatTime(occurrence.startAt)}
                   {' · '}

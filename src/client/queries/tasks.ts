@@ -181,6 +181,23 @@ export function useUpdateTask() {
   });
 }
 
+export function usePromoteSubtask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ taskId, subtaskId }: { taskId: string; subtaskId: string }) => {
+      const res = await apiRequest<{ item: TaskDto }>(
+        `/api/tasks/${taskId}/subtasks/${subtaskId}/promote`,
+        { method: 'POST' },
+      );
+      return res.item;
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: taskKeys.all });
+    },
+  });
+}
+
 export function useCompleteTask() {
   const queryClient = useQueryClient();
 

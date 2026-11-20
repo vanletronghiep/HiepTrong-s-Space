@@ -478,7 +478,7 @@ describe('ZodiacIllumination component lifecycle, fallback & SVG ID isolation', 
     expect(aquariusFeature.thumbnail.zodiacSign).toBe('aquarius');
     render(<FeatureCard feature={aquariusFeature} revealComplete={true} />);
 
-    const link = screen.getByRole('link', { name: /Learning Room/i });
+    const link = screen.getByRole('link', { name: /Focus Room/i });
     const root = document.querySelector('[data-zodiac-sign="aquarius"]');
     expect(root).toHaveAttribute('data-zodiac-mode', 'static-full');
     expect(root).toHaveAttribute('data-zodiac-presentation', 'static');

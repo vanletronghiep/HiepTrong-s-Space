@@ -7,4 +7,3 @@ export function computeLandmarkProgress(milestone: MilestoneItem): number {
   const completed = milestone.landmarks.filter((l) => l.completed).length;
   return Math.round((completed / milestone.landmarks.length) * 100);
 }
-

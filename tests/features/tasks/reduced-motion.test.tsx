@@ -99,7 +99,7 @@ it('disables residual CSS transitions on TaskCard, TaskMenu trigger, and TaskFor
 
   const article = container.querySelector('article');
   const menuTrigger = screen.getByRole('button', { name: 'Actions for Reduced motion task' });
-  const pinnedSwitch = screen.getByRole('switch');
+  const pinnedSwitch = screen.getByRole('switch', { name: 'Pin to top of the day' });
 
   expect(article).toHaveClass('motion-reduce:transition-none', 'motion-reduce:duration-0');
   expect(menuTrigger).toHaveClass('motion-reduce:transition-none', 'motion-reduce:duration-0');

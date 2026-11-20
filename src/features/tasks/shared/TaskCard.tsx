@@ -1,18 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useRef, type Ref } from 'react';
-import { ArrowRightLeft, Clock, Pin, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Clock, Pin, Repeat, Trash2 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import type { TaskDto } from '@/contracts';
 import { MOTION_DURATION, MOTION_EASE } from '@/design/motion';
 import { formatDayColumnHeader } from '@/domain/date-input';
 import { extractNotePlainText } from '@/domain/note-format';
 import { deriveTaskState, formatTimeLeftLabel } from '@/domain/task-status';
-import {
-  DEFAULT_APP_TIMEZONE,
-  formatDisplayDateTime,
-  formatHubDeadline,
-} from '@/domain/time';
+import { DEFAULT_APP_TIMEZONE, formatDisplayDateTime, formatHubDeadline } from '@/domain/time';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
@@ -21,6 +17,7 @@ import noteStyles from './task-note.module.css';
 import { cn } from '@/ui/cn';
 import { DueSoonDot } from './DueSoonDot';
 import { PriorityBadge } from './PriorityBadge';
+import { SubtaskBadge } from './SubtaskBadge';
 import { TaskMenu } from './TaskMenu';
 import dailyStyles from './daily-task-card.module.css';
 import brief from './task-brief.module.css';
@@ -88,6 +85,13 @@ export function TaskCard({
   const isCompleted = task.status === 'completed';
   const plainDescription = extractNotePlainText(task.description);
   const hasDescription = plainDescription.length > 0;
+  // Carousel and Overdue cards share a fixed anatomy: a one-line title and a reserved
+  // two-line description slot, so metadata and actions line up across cards. Every other card
+  // reserves the same description slot, so a missing description never shifts content upward.
+  const fixedAnatomy = carousel || context === 'overdue';
+  const hasSubtasks = (task.subtasks?.length ?? 0) > 0;
+  // Overdue cards show the badge at the left of their action row instead of the corner.
+  const cornerBadge = hasSubtasks && context !== 'overdue';
 
   useEffect(() => {
     if ((isNew || isHighlighted) && cardRef.current) {
@@ -141,7 +145,7 @@ export function TaskCard({
       }}
       className={cn(
         'w-full text-left bg-transparent border-0 p-0 font-inherit text-inherit leading-[inherit] cursor-pointer rounded-sm',
-        (carousel || context === 'hub') && 'block truncate',
+        (fixedAnatomy || context === 'hub') && 'block truncate',
       )}
     >
       {task.title}
@@ -180,7 +184,7 @@ export function TaskCard({
 
   const descriptionNode = hasDescription ? (
     <p
-      title={carousel || context === 'hub' ? plainDescription : undefined}
+      title={fixedAnatomy || context === 'hub' ? plainDescription : undefined}
       className={cn(brief.desc, isCompleted ? 'text-text-completed' : 'text-ws-text-muted')}
     >
       {plainDescription}
@@ -278,11 +282,9 @@ export function TaskCard({
             {menuNode}
           </div>
 
-          {hasDescription ? (
-            <div className={cn(noteStyles.descriptionSlot, brief.descSlot)}>{descriptionNode}</div>
-          ) : null}
+          <div className={cn(noteStyles.descriptionSlot, brief.descSlot)}>{descriptionNode}</div>
 
-          <div className={noteStyles.metadata}>
+          <div className={cn(noteStyles.metadata, cornerBadge && brief.metaPad)}>
             <div className="flex flex-wrap items-center gap-1.5">
               {task.pinned ? (
                 <span
@@ -291,6 +293,15 @@ export function TaskCard({
                   className="inline-flex items-center text-text-accent"
                 >
                   <Pin size={14} strokeWidth={1.5} />
+                </span>
+              ) : null}
+              {task.repeatWeekly ? (
+                <span
+                  aria-label="Repeats weekly"
+                  title="Repeats weekly"
+                  className="inline-flex items-center text-text-accent"
+                >
+                  <Repeat size={14} strokeWidth={1.5} />
                 </span>
               ) : null}
               {scheduledHeader ? (
@@ -308,10 +319,10 @@ export function TaskCard({
           <div className={brief.header}>
             {checkboxNode}
             <h3
-              title={carousel ? task.title : undefined}
+              title={fixedAnatomy ? task.title : undefined}
               className={cn(
                 brief.title,
-                carousel ? brief.titleSingle : brief.titleDouble,
+                fixedAnatomy ? brief.titleSingle : brief.titleDouble,
                 'font-semibold',
                 isCompleted
                   ? 'italic line-through decoration-text-completed decoration-1 text-text-completed font-normal'
@@ -330,11 +341,12 @@ export function TaskCard({
               carousel ? dailyStyles.compactBody : dense ? 'gap-1.5' : 'gap-2',
             )}
           >
-            {carousel ? <div className={brief.descSlot}>{descriptionNode}</div> : descriptionNode}
+            <div className={brief.descSlot}>{descriptionNode}</div>
 
             <div
               className={cn(
                 brief.meta,
+                cornerBadge && brief.metaPad,
                 'flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[length:var(--fs-small)]',
                 carousel && dailyStyles.compactMetadata,
               )}
@@ -347,6 +359,15 @@ export function TaskCard({
                   className="inline-flex items-center text-text-accent"
                 >
                   <Pin size={14} strokeWidth={1.5} />
+                </span>
+              ) : null}
+              {task.repeatWeekly ? (
+                <span
+                  aria-label="Repeats weekly"
+                  title="Repeats weekly"
+                  className="inline-flex items-center text-text-accent"
+                >
+                  <Repeat size={14} strokeWidth={1.5} />
                 </span>
               ) : null}
               {carousel && derived.isDueSoon ? <DueSoonDot /> : null}
@@ -363,6 +384,7 @@ export function TaskCard({
                 onClick={(e) => e.stopPropagation()}
                 className="pt-2 mt-0.5 border-t border-tint-overdue-border flex flex-wrap items-center justify-end gap-2"
               >
+                <SubtaskBadge inline subtasks={task.subtasks} />
                 <Button
                   size="sm"
                   variant="secondary"
@@ -384,6 +406,7 @@ export function TaskCard({
           </div>
         </>
       )}
+      {context !== 'overdue' ? <SubtaskBadge subtasks={task.subtasks} /> : null}
     </motion.article>
   );
 }

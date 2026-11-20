@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadEditorDraft, makeEditorDraftKey, saveEditorDraft } from '@/client/editor-drafts';
-import type { ProjectItem } from '@/contracts/project';
+import { projectItemSchema, type ProjectItem } from '@/contracts/project';
 import { ProjectsView } from '@/features/projects/ProjectsView';
 import { TransitionProvider } from '@/features/transitions/TransitionProvider';
 import { ToastProvider } from '@/ui/Toast';
@@ -17,15 +14,10 @@ const state = vi.hoisted(() => ({
   refetch: vi.fn(),
   createAsync: vi.fn(),
   updateMutate: vi.fn(),
-  updateAsync: vi.fn(),
   deleteMutate: vi.fn(),
-  deleteIsPending: false,
-  anchorSpy: vi.fn(),
 }));
 
-vi.mock('@/ui/use-item-anchor', () => ({
-  useItemAnchor: (items: readonly { id: string }[]) => state.anchorSpy(items),
-}));
+vi.mock('@/ui/use-item-anchor', () => ({ useItemAnchor: () => undefined }));
 
 vi.mock('@/client/queries/projects', () => ({
   useProjects: () => ({
@@ -34,22 +26,14 @@ vi.mock('@/client/queries/projects', () => ({
     isError: state.isError,
     refetch: state.refetch,
   }),
-  useCreateProject: () => ({
-    mutateAsync: state.createAsync,
-  }),
-  useUpdateProject: () => ({
-    mutate: state.updateMutate,
-    mutateAsync: state.updateAsync,
-  }),
-  useDeleteProject: () => ({
-    mutate: state.deleteMutate,
-    isPending: state.deleteIsPending,
-  }),
+  useCreateProject: () => ({ mutateAsync: state.createAsync, isPending: false }),
+  useUpdateProject: () => ({ mutate: state.updateMutate }),
+  useDeleteProject: () => ({ mutate: state.deleteMutate, isPending: false }),
 }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-  usePathname: () => '/projects',
+  usePathname: () => '/focus',
 }));
 
 function renderProjects() {
@@ -62,66 +46,39 @@ function renderProjects() {
   );
 }
 
-const sampleProject = (overrides: Partial<ProjectItem> = {}): ProjectItem => ({
-  id: 'proj-1',
-  title: 'Go Game AI',
-  overview: 'Monte Carlo tree search engine for 9x9 Go.',
-  status: 'active',
-  progressPercent: 45,
-  deadlineAt: '2026-12-15',
-  blockers: 'Need faster rollout heuristic',
-  nextStep: 'Benchmark UCT exploration constant',
-  techStack: ['TypeScript', 'WebAssembly'],
-  repoUrl: 'https://github.com/hieptrong/go-ai',
-  liveUrl: 'https://go-ai.example.com',
-  linkedTaskIds: ['task-a', 'task-b'],
-  linkedMilestoneIds: ['mile-1'],
-  createdAt: '2026-11-01T00:00:00.000Z',
-  updatedAt: '2026-11-10T08:00:00.000Z',
-  ...overrides,
+const block = (id: string, title: string, done = false) => ({
+  id,
+  title,
+  description: '',
+  done,
+  doneAt: done ? '2026-11-10T00:00:00.000Z' : null,
 });
 
-function createMemoryStorage(): Storage {
-  const store = new Map<string, string>();
-  return {
-    get length() {
-      return store.size;
-    },
-    clear() {
-      store.clear();
-    },
-    getItem(key: string) {
-      return store.get(key) ?? null;
-    },
-    key(index: number) {
-      return Array.from(store.keys())[index] ?? null;
-    },
-    removeItem(key: string) {
-      store.delete(key);
-    },
-    setItem(key: string, value: string) {
-      store.set(key, value);
-    },
-  };
-}
+const focus = (overrides: Record<string, unknown> = {}): ProjectItem =>
+  projectItemSchema.parse({
+    id: 'p1',
+    title: 'IELTS 7.5',
+    why: 'Needed for the exchange application.',
+    priority: 'critical',
+    status: 'moderate',
+    deadlineAt: '2027-02-28',
+    deadlinePhrase: 'end of February',
+    roadmap: [block('c1', 'Diagnostic', true), block('c2', 'Essay drills'), block('c3', 'Mocks')],
+    history: [],
+    createdAt: '2026-11-01T00:00:00.000Z',
+    updatedAt: '2026-11-10T08:00:00.000Z',
+    ...overrides,
+  });
 
-describe('ProjectsView Eastern Strategy Workspace', () => {
+describe('ProjectsView current focus', () => {
   beforeEach(() => {
-    Object.defineProperty(window, 'localStorage', {
-      value: createMemoryStorage(),
-      configurable: true,
-      writable: true,
-    });
     state.projects = [];
     state.isLoading = false;
     state.isError = false;
     state.refetch.mockReset();
     state.createAsync.mockReset();
     state.updateMutate.mockReset();
-    state.updateAsync.mockReset();
     state.deleteMutate.mockReset();
-    state.deleteIsPending = false;
-    state.anchorSpy.mockReset();
   });
 
   afterEach(() => {
@@ -129,353 +86,594 @@ describe('ProjectsView Eastern Strategy Workspace', () => {
     vi.restoreAllMocks();
   });
 
-  it('ships exactly 5 safe static SVGs in public/visuals/project and renders them decoratively', async () => {
-    const publicDir = path.resolve(process.cwd(), 'public', 'visuals', 'project');
-    const files = (await fs.readdir(publicDir)).sort();
-    expect(files).toEqual([
-      'auspicious-cloud-pillar.svg',
-      'auspicious-cloud-scroll.svg',
-      'dragon-over-the-ridge.svg',
-      'jade-knot-talisman.svg',
-      'wooden-training-dummy.svg',
-    ]);
-
-    for (const file of files) {
-      const svg = await fs.readFile(path.join(publicDir, file), 'utf8');
-      expect(svg).not.toMatch(/<script|\bon\w+\s*=|<animate|<foreignObject/i);
-      const withoutXmlns = svg.replace(/xmlns="http:\/\/www\.w3\.org\/2000\/svg"/g, '');
-      expect(withoutXmlns).not.toMatch(/https?:\/\//i);
-    }
-
-    // Empty state renders wooden-training-dummy.svg + page assets
-    renderProjects();
-    const decorativeImgs = Array.from(document.querySelectorAll('img')).map((img) => ({
-      src: img.getAttribute('src'),
-      alt: img.getAttribute('alt'),
-      ariaHidden: img.getAttribute('aria-hidden'),
-    }));
-    expect(decorativeImgs).toEqual(
-      expect.arrayContaining([
-        { src: '/visuals/project/auspicious-cloud-pillar.svg', alt: '', ariaHidden: 'true' },
-        { src: '/visuals/project/dragon-over-the-ridge.svg', alt: '', ariaHidden: 'true' },
-        { src: '/visuals/project/auspicious-cloud-scroll.svg', alt: '', ariaHidden: 'true' },
-        { src: '/visuals/project/wooden-training-dummy.svg', alt: '', ariaHidden: 'true' },
-      ]),
-    );
-
-    // Editor renders jade-knot-talisman.svg decoratively
-    fireEvent.click(screen.getAllByRole('button', { name: 'New project' })[0]!);
-    const jade = document.querySelector('img[src="/visuals/project/jade-knot-talisman.svg"]');
-    expect(jade).not.toBeNull();
-    expect(jade).toHaveAttribute('alt', '');
-    expect(jade).toHaveAttribute('aria-hidden', 'true');
-  });
-
-  it('renders skeleton loading, non-blocking retry alert, KPI strip, status chip filters, and useItemAnchor targets', () => {
+  it('shows a skeleton while loading and a retry alert when loading fails', () => {
     state.isLoading = true;
-    const loadingView = renderProjects();
-    expect(screen.getByLabelText('Loading projects')).toBeInTheDocument();
-    loadingView.unmount();
-
+    renderProjects().unmount();
     state.isLoading = false;
     state.isError = true;
-    const errorView = renderProjects();
+    renderProjects();
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent(/Could not load your projects/);
+    expect(alert).toHaveTextContent(/Could not load your focuses/);
     fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
     expect(state.refetch).toHaveBeenCalledTimes(1);
-    errorView.unmount();
+  });
 
-    state.isError = false;
+  it('shows the chosen art, all decorative: masthead, emblems, bamboo rule and footer', () => {
     state.projects = [
-      sampleProject({
-        id: 'p-active',
-        title: 'Compiler Core',
-        status: 'active',
-        progressPercent: 30,
-      }),
-      sampleProject({
-        id: 'p-prog',
-        title: 'Kernel Lab',
-        status: 'in_progress',
-        progressPercent: 60,
-      }),
-      sampleProject({
-        id: 'p-done',
-        title: 'Chess Engine',
-        status: 'completed',
-        progressPercent: 100,
-      }),
+      focus({ finishedAt: null }),
+      focus({ id: 'p9', title: 'Done one', finishedAt: '2026-11-12T00:00:00.000Z' }),
     ];
-
     renderProjects();
-    expect(state.anchorSpy).toHaveBeenCalledWith(state.projects);
-
-    const kpiSection = screen.getByRole('region', { name: 'Project statistics' });
-    expect(within(kpiSection).getByText('3')).toBeInTheDocument();
-    expect(within(kpiSection).getByText('2')).toBeInTheDocument();
-    expect(within(kpiSection).getByText('1')).toBeInTheDocument();
-    expect(within(kpiSection).getByText('63%')).toBeInTheDocument();
-
-    const compilerCard = document.getElementById('item-p-active');
-    expect(compilerCard).not.toBeNull();
-    expect(compilerCard).toHaveAttribute('tabindex', '-1');
-
-    // Filter chips with aria-pressed and filtered empty state recovery
-    const filterGroup = screen.getByRole('group', { name: 'Project status filter' });
-    const inProgressChip = within(filterGroup).getByRole('button', { name: 'In progress' });
-    fireEvent.click(inProgressChip);
-    expect(inProgressChip).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('heading', { name: 'Kernel Lab' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Compiler Core' })).toBeNull();
-
-    fireEvent.click(within(filterGroup).getByRole('button', { name: 'On hold' }));
-    expect(screen.getByText('No on hold projects right now.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show all projects' }));
-    expect(screen.getByRole('heading', { name: 'Compiler Core' })).toBeInTheDocument();
+    const srcs = Array.from(document.querySelectorAll('img')).map((img) => ({
+      src: img.getAttribute('src'),
+      alt: img.getAttribute('alt'),
+      hidden: img.getAttribute('aria-hidden'),
+    }));
+    for (const name of [
+      'ridge-and-rising-sun',
+      'emblem-seal',
+      'emblem-bamboo',
+      'emblem-mountain',
+      'bamboo-rule',
+      'distant-mountains',
+      'jade-stamp-check',
+    ]) {
+      expect(srcs, name).toContainEqual({
+        src: `/visuals/project/${name}.svg`,
+        alt: '',
+        hidden: 'true',
+      });
+    }
+    expect(srcs.some((s) => s.src === '/visuals/project/dragon-over-the-ridge.svg')).toBe(false);
   });
 
-  it('supports -5%/+5% progress controls with clamping, completion status sync, pending guard, and scoped error alert', () => {
-    const nearlyDone = sampleProject({
-      id: 'p-98',
-      title: 'Ray Tracer',
-      status: 'in_progress',
-      progressPercent: 98,
-    });
-    const completed = sampleProject({
-      id: 'p-100',
-      title: 'Lexer',
-      status: 'completed',
-      progressPercent: 100,
-    });
-    const zero = sampleProject({
-      id: 'p-0',
-      title: 'Shader Toy',
-      status: 'active',
-      progressPercent: 0,
-    });
-    state.projects = [nearlyDone, completed, zero];
-
+  it('gives the open panel one piece of corner art and lotus markers on the roadmap', () => {
+    state.projects = [focus()];
     renderProjects();
-
-    // Clamps to 100 and promotes status to completed, with pending guard preventing double-fire
-    const inc98 = screen.getByRole('button', { name: 'Increase progress for Ray Tracer by 5%' });
-    fireEvent.click(inc98);
-    expect(inc98).toBeDisabled();
-    fireEvent.click(inc98);
-    expect(state.updateMutate).toHaveBeenCalledTimes(1);
-    expect(state.updateMutate).toHaveBeenCalledWith(
-      { id: 'p-98', patch: { progressPercent: 100, status: 'completed' } },
-      expect.objectContaining({ onError: expect.any(Function), onSettled: expect.any(Function) }),
+    const dialog = openPanel();
+    const art = Array.from(dialog.querySelectorAll('img[class*="watermarkArt"]')).map((img) =>
+      img.getAttribute('src'),
     );
-
-    // Simulate failure from server -> shows page alert outside modals and clears pending lock
-    const firstOpts = state.updateMutate.mock.calls[0]![1] as {
-      onError: (err: Error) => void;
-      onSettled: () => void;
-    };
-    act(() => {
-      firstOpts.onError(new Error('Network hiccup'));
-      firstOpts.onSettled();
-    });
-    expect(screen.getByRole('alert')).toHaveTextContent('Network hiccup');
-    expect(inc98).not.toBeDisabled();
-
-    // Decreasing from completed (100%) transitions status back to in_progress
-    fireEvent.click(screen.getByRole('button', { name: 'Decrease progress for Lexer by 5%' }));
-    expect(state.updateMutate).toHaveBeenLastCalledWith(
-      { id: 'p-100', patch: { progressPercent: 95, status: 'in_progress' } },
-      expect.any(Object),
+    expect(art).toHaveLength(1);
+    expect(art[0]).toMatch(
+      /crane-against-the-moon|scholars-pavilion|pine-and-full-moon|paper-lantern|plum-blossom-branch|cloud-curls/,
     );
-
-    // Decreasing at 0% clamps to 0
-    fireEvent.click(screen.getByRole('button', { name: 'Decrease progress for Shader Toy by 5%' }));
-    expect(state.updateMutate).toHaveBeenLastCalledWith(
-      { id: 'p-0', patch: { progressPercent: 0, status: 'active' } },
-      expect.any(Object),
-    );
+    expect(dialog.querySelectorAll('img[src*="lotus-"]').length).toBe(9); // 3 checkpoints x 3 states
+    expect(dialog.querySelector('img[src*="summit-pennant"]')).not.toBeNull();
   });
 
-  it('requires ConfirmDialog for deletion and clears local draft on delete', () => {
-    const target = sampleProject({ id: 'p-del', title: 'Legacy Parser' });
-    state.projects = [target];
-    saveEditorDraft({
-      formId: 'project',
-      recordId: target.id,
-      recordUpdatedAt: target.updatedAt,
-      values: {
-        title: 'Legacy Parser edited',
-        overview: target.overview,
-        status: target.status,
-        progressPercent: target.progressPercent,
-        deadlineDate: '2026-12-15',
-        nextStep: '',
-        blockers: '',
-        techStackText: 'Rust',
-        repoUrl: '',
-        liveUrl: '',
-      },
-    });
-
+  it('drops the removed sections and shows the tier switcher', () => {
+    state.projects = [focus()];
     renderProjects();
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Legacy Parser' }));
-    const confirm = screen.getByRole('dialog', { name: 'Delete project?' });
-    expect(state.deleteMutate).not.toHaveBeenCalled();
+    expect(screen.queryByText('Total focuses')).toBeNull();
+    expect(screen.queryByText('Average progress')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Increase progress/ })).toBeNull();
+    const group = screen.getByRole('radiogroup', { name: 'Focus tier' });
+    expect(
+      within(group)
+        .getAllByRole('radio')
+        .map((r) => r.textContent?.replace(/\d+$/, '')),
+    ).toEqual(['All', 'Background', 'Active', 'Critical']);
+  });
 
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
-    expect(state.deleteMutate).toHaveBeenCalledWith(target.id, expect.any(Object));
-    const opts = state.deleteMutate.mock.calls[0]![1] as { onSuccess: () => void };
-    act(() => {
-      opts.onSuccess();
+  it('shows progress from the roadmap, status, priority and the next checkpoint on the card', () => {
+    state.projects = [focus()];
+    renderProjects();
+    const card = screen.getByRole('button', { name: 'Open IELTS 7.5' });
+    expect(within(card).getByText('33%')).toBeInTheDocument();
+    expect(within(card).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '33');
+    expect(within(card).getByText('Critical')).toBeInTheDocument();
+    expect(within(card).getByText('Moderate')).toBeInTheDocument();
+    expect(within(card).getByText('Essay drills')).toBeInTheDocument();
+  });
+
+  it('filters by tier with the switcher and moves with arrow keys', async () => {
+    state.projects = [
+      focus(),
+      focus({ id: 'p2', title: 'Running habit', priority: 'background', deadlineAt: null }),
+    ];
+    renderProjects();
+    expect(screen.getAllByRole('button', { name: /^Open / })).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('radio', { name: /^Background/ }));
+    expect(screen.getByRole('radio', { name: /^Background/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Open Running habit' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Open IELTS 7.5' })).toBeNull(),
+    );
+
+    fireEvent.keyDown(screen.getByRole('radiogroup', { name: 'Focus tier' }), {
+      key: 'ArrowRight',
+    });
+    expect(screen.getByRole('radio', { name: /^Active/ })).toHaveAttribute('aria-checked', 'true');
+    expect(await screen.findByText(/No active focuses right now/)).toBeInTheDocument();
+  });
+
+  it('puts finished focuses in a folded list instead of the grid', () => {
+    state.projects = [focus({ finishedAt: '2026-11-12T00:00:00.000Z' })];
+    renderProjects();
+    expect(screen.queryByRole('button', { name: 'Open IELTS 7.5' })).toBeNull();
+    expect(screen.getByText('Finished (1)')).toBeInTheDocument();
+  });
+
+  const NOTES = [
+    { id: 'n1', at: '2026-11-18T01:00:00.000Z', text: 'Speaking mock 2', editedAt: null },
+    { id: 'n2', at: '2026-11-17T01:00:00.000Z', text: 'Timed essay', editedAt: null },
+  ];
+
+  const openPanel = (mode: 'view' | 'edit' = 'view') => {
+    fireEvent.click(screen.getByRole('button', { name: 'Open IELTS 7.5' }));
+    const dialog = screen.getByRole('dialog', { name: 'IELTS 7.5' });
+    if (mode === 'edit') fireEvent.click(within(dialog).getByRole('button', { name: 'Edit' }));
+    return dialog;
+  };
+
+  const deleteInEditor = (dialog: HTMLElement) => {
+    const editor = within(dialog).getByLabelText('Edit note', { selector: 'textarea' });
+    return within(editor.parentElement as HTMLElement).getByRole('button', { name: 'Delete' });
+  };
+
+  it('opens in View mode with text locked and the edit tools hidden', () => {
+    state.projects = [focus()];
+    renderProjects();
+    const dialog = openPanel();
+    expect(within(dialog).getByRole('button', { name: 'View' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    // Text is plain display elements, not read-only fields: no caret, nothing to focus.
+    expect(within(dialog).queryByLabelText('Focus title')).toBeNull();
+    expect(within(dialog).queryByRole('textbox', { name: 'Why' })).toBeNull();
+    expect(within(dialog).queryByLabelText(/^Checkpoint \d+ title/)).toBeNull();
+    expect(within(dialog).queryByLabelText(/^Checkpoint \d+ description/)).toBeNull();
+    const shownTitle = within(dialog).getByText('IELTS 7.5');
+    expect(shownTitle.tagName).toBe('DIV');
+    expect(within(dialog).getByText('Needed for the exchange application.').tagName).toBe('SPAN');
+    expect(within(dialog).getByText('Essay drills').tagName).toBe('DIV');
+    // Double-clicking text does nothing.
+    fireEvent.doubleClick(shownTitle);
+    expect(within(dialog).queryByLabelText('Focus title')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeEnabled();
+    expect(within(dialog).queryByLabelText('New checkpoint')).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: /^Remove checkpoint/ })).toBeNull();
+    // Chips show the values but are not menus.
+    expect(within(dialog).queryByRole('button', { name: 'Status' })).toBeNull();
+    expect(within(dialog).getByText('Moderate')).toBeInTheDocument();
+    expect(within(dialog).getByText('Critical')).toBeInTheDocument();
+  });
+
+  it('locks ticking and logging in View mode and unlocks them in Edit mode', () => {
+    state.projects = [focus()];
+    renderProjects();
+    const dialog = openPanel();
+    expect(within(dialog).getByRole('progressbar', { name: 'Progress' })).toHaveAttribute(
+      'aria-valuenow',
+      '33',
+    );
+    expect(within(dialog).getByText('You are here')).toBeInTheDocument();
+
+    const tick = within(dialog).getByRole('button', { name: 'Mark done: Essay drills' });
+    expect(tick).toBeDisabled();
+    fireEvent.click(tick);
+    expect(within(dialog).getByLabelText('What did you do?')).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Log' })).toBeDisabled();
+    expect(state.updateMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Edit' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Mark done: Essay drills' }));
+    const [{ id, patch }] = state.updateMutate.mock.calls[0] as [
+      { id: string; patch: { roadmap: ProjectItem['roadmap'] } },
+    ];
+    expect(id).toBe('p1');
+    expect(patch.roadmap.map((b) => b.done)).toEqual([true, true, false]);
+
+    fireEvent.change(within(dialog).getByLabelText('What did you do?'), {
+      target: { value: 'Speaking mock 3' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Log' }));
+    expect(state.updateMutate.mock.calls[1]?.[0]).toEqual({
+      id: 'p1',
+      patch: { logNote: 'Speaking mock 3' },
+    });
+  });
+
+  it('unlocks text, Delete and the checkpoint tools in Edit mode', () => {
+    state.projects = [focus()];
+    renderProjects();
+    const dialog = openPanel('edit');
+    expect(within(dialog).getByLabelText('Focus title')).toBeEnabled();
+    expect(within(dialog).getByLabelText('Why')).toBeEnabled();
+    expect(within(dialog).getByLabelText('Checkpoint 2 title')).toBeEnabled();
+    expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('New checkpoint')).toBeInTheDocument();
+    expect(
+      within(dialog).getAllByRole('button', { name: /^Remove checkpoint/ }).length,
+    ).toBeGreaterThan(0);
+    // Back to View locks it again.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'View' }));
+    expect(within(dialog).queryByLabelText('Focus title')).toBeNull();
+  });
+
+  it('changes status and priority from the chip menus in Edit mode', async () => {
+    state.projects = [focus()];
+    renderProjects();
+    const dialog = openPanel('edit');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Status' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Intensive', hidden: true }));
+    expect(state.updateMutate.mock.calls[0]?.[0]).toEqual({
+      id: 'p1',
+      patch: { status: 'intensive' },
     });
 
-    const loaded = loadEditorDraft('project', target.id);
-    expect(loaded.ok).toBe(true);
-    if (loaded.ok) {
-      expect(loaded.draft).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Priority' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Background', hidden: true }));
+    expect(state.updateMutate.mock.calls[1]?.[0]).toEqual({
+      id: 'p1',
+      patch: { priority: 'background' },
+    });
+  });
+
+  it('previews a typed deadline and saves the resolved date after a pause', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-18T05:00:00Z'));
+    try {
+      state.projects = [focus({ deadlineAt: null, deadlinePhrase: null })];
+      renderProjects();
+      const dialog = openPanel('edit');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Deadline' }));
+      const input = await screen.findByLabelText('Deadline', { selector: 'input' });
+
+      fireEvent.change(input, { target: { value: 'next friday' } });
+      expect(screen.getByText(/2026-11-27 · in 9 days/)).toBeInTheDocument();
+      await waitFor(
+        () =>
+          expect(state.updateMutate.mock.calls.at(-1)?.[0]).toEqual({
+            id: 'p1',
+            patch: { deadlineAt: '2026-11-27', deadlinePhrase: 'next friday' },
+          }),
+        { timeout: 2000 },
+      );
+
+      state.updateMutate.mockClear();
+      fireEvent.change(input, { target: { value: 'sometime soon-ish' } });
+      expect(screen.getByText(/Not sure what date that is/)).toBeInTheDocument();
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      expect(state.updateMutate).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
     }
   });
 
-  it('runs unified LargeEditorDialog lifecycle: validation, double-submit lock, Ctrl+S, dirty 3-choice prompt, local drafts, stale warning, orphans, and linked ID preservation', async () => {
-    const existing = sampleProject({
-      id: 'p-edit',
-      title: 'Distributed KV',
-      updatedAt: '2026-11-10T08:00:00.000Z',
-      linkedTaskIds: ['t-1', 't-2'],
-      linkedMilestoneIds: ['m-9'],
-    });
-    state.projects = [existing];
-
-    // Seed orphaned draft for absent project
-    saveEditorDraft({
-      formId: 'project',
-      recordId: 'missing-proj',
-      recordUpdatedAt: null,
-      values: {
-        title: 'Ghost project',
-        overview: 'Should not auto-create',
-        status: 'active',
-        progressPercent: 10,
-        deadlineDate: '',
-        nextStep: '',
-        blockers: '',
-        techStackText: '',
-        repoUrl: '',
-        liveUrl: '',
-      },
+  const describedFocus = (description: string) =>
+    focus({
+      roadmap: [
+        { id: 'c1', title: 'Write plan', description, done: false, doneAt: null },
+        block('c2', 'Second'),
+      ],
     });
 
-    const firstMount = renderProjects();
-    expect(
-      screen.getByText(
-        /1 saved local edit draft refers to a project that is no longer in your workspace/,
+  it('renders checkpoint descriptions as formatted text in View mode, with no Markdown markers', () => {
+    state.projects = [
+      describedFocus(
+        '# Plan\n## Steps\n### Detail\n- **bold** item\n- *soft* item\nrun `npm test` now',
       ),
-    ).toBeInTheDocument();
+    ];
+    renderProjects();
+    const dialog = openPanel();
+    expect(within(dialog).getByRole('heading', { name: 'Plan', level: 4 })).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: 'Steps', level: 5 })).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: 'Detail', level: 6 })).toBeInTheDocument();
+    expect(dialog.querySelectorAll('ul li')).toHaveLength(2);
+    expect(within(dialog).getByText('bold').tagName).toBe('STRONG');
+    expect(within(dialog).getByText('soft').tagName).toBe('EM');
+    expect(within(dialog).getByText('npm test').tagName).toBe('CODE');
+    const text = dialog.textContent ?? '';
+    expect(text).not.toMatch(/\*\*|`|# Plan|- bold/);
+  });
+
+  it('grows a description to fit all its text in Edit mode, with no length cap at two lines', () => {
+    const scrollHeight = vi
+      .spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get')
+      .mockReturnValue(240);
+    state.projects = [describedFocus('long text '.repeat(120))];
+    renderProjects();
+    const dialog = openPanel('edit');
+    const box = within(dialog).getByLabelText('Checkpoint 1 description') as HTMLTextAreaElement;
+    expect(box.style.height).toBe('240px');
+    expect(box.maxLength).toBe(4000);
+    scrollHeight.mockReturnValue(400);
+    fireEvent.change(box, { target: { value: `${box.value} and more` } });
+    expect(box.style.height).toBe('400px');
+  });
+
+  it.each([
+    ['Windows or Linux', 'Win32', { ctrlKey: true }],
+    ['macOS', 'MacIntel', { metaKey: true }],
+  ])(
+    'bolds and italicises with the keyboard on %s, without any visible toolbar',
+    (_name, platform, mod) => {
+      vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform);
+      state.projects = [describedFocus('make this bold')];
+      renderProjects();
+      const dialog = openPanel('edit');
+      expect(within(dialog).queryByRole('button', { name: /bold|italic/i })).toBeNull();
+
+      const box = within(dialog).getByLabelText('Checkpoint 1 description') as HTMLTextAreaElement;
+      box.focus();
+      box.setSelectionRange(5, 9);
+      fireEvent.keyDown(box, { key: 'b', ...mod });
+      expect(box.value).toBe('make **this** bold');
+      expect([box.selectionStart, box.selectionEnd]).toEqual([7, 11]);
+
+      fireEvent.keyDown(box, { key: 'i', ...mod });
+      expect(box.value).toBe('make ***this*** bold');
+
+      // The other platform's modifier does nothing.
+      const wrong = platform === 'MacIntel' ? { ctrlKey: true } : { metaKey: true };
+      fireEvent.keyDown(box, { key: 'b', ...wrong });
+      expect(box.value).toBe('make ***this*** bold');
+    },
+  );
+
+  it('opens a bold pair at the caret so the next typing is bold', () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Win32');
+    state.projects = [describedFocus('')];
+    renderProjects();
+    const dialog = openPanel('edit');
+    const box = within(dialog).getByLabelText('Checkpoint 1 description') as HTMLTextAreaElement;
+    box.focus();
+    fireEvent.keyDown(box, { key: 'b', ctrlKey: true });
+    expect(box.value).toBe('****');
+    expect(box.selectionStart).toBe(2);
+    fireEvent.change(box, { target: { value: '**hi**' } });
+    expect(box.value).toBe('**hi**');
+  });
+
+  it('has no automatic events control and shows only notes in History', () => {
+    state.projects = [focus({ history: NOTES })];
+    renderProjects();
+    const dialog = openPanel();
+    expect(within(dialog).queryByText('Show automatic events')).toBeNull();
+    expect(within(dialog).getByText('Speaking mock 2')).toBeInTheDocument();
+    expect(within(dialog).getByText('Timed essay')).toBeInTheDocument();
+  });
+
+  it('edits a note by double-click in Edit mode, saves on Enter and cancels on Escape', () => {
+    state.projects = [focus({ history: NOTES })];
+    renderProjects();
+    const dialog = openPanel();
+
+    // View mode: double-click does nothing.
+    fireEvent.doubleClick(within(dialog).getByText('Speaking mock 2'));
+    expect(within(dialog).queryByLabelText('Edit note', { selector: 'textarea' })).toBeNull();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Edit' }));
+    fireEvent.doubleClick(within(dialog).getByText('Speaking mock 2'));
+    const box = within(dialog).getByLabelText('Edit note', { selector: 'textarea' });
+    expect(box).toHaveValue('Speaking mock 2');
+
+    // Escape cancels and leaves the panel open.
+    fireEvent.change(box, { target: { value: 'Something else' } });
+    fireEvent.keyDown(box, { key: 'Escape' });
+    expect(within(dialog).queryByLabelText('Edit note', { selector: 'textarea' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'IELTS 7.5' })).toBeInTheDocument();
+    expect(state.updateMutate).not.toHaveBeenCalled();
+
+    fireEvent.doubleClick(within(dialog).getByText('Speaking mock 2'));
+    const again = within(dialog).getByLabelText('Edit note', { selector: 'textarea' });
+    fireEvent.change(again, { target: { value: 'Speaking mock 2, fluency better' } });
+    fireEvent.keyDown(again, { key: 'Enter' });
+    expect(state.updateMutate.mock.calls[0]?.[0]).toEqual({
+      id: 'p1',
+      patch: { editNote: { id: 'n1', text: 'Speaking mock 2, fluency better' } },
+    });
+  });
+
+  it('deletes a note after the Undo window and can undo it first', () => {
+    vi.useFakeTimers();
+    try {
+      state.projects = [focus({ history: NOTES })];
+      renderProjects();
+      const dialog = openPanel('edit');
+
+      fireEvent.doubleClick(within(dialog).getByText('Speaking mock 2'));
+      fireEvent.click(deleteInEditor(dialog));
+      expect(within(dialog).queryByText('Speaking mock 2')).toBeNull();
+      // Undo brings it back and nothing is sent.
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Undo' }));
+      expect(within(dialog).getByText('Speaking mock 2')).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(7000);
+      });
+      expect(state.updateMutate).not.toHaveBeenCalled();
+
+      // Without Undo it is removed for good.
+      fireEvent.doubleClick(within(dialog).getByText('Timed essay'));
+      fireEvent.click(deleteInEditor(dialog));
+      act(() => {
+        vi.advanceTimersByTime(7000);
+      });
+      expect(state.updateMutate.mock.calls[0]?.[0]).toEqual({
+        id: 'p1',
+        patch: { deleteNote: 'n2' },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lets one column take the whole panel with the view switch', () => {
+    state.projects = [focus()];
+    renderProjects();
+    const dialog = openPanel();
+    const body = dialog.querySelector('[class*="panelBody"]');
+    expect(body?.className).not.toMatch(/bodyRoadmap|bodyHistory/);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Roadmap' }));
+    expect(body?.className).toMatch(/bodyRoadmap/);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'History' }));
+    expect(body?.className).toMatch(/bodyHistory/);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Split' }));
+    expect(body?.className).not.toMatch(/bodyRoadmap|bodyHistory/);
+  });
+
+  it('offers Mark as finished only once every checkpoint is done, and only in Edit mode', () => {
+    state.projects = [focus({ roadmap: [block('a', 'Only step', true)] })];
+    renderProjects();
+    openPanel();
+    expect(screen.getByRole('button', { name: 'Mark as finished' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as finished' }));
+    expect(state.updateMutate.mock.calls[0]?.[0]).toEqual({ id: 'p1', patch: { finished: true } });
+  });
+
+  const startNewFocus = () => {
+    fireEvent.click(screen.getAllByRole('button', { name: 'New focus' })[0]!);
+    return screen.getByRole('dialog', { name: 'Focus details' });
+  };
+
+  it('opens a new focus as an unsaved draft without creating anything', () => {
+    renderProjects();
+    fireEvent.click(screen.getByRole('radio', { name: /^Critical/ }));
+    const dialog = startNewFocus();
+    expect(state.createAsync).not.toHaveBeenCalled();
+    expect(within(dialog).getByLabelText('Focus title')).toHaveValue('');
+    expect(within(dialog).getByRole('button', { name: 'Save focus' })).toBeDisabled();
+    expect(within(dialog).queryByRole('button', { name: 'View' })).toBeNull();
+    expect(within(dialog).getByLabelText('What did you do?')).toBeDisabled();
+  });
+
+  it('closes an empty draft silently, with nothing saved and no prompt', async () => {
+    renderProjects();
+    const dialog = startNewFocus();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close focus' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(state.createAsync).not.toHaveBeenCalled();
+  });
+
+  it('asks to save or discard when leaving a draft that has content', async () => {
+    renderProjects();
+    const dialog = startNewFocus();
+    fireEvent.change(within(dialog).getByLabelText('Focus title'), {
+      target: { value: 'Learn Rust' },
+    });
+
+    // Clicking the backdrop, the close button and Escape all ask first.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close focus' }));
+    const prompt = await screen.findByRole('dialog', { name: 'Save this focus before leaving?' });
     expect(state.createAsync).not.toHaveBeenCalled();
 
-    // Discard orphaned drafts cleanly
-    fireEvent.click(screen.getByRole('button', { name: 'Discard missing drafts' }));
-    expect(screen.queryByRole('button', { name: 'Discard missing drafts' })).toBeNull();
-
-    // Untouched New project editor closes without 3-choice prompt
-    fireEvent.click(screen.getByRole('button', { name: 'New project' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Close project editor' }));
-    expect(screen.queryByRole('dialog', { name: 'Save changes before closing?' })).toBeNull();
-
-    // Dirty New project editor -> validation retains input -> 3-choice prompt saves draft across remount
-    fireEvent.click(screen.getByRole('button', { name: 'New project' }));
-    const createDialog = screen.getByRole('dialog', { name: 'New project' });
-    const titleInput = within(createDialog).getByLabelText('Title');
-    const overviewInput = within(createDialog).getByLabelText('Overview');
-    fireEvent.change(overviewInput, { target: { value: 'Draft overview retained' } });
-    fireEvent.submit(titleInput.closest('form')!);
-    expect(within(createDialog).getByRole('alert')).toHaveTextContent('Enter a project title.');
-    expect(overviewInput).toHaveValue('Draft overview retained');
-
-    fireEvent.change(titleInput, { target: { value: 'Drafted Build' } });
-    fireEvent.click(within(createDialog).getByRole('button', { name: 'Close project editor' }));
-    const closePrompt = screen.getByRole('dialog', { name: 'Save changes before closing?' });
-    expect(
-      within(closePrompt).getByRole('button', { name: 'Discard changes' }),
-    ).toBeInTheDocument();
-    expect(
-      within(closePrompt).getByRole('button', { name: 'Continue editing' }),
-    ).toBeInTheDocument();
-    fireEvent.click(within(closePrompt).getByRole('button', { name: 'Save draft and close' }));
-    expect(window.localStorage.getItem(makeEditorDraftKey('project', null))).not.toBeNull();
-
-    firstMount.unmount();
-
-    // Remount -> resume draft -> submit via Ctrl+S with double-submit lock & cleanup
-    renderProjects();
-    fireEvent.click(screen.getByRole('button', { name: 'New project' }));
-    const resumedDialog = screen.getByRole('dialog', { name: 'New project' });
-    fireEvent.click(within(resumedDialog).getByRole('button', { name: 'Resume draft' }));
-    expect(within(resumedDialog).getByLabelText('Title')).toHaveValue('Drafted Build');
-    expect(within(resumedDialog).getByLabelText('Overview')).toHaveValue('Draft overview retained');
-
-    let resolveCreate!: (saved: ProjectItem) => void;
-    state.createAsync.mockImplementationOnce(
-      () =>
-        new Promise<ProjectItem>((resolve) => {
-          resolveCreate = resolve;
-        }),
+    // Keep editing returns to the draft.
+    fireEvent.click(within(prompt).getByRole('button', { name: 'Keep editing' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Save this focus before leaving?' })).toBeNull(),
     );
+    expect(screen.getByRole('dialog', { name: 'Learn Rust' })).toBeInTheDocument();
 
-    fireEvent.keyDown(window, { key: 's', ctrlKey: true });
-    fireEvent.keyDown(window, { key: 's', ctrlKey: true });
-    expect(state.createAsync).toHaveBeenCalledTimes(1);
-
-    resolveCreate(sampleProject({ id: 'created-1', title: 'Drafted Build' }));
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New project' })).toBeNull());
-    expect(window.localStorage.getItem(makeEditorDraftKey('project', null))).toBeNull();
-
-    // Stale edit draft warning + linkedTaskIds / linkedMilestoneIds preservation on edit
-    saveEditorDraft({
-      formId: 'project',
-      recordId: existing.id,
-      recordUpdatedAt: '2026-11-05T00:00:00.000Z', // older than existing.updatedAt
-      values: {
-        title: 'Distributed KV v2',
-        overview: existing.overview,
-        status: existing.status,
-        progressPercent: existing.progressPercent,
-        deadlineDate: '2026-12-15',
-        nextStep: existing.nextStep ?? '',
-        blockers: existing.blockers ?? '',
-        techStackText: existing.techStack.join(', '),
-        repoUrl: existing.repoUrl ?? '',
-        liveUrl: existing.liveUrl ?? '',
-      },
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit details for Distributed KV' }));
-    const editDialog = screen.getByRole('dialog', { name: 'Edit project' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(
-      within(editDialog).getByText(/This project was updated after your local draft was saved/),
+      await screen.findByRole('dialog', { name: 'Save this focus before leaving?' }),
     ).toBeInTheDocument();
-    fireEvent.click(within(editDialog).getByRole('button', { name: 'Resume draft' }));
+  });
 
-    state.updateAsync.mockRejectedValueOnce(new Error('Patch failed'));
-    fireEvent.submit(within(editDialog).getByLabelText('Title').closest('form')!);
-    await within(editDialog).findByText('Patch failed');
-    expect(within(editDialog).getByLabelText('Title')).toHaveValue('Distributed KV v2');
-
-    // Patch must only change edited fields so linkedTaskIds/linkedMilestoneIds stay untouched on server
-    const sentPatch = state.updateAsync.mock.calls[0]![0] as {
-      id: string;
-      patch: Record<string, unknown>;
-    };
-    expect(sentPatch).toEqual({
-      id: existing.id,
-      patch: { title: 'Distributed KV v2' },
+  it('discards a draft without saving it', async () => {
+    renderProjects();
+    const dialog = startNewFocus();
+    fireEvent.change(within(dialog).getByLabelText('Focus title'), {
+      target: { value: 'Learn Rust' },
     });
-    expect(sentPatch.patch).not.toHaveProperty('linkedTaskIds');
-    expect(sentPatch.patch).not.toHaveProperty('linkedMilestoneIds');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close focus' }));
+    const prompt = await screen.findByRole('dialog', { name: 'Save this focus before leaving?' });
+    fireEvent.click(within(prompt).getByRole('button', { name: 'Discard' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(state.createAsync).not.toHaveBeenCalled();
+  });
 
-    state.updateAsync.mockResolvedValueOnce({ ...existing, title: 'Distributed KV v2' });
-    fireEvent.submit(within(editDialog).getByLabelText('Title').closest('form')!);
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit project' })).toBeNull());
-    expect(window.localStorage.getItem(makeEditorDraftKey('project', existing.id))).toBeNull();
+  it('saves a draft from the leave prompt and closes, creating it with what was written', async () => {
+    state.createAsync.mockImplementation(async (input: { title: string }) =>
+      focus({ id: 'new', title: input.title }),
+    );
+    renderProjects();
+    fireEvent.click(screen.getByRole('radio', { name: /^Critical/ }));
+    const dialog = startNewFocus();
+    fireEvent.change(within(dialog).getByLabelText('Focus title'), {
+      target: { value: 'Learn Rust' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Why'), { target: { value: 'Systems work' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close focus' }));
+    const prompt = await screen.findByRole('dialog', { name: 'Save this focus before leaving?' });
+    await act(async () => {
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Save' }));
+    });
+    expect(state.createAsync).toHaveBeenCalledTimes(1);
+    expect(state.createAsync.mock.calls[0]?.[0]).toMatchObject({
+      title: 'Learn Rust',
+      why: 'Systems work',
+      priority: 'critical',
+      status: 'steady',
+      roadmap: [],
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('saves a draft from the header button and stays open on the saved focus in View mode', async () => {
+    state.createAsync.mockImplementation(async (input: { title: string }) => {
+      const created = focus({ id: 'new', title: input.title });
+      state.projects = [created];
+      return created;
+    });
+    renderProjects();
+    const dialog = startNewFocus();
+    fireEvent.change(within(dialog).getByLabelText('Focus title'), {
+      target: { value: 'Learn Rust' },
+    });
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Save focus' }));
+    });
+    expect(state.createAsync).toHaveBeenCalledTimes(1);
+    const saved = await screen.findByRole('dialog', { name: 'Learn Rust' });
+    expect(within(saved).getByRole('button', { name: 'View' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('keeps the leave prompt open with the error when saving fails', async () => {
+    state.createAsync.mockRejectedValue(new Error('Disk is full'));
+    renderProjects();
+    const dialog = startNewFocus();
+    fireEvent.change(within(dialog).getByLabelText('Focus title'), {
+      target: { value: 'Learn Rust' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close focus' }));
+    const prompt = await screen.findByRole('dialog', { name: 'Save this focus before leaving?' });
+    await act(async () => {
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Save' }));
+    });
+    expect(within(prompt).getByRole('alert')).toHaveTextContent('Disk is full');
+  });
+
+  it('needs a title to save a draft from the leave prompt', async () => {
+    renderProjects();
+    const dialog = startNewFocus();
+    fireEvent.change(within(dialog).getByLabelText('Why'), { target: { value: 'Only a reason' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close focus' }));
+    const prompt = await screen.findByRole('dialog', { name: 'Save this focus before leaving?' });
+    expect(within(prompt).getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(within(prompt).getByText(/Give it a title/)).toBeInTheDocument();
+  });
+
+  it.each(['view', 'edit'] as const)('asks before deleting a focus in %s mode', (mode) => {
+    state.projects = [focus()];
+    renderProjects();
+    const dialog = openPanel(mode);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    expect(state.deleteMutate).not.toHaveBeenCalled();
+    const confirm = screen.getByRole('dialog', { name: 'Delete focus?' });
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
+    expect(state.deleteMutate.mock.calls[0]?.[0]).toBe('p1');
   });
 });

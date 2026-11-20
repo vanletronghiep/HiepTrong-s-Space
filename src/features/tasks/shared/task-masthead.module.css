@@ -7,13 +7,26 @@
   align-items: flex-end;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: var(--space-4) var(--space-5);
+  gap: var(--space-6) var(--space-5);
   margin-bottom: var(--space-6);
 }
 
 .mastheadText {
-  min-width: 0;
   max-width: 40rem;
+  /* Shrinks so the controls stay beside the title; wraps only when the title itself no longer fits. */
+  flex: 1 1 16rem;
+}
+
+@media (min-width: 701px) {
+  .masthead {
+    flex-wrap: nowrap;
+  }
+  .mastheadText {
+    min-width: min-content;
+  }
+  .mastheadText .title {
+    white-space: nowrap;
+  }
 }
 
 .title {
@@ -48,26 +61,13 @@
   }
 }
 
-/* Tasks hub art: hourglass beside the heading, coordinate rule under the controls. */
+/* Tasks hub art: hourglass beside the heading. */
 .hubArt::after {
   content: '';
   flex: none;
   width: clamp(120px, 16vw, 200px);
   aspect-ratio: 8 / 5;
   background: url('/visuals/tasks-hub/starlight-hourglass.svg') center / contain no-repeat;
-  pointer-events: none;
-}
-
-.hubRule {
-  position: relative;
-}
-
-.hubRule::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 -4px;
-  height: 36px;
-  background: url('/visuals/tasks-hub/celestial-coordinate-rule.svg') center / min(100%, 720px) auto no-repeat;
   pointer-events: none;
 }
 

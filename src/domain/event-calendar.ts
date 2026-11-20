@@ -110,4 +110,3 @@ export function getAgendaEventsForState(options: {
     .filter((evt) => Date.parse(evt.startAt) >= nowMs)
     .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
 }
-

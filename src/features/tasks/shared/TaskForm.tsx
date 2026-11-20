@@ -3,7 +3,7 @@
 import { useRef, useState, type FormEvent, type RefObject } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { ClientApiError } from '@/client/api-client';
-import type { CreateTaskInput, Priority, TaskDto, UpdateTaskInput } from '@/contracts';
+import type { CreateTaskInput, Priority, Subtask, TaskDto, UpdateTaskInput } from '@/contracts';
 import {
   buildDeadlineFromInputs,
   extractZonedDateAndTime,
@@ -14,6 +14,7 @@ import { DEFAULT_APP_TIMEZONE, formatScheduledDate } from '@/domain/time';
 import { Button } from '@/ui/Button';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import styles from './task-form.module.css';
+import { SubtaskList } from './SubtaskList';
 import { DatePickerField } from '@/ui/DatePickerField';
 import { Drawer } from '@/ui/Drawer';
 import { RichNoteEditor } from '@/ui/RichNoteEditor';
@@ -48,6 +49,7 @@ interface FieldErrors {
   deadlineDate?: string;
   deadlineTime?: string;
   description?: string;
+  repeatUntil?: string;
   form?: string;
 }
 
@@ -59,6 +61,10 @@ interface TaskDraft {
   priority: Priority;
   description: string;
   pinned: boolean;
+  repeatWeekly: boolean;
+  repeatUntilInput: string;
+  repeatUntilCanonical: string | null;
+  subtasks: Subtask[];
 }
 
 function buildInitialTaskDraft({
@@ -84,6 +90,12 @@ function buildInitialTaskDraft({
       priority: initialTask.priority,
       description: initialTask.description,
       pinned: initialTask.pinned,
+      repeatWeekly: initialTask.repeatWeekly === true,
+      repeatUntilInput: initialTask.repeatUntil
+        ? (resolveDateInput(initialTask.repeatUntil, now, timeZone)?.displayInput ?? '')
+        : '',
+      repeatUntilCanonical: initialTask.repeatUntil ?? null,
+      subtasks: initialTask.subtasks ?? [],
     };
   }
 
@@ -97,6 +109,10 @@ function buildInitialTaskDraft({
     priority: 'normal',
     description: '',
     pinned: false,
+    repeatWeekly: false,
+    repeatUntilInput: '',
+    repeatUntilCanonical: null,
+    subtasks: [],
   };
 }
 
@@ -204,6 +220,12 @@ function TaskFormBody({
   const [priority, setPriority] = useState<Priority>(initialDraft.priority);
   const [description, setDescription] = useState(initialDraft.description);
   const [pinned, setPinned] = useState(initialDraft.pinned);
+  const [repeatWeekly, setRepeatWeekly] = useState(initialDraft.repeatWeekly);
+  const [repeatUntilInput, setRepeatUntilInput] = useState(initialDraft.repeatUntilInput);
+  const [repeatUntilCanonical, setRepeatUntilCanonical] = useState<string | null>(
+    initialDraft.repeatUntilCanonical,
+  );
+  const [subtasks, setSubtasks] = useState<Subtask[]>(initialDraft.subtasks);
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const resolvedDate = resolveDateInput(dateInput, now, timeZone, canonicalDate);
@@ -242,6 +264,23 @@ function TaskFormBody({
       nextErrors.deadlineDate = 'New tasks must have a deadline in the future.';
     }
 
+    // Repeat until is optional; an empty field means the repeat has no end date.
+    let repeatUntil: string | null = null;
+    if (repeatWeekly && repeatUntilInput.trim() !== '') {
+      const resolvedUntil = resolveDateInput(repeatUntilInput, now, timeZone, repeatUntilCanonical);
+      if (!resolvedUntil) {
+        nextErrors.repeatUntil = 'Enter a valid date, such as 30/10.';
+      } else if (
+        builtDeadline.ok &&
+        resolvedUntil.scheduledDate <
+          extractZonedDateAndTime(builtDeadline.deadlineAt, now, timeZone).scheduledDate
+      ) {
+        nextErrors.repeatUntil = 'Repeat until must be on or after the deadline date.';
+      } else {
+        repeatUntil = resolvedUntil.scheduledDate;
+      }
+    }
+
     if (Object.keys(nextErrors).length > 0 || !builtDeadline.ok) {
       setErrors(nextErrors);
       if (nextErrors.title) titleInputRef.current?.focus();
@@ -258,6 +297,9 @@ function TaskFormBody({
           priority,
           pinned,
           deadlineAt: builtDeadline.deadlineAt,
+          repeatWeekly,
+          repeatUntil,
+          subtasks,
         });
       } else {
         await onCreate({
@@ -267,6 +309,9 @@ function TaskFormBody({
           pinned,
           deadlineAt: builtDeadline.deadlineAt,
           scheduledDate: defaultScheduledDate,
+          repeatWeekly,
+          repeatUntil,
+          subtasks,
         });
       }
       onClose();
@@ -276,6 +321,7 @@ function TaskFormBody({
           title: error.fields.title,
           deadlineDate: error.fields.deadlineAt,
           description: error.fields.description,
+          repeatUntil: error.fields.repeatUntil,
           form: error.message,
         });
         return;
@@ -461,6 +507,9 @@ function TaskFormBody({
         {errors.description ? <InlineFieldError message={errors.description} /> : null}
       </div>
 
+      {/* Subtasks (v3.4): saved together with the task */}
+      <SubtaskList subtasks={subtasks} onChange={setSubtasks} />
+
       {/* Pinned toggle */}
       <div className="flex items-center justify-between pt-1">
         <label
@@ -490,6 +539,62 @@ function TaskFormBody({
             )}
           />
         </button>
+      </div>
+
+      {/* Weekly repeat (v3.3): completing the task creates next week's copy */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor="task-repeat-switch"
+            className="text-[length:var(--fs-ui)] font-medium text-ws-text cursor-pointer"
+          >
+            Repeat weekly
+          </label>
+          <button
+            id="task-repeat-switch"
+            type="button"
+            role="switch"
+            aria-checked={repeatWeekly}
+            onClick={() => setRepeatWeekly((prev) => !prev)}
+            className={cn(
+              'relative inline-flex h-6 w-11 items-center rounded-pill border transition-colors duration-[var(--dur-fast)] motion-reduce:transition-none motion-reduce:duration-0 cursor-pointer',
+              repeatWeekly
+                ? 'bg-fill-checkbox-checked border-fill-checkbox-checked'
+                : 'bg-ws-accent-soft border-ws-border',
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                'inline-block h-4 w-4 rounded-pill bg-ws-surface transition-transform duration-[var(--dur-fast)] motion-reduce:transition-none motion-reduce:duration-0',
+                repeatWeekly ? 'translate-x-5' : 'translate-x-1',
+              )}
+            />
+          </button>
+        </div>
+        {repeatWeekly ? (
+          <div className="space-y-2">
+            <p className="text-[length:var(--fs-small)] text-ws-text-muted">
+              Completing this task creates next week’s copy on the same weekday.
+            </p>
+            <DatePickerField
+              id="task-repeat-until-input"
+              ariaLabel="Repeat until (optional)"
+              mode="task"
+              clearable
+              referenceYear={referenceYear}
+              placeholder="Repeat until (optional), e.g. 30/12"
+              value={repeatUntilInput}
+              error={Boolean(errors.repeatUntil)}
+              onChange={(nextValue) => {
+                setRepeatUntilInput(nextValue);
+                setRepeatUntilCanonical(null);
+                if (errors.repeatUntil) setErrors((prev) => ({ ...prev, repeatUntil: undefined }));
+              }}
+            />
+            {errors.repeatUntil ? <InlineFieldError message={errors.repeatUntil} /> : null}
+          </div>
+        ) : null}
       </div>
 
       {errors.form ? <InlineFieldError message={errors.form} /> : null}

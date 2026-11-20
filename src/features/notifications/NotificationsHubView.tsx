@@ -132,13 +132,12 @@ export function NotificationsHubView() {
         />
 
         <div className={styles.mastheadText}>
-          <p className={styles.eyebrow}>Daily correspondence · 7-day archive</p>
+          <p className={styles.eyebrow}>Notification Center</p>
           <h1 className={styles.displayTitle}>
-            Sakura <span className={styles.displayTitleEmphasis}>Inbox</span>
+            My <span className={styles.displayTitleEmphasis}>Inbox</span>
           </h1>
           <p className={styles.mastheadSubtitle}>
-            Calm reminders for due-soon deadlines, overdue tasks, scheduled events, and completed
-            milestones.
+            Notification for due-soon deadlines, overdue tasks, scheduled events.
           </p>
         </div>
 

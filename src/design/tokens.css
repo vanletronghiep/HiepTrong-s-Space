@@ -59,6 +59,37 @@
   --ws-accent-soft: #dcd5f1;
   --ws-border: #e9e5f2;
 
+  /* ─── Text selection (v4.0, soft emerald) ─── */
+  --selection-bg: color-mix(in srgb, #10b981 28%, transparent);
+  --writing-caret: #10a571;
+
+  /* ─── Writing Room objects (v4.0): book bindings, paper and shelf ─── */
+  --wr-ink: #281908;
+  --wr-light: #ffffff;
+  --book-kraft: #b98a5a;
+  --book-kraft-dark: #8f6640;
+  --book-cloth: #4d6a5a;
+  --book-cloth-dark: #36503f;
+  --book-leather: #5b2c29;
+  --book-leather-dark: #3f1c1a;
+  --book-gold: #d2ae67;
+  --book-brass: #c2964f;
+  --book-brass-dark: #7d5a26;
+  --book-band: #2f2219;
+  --book-ribbon: #9b3b38;
+  --book-tab-1: #e7c35d;
+  --book-tab-2: #8fb39b;
+  --book-tab-3: #d98c76;
+  --book-page: #fbf6ea;
+  --book-page-edge: #ddcfb5;
+  --book-page-line: #e4d8c2;
+  --book-page-ink: #3b2e22;
+  --book-page-muted: #8a7660;
+  --shelf-wood: #7b5639;
+  --shelf-wood-dark: #563a25;
+  --shelf-wall-top: #efe2cb;
+  --shelf-wall-bottom: #e6d4b6;
+
   /* ─── Status (shared) ─── */
   --status-overdue: #d77f85;
   --status-completed: #9a8bcb;
@@ -79,6 +110,10 @@
   --tint-overdue-border: color-mix(in srgb, var(--status-overdue) 45%, var(--ws-border));
   --text-overdue: color-mix(in srgb, var(--status-overdue) 45%, var(--ws-text));
   --text-due-soon: color-mix(in srgb, var(--status-due-soon) 38%, var(--ws-text));
+  /* Events highlights (v3.3): soft gold derived from the due-soon hue, no new colour. */
+  --tint-highlight-bg: color-mix(in srgb, var(--status-due-soon) 14%, var(--ws-surface));
+  --tint-highlight-border: color-mix(in srgb, var(--status-due-soon) 45%, var(--ws-border));
+  --tint-highlight-border-hover: color-mix(in srgb, var(--status-due-soon) 75%, var(--ws-border));
   --text-completed: color-mix(in srgb, var(--status-completed) 55%, var(--ws-text));
   --text-notif-completed: color-mix(in srgb, var(--status-notif-completed) 36%, var(--ws-text));
   --text-system: color-mix(in srgb, var(--status-system) 32%, var(--ws-text));
@@ -87,6 +122,7 @@
 
   /* ─── Typography ─── */
   --font-display: var(--font-cormorant, 'Cormorant Garamond'), ui-serif, Georgia, serif;
+  --font-reading: var(--font-newsreader, 'Newsreader'), ui-serif, Georgia, serif;
   --font-ui: var(--font-inter, 'Inter'), system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   --fs-wordmark-space: clamp(3.25rem, 14vw, 11rem);
@@ -253,6 +289,10 @@
   --feature-soft: #e9decd;
   --feature-ink: #443326;
   --feature-muted: #75614d;
+  /* Current Focus priority tiers: cinnabar seal, jade, ink wash. */
+  --focus-critical: #bf5a3c;
+  --focus-active: #5c8a66;
+  --focus-background: #8f877d;
 }
 [data-feature-theme='learning-room'] {
   --feature-canvas: #f5f6ed;
@@ -260,6 +300,17 @@
   --feature-soft: #e2e8d7;
   --feature-ink: #333e2b;
   --feature-muted: #616d54;
+  /* Focus Room session line: focus, short break, long break. */
+  --focus-seg-focus: #5f754d;
+  --focus-seg-short: #c5d3b0;
+  --focus-seg-long: #9fb5ad;
+  --focus-pebble: #7f8f6e;
+  /* Focus Room heatmap, light to dark. */
+  --focus-heat-0: #e6eadc;
+  --focus-heat-1: #c9d6b4;
+  --focus-heat-2: #9fb585;
+  --focus-heat-3: #73905c;
+  --focus-heat-4: #4f6340;
 }
 [data-feature-theme='personal-achievements'] {
   --feature-canvas: #faf7ef;

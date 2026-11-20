@@ -1,3 +1,4 @@
+import { isRouteHidden } from '@/domain/feature-visibility';
 import type { ZodiacSign } from '@/features/zodiac/types';
 
 export type FeatureThumbnailPreset =
@@ -70,9 +71,9 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
   {
     id: 'blogs',
     slug: 'blogs',
-    title: 'Blogs Hub',
+    title: 'Writing Room',
     label: 'Writing',
-    href: '/blogs',
+    href: '/writing',
     status: 'built',
     thumbnail: { preset: 'manuscript-lines', accent: 'lavender', zodiacSign: 'cancer' },
   },
@@ -115,9 +116,9 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
   {
     id: 'projects',
     slug: 'projects',
-    title: 'In Progress Projects',
+    title: 'Current Focus',
     label: 'Projects',
-    href: '/projects',
+    href: '/focus',
     status: 'built',
     thumbnail: { preset: 'blueprint-vectors', accent: 'blue', zodiacSign: 'sagittarius' },
   },
@@ -133,9 +134,9 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
   {
     id: 'learning-room',
     slug: 'learning-room',
-    title: 'Learning Room',
+    title: 'Focus Room',
     label: 'Learning',
-    href: '/learning-room',
+    href: '/focus-room',
     status: 'built',
     thumbnail: { preset: 'focus-aperture', accent: 'blue', zodiacSign: 'aquarius' },
   },
@@ -149,6 +150,11 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     thumbnail: { preset: 'zenith-crown', accent: 'lavender', zodiacSign: 'pisces' },
   },
 ] as const;
+
+/** Registry entries that are not hidden; drives homepage, universe menu and route loader. */
+export const VISIBLE_FEATURES: readonly FeatureEntry[] = FEATURE_REGISTRY.filter(
+  (entry) => !isRouteHidden(entry.href),
+);
 
 export function getFeatureById(id: string): FeatureEntry | undefined {
   return FEATURE_REGISTRY.find((entry) => entry.id === id);

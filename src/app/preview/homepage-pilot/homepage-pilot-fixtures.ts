@@ -119,9 +119,9 @@ export const PILOT_FEATURES: readonly PilotFeatureEntry[] = [
   {
     id: 'blogs',
     slug: 'blogs',
-    title: 'Blogs Hub',
+    title: 'Writing Room',
     label: 'Writing',
-    href: '/blogs',
+    href: '/writing',
     status: 'built',
     thumbnail: { preset: 'manuscript-lines', accent: 'lavender' },
     accentVar: 'color-mix(in srgb, var(--journey-flare-gold) 74%, var(--cosmos-star-white))',
@@ -169,9 +169,9 @@ export const PILOT_FEATURES: readonly PilotFeatureEntry[] = [
   {
     id: 'projects',
     slug: 'projects',
-    title: 'In Progress Projects',
+    title: 'Current Focus',
     label: 'Projects',
-    href: '/projects',
+    href: '/focus',
     status: 'built',
     thumbnail: { preset: 'blueprint-vectors', accent: 'blue' },
     accentVar:
@@ -190,9 +190,9 @@ export const PILOT_FEATURES: readonly PilotFeatureEntry[] = [
   {
     id: 'learning-room',
     slug: 'learning-room',
-    title: 'Learning Room',
+    title: 'Focus Room',
     label: 'Learning',
-    href: '/learning-room',
+    href: '/focus-room',
     status: 'built',
     thumbnail: { preset: 'focus-aperture', accent: 'blue' },
     accentVar: 'color-mix(in srgb, var(--daily-planet-optional-light) 60%, var(--cosmos-lavender))',

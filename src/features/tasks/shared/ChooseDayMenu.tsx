@@ -100,7 +100,7 @@ export function ChooseDayMenu({
           ref={menuRef}
           role="menu"
           aria-label="Choose day"
-          className="absolute bottom-full left-0 z-10 mb-2 w-60 rounded-input border border-ws-border bg-ws-surface p-1.5 shadow-popover"
+          className="absolute bottom-full left-0 z-10 mb-2 flex w-60 flex-col gap-1 rounded-card border border-ws-border bg-ws-surface p-2 shadow-popover"
         >
           {isOverdue ? (
             <p className="px-3 pb-1 pt-1.5 text-[length:var(--fs-micro)] text-ws-text-muted">
@@ -167,7 +167,7 @@ function MenuItem({
       aria-current={current ? 'true' : undefined}
       onClick={onClick}
       className={cn(
-        'flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-sm px-3 text-left text-[length:var(--fs-ui)] text-ws-text transition-colors duration-[var(--dur-fast)] hover:bg-ws-accent-soft focus-visible:outline-2 focus-visible:outline-ws-focus motion-reduce:transition-none',
+        'flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-item px-3 text-left text-[length:var(--fs-ui)] text-ws-text transition-colors duration-[var(--dur-fast)] hover:bg-ws-accent-soft focus-visible:bg-ws-accent-soft focus-visible:outline-none motion-reduce:transition-none',
         current && 'bg-ws-accent-soft',
       )}
     >

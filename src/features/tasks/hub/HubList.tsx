@@ -12,6 +12,7 @@ import {
   useTasks,
   useTransferTask,
   useUncompleteTask,
+  usePromoteSubtask,
   useUpdateTask,
 } from '@/client/queries/tasks';
 import { useMinuteTicker } from '@/client/use-minute-ticker';
@@ -93,6 +94,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
   const tasksQuery = useTasks();
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
+  const promoteSubtask = usePromoteSubtask();
   const completeTask = useCompleteTask();
   const uncompleteTask = useUncompleteTask();
   const transferTask = useTransferTask();
@@ -326,7 +328,7 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
       </header>
 
       {/* Search & filter controls */}
-      <div className={`flex flex-col gap-3 lg:flex-row lg:items-center pb-8 mb-2 ${masthead.hubRule}`}>
+      <div className={`flex flex-col gap-3 lg:flex-row lg:items-center pb-8 mb-2`}>
         <div className="relative flex-1 min-w-0 lg:max-w-[380px]">
           <Search
             size={16}
@@ -536,6 +538,12 @@ export function HubList({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: string
           setTransferTarget(target);
         }}
         onRequestDelete={(target) => setDeleteTarget(target)}
+        onSubtasksChange={(target, subtasks) =>
+          updateTask.mutate({ id: target.id, input: { subtasks } })
+        }
+        onPromoteSubtask={(target, subtaskId) =>
+          promoteSubtask.mutate({ taskId: target.id, subtaskId })
+        }
       />
 
       {/* Shared TaskForm Drawer (no scheduledDate when created in Hub!) */}

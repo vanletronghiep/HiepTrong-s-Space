@@ -20,6 +20,13 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/',
 }));
 
+// These tests pin gallery geometry for the full 12-card collection, so site-level
+// hiding is switched off here. Hiding itself is covered in feature-visibility.test.ts.
+vi.mock('@/domain/feature-visibility', () => ({
+  HIDDEN_ROUTES: [],
+  isRouteHidden: () => false,
+}));
+
 const collectionFeatures = FEATURE_REGISTRY.filter((feature) => feature.id !== 'tasks-hub');
 const intersectionObserveSpy = vi.fn();
 

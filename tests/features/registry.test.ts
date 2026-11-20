@@ -13,14 +13,14 @@ describe('FEATURE_REGISTRY and route coverage', () => {
       'Tasks Hub',
       'Events',
       'AI Engineering',
-      'Blogs Hub',
+      'Writing Room',
       'APCS Hub',
       'Flashcards',
       'Entertainment Hub',
       'Tracking',
-      'In Progress Projects',
+      'Current Focus',
       'Annual Milestones',
-      'Learning Room',
+      'Focus Room',
       'Personal Achievements',
     ]);
 

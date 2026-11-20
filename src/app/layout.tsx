@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { cormorantGaramond, inter } from '@/design/fonts';
+import { cormorantGaramond, inter, newsreader } from '@/design/fonts';
 import { AppProviders } from './providers';
 import './globals.css';
 
@@ -20,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${cormorantGaramond.variable} ${inter.variable}`}>
+    <html lang="en" className={`${cormorantGaramond.variable} ${inter.variable} ${newsreader.variable}`}>
       <body>
         <AppProviders>{children}</AppProviders>
       </body>

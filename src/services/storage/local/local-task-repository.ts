@@ -1,10 +1,19 @@
 import { and, asc, eq, gte, isNull, lte, type SQL } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { taskRecordSchema, type TaskQuery, type TaskRecord } from '@/contracts';
+import { subtasksSchema, taskRecordSchema, type TaskQuery, type TaskRecord } from '@/contracts';
 import type { TaskRecordPatch, TaskRepository } from '../storage-adapter';
 import { tasksTable } from './schema';
 
 type TaskRow = typeof tasksTable.$inferSelect;
+
+function parseSubtasks(raw: string): TaskRecord['subtasks'] {
+  try {
+    const parsed = subtasksSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
+}
 
 function rowToTaskRecord(row: TaskRow): TaskRecord {
   return {
@@ -18,6 +27,10 @@ function rowToTaskRecord(row: TaskRow): TaskRecord {
     status: row.status,
     completedAt: row.completedAt,
     reminderAt: row.reminderAt,
+    repeatWeekly: row.repeatWeekly,
+    repeatUntil: row.repeatUntil,
+    subtasks: parseSubtasks(row.subtasks),
+    transferCount: row.transferCount,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -46,6 +59,10 @@ export class LocalTaskRepository implements TaskRepository {
         status: validated.status,
         completedAt: validated.completedAt,
         reminderAt: validated.reminderAt,
+        repeatWeekly: validated.repeatWeekly,
+        repeatUntil: validated.repeatUntil,
+        subtasks: JSON.stringify(validated.subtasks ?? []),
+        transferCount: validated.transferCount ?? 0,
         createdAt: validated.createdAt,
         updatedAt: validated.updatedAt,
       })
@@ -61,6 +78,10 @@ export class LocalTaskRepository implements TaskRepository {
           status: validated.status,
           completedAt: validated.completedAt,
           reminderAt: validated.reminderAt,
+          repeatWeekly: validated.repeatWeekly,
+          repeatUntil: validated.repeatUntil,
+          subtasks: JSON.stringify(validated.subtasks ?? []),
+          transferCount: validated.transferCount ?? 0,
           createdAt: validated.createdAt,
           updatedAt: validated.updatedAt,
         },
@@ -85,6 +106,10 @@ export class LocalTaskRepository implements TaskRepository {
     if (patch.status !== undefined) updateValues.status = patch.status;
     if (patch.completedAt !== undefined) updateValues.completedAt = patch.completedAt;
     if (patch.reminderAt !== undefined) updateValues.reminderAt = patch.reminderAt;
+    if (patch.repeatWeekly !== undefined) updateValues.repeatWeekly = patch.repeatWeekly;
+    if (patch.repeatUntil !== undefined) updateValues.repeatUntil = patch.repeatUntil;
+    if (patch.subtasks !== undefined) updateValues.subtasks = JSON.stringify(patch.subtasks);
+    if (patch.transferCount !== undefined) updateValues.transferCount = patch.transferCount;
 
     const result = db.update(tasksTable).set(updateValues).where(eq(tasksTable.id, id)).run();
     if (result.changes === 0) {

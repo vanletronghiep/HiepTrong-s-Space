@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { getLocalTimeZone, parseDate, today, type CalendarDate } from '@internationalized/date';
-import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   Button as AriaButton,
   Calendar,
@@ -153,17 +153,6 @@ export function DatePickerField({
           aria-invalid={error || undefined}
           className="min-w-0 flex-1 bg-transparent px-3 py-2 text-[length:var(--fs-small)] text-ws-text placeholder:text-ws-text-muted/75 outline-none"
         />
-
-        {clearable && value && !disabled ? (
-          <button
-            type="button"
-            aria-label="Clear date"
-            onClick={() => onChange('')}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-sm text-ws-text-muted hover:bg-ws-accent-soft hover:text-ws-text cursor-pointer"
-          >
-            <X size={14} aria-hidden="true" />
-          </button>
-        ) : null}
 
         <DialogTrigger
           isOpen={open}

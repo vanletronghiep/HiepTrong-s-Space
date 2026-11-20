@@ -92,6 +92,26 @@ export function matchTimetablePeriod(startTime: string, endTime: string): number
   return period ? period.index : null;
 }
 
+export interface TimetableSpan {
+  /** First period index the lesson covers. */
+  start: number;
+  /** Last period index the lesson covers (equal to `start` for a single period). */
+  end: number;
+}
+
+/**
+ * Consecutive periods a lesson covers (v3.3): it must start when a period starts and end when
+ * a period ends, with the end no earlier than the start, and stay within the morning
+ * (periods 0–1) or the afternoon (periods 2–3). Anything else is null.
+ */
+export function matchTimetableSpan(startTime: string, endTime: string): TimetableSpan | null {
+  const first = TIMETABLE_PERIODS.find((p) => p.start === startTime);
+  const last = TIMETABLE_PERIODS.find((p) => p.end === endTime);
+  if (!first || !last || last.index < first.index) return null;
+  if (first.index < 2 !== last.index < 2) return null;
+  return { start: first.index, end: last.index };
+}
+
 /* ─── Normalisation ─── */
 
 /** Exam meaning: Exam category, or a preserved legacy flag on any other record. */
@@ -192,6 +212,7 @@ function classOccurrence(
   fields: ResolvedClassFields,
   timeZone: string,
 ): EventOccurrence {
+  const span = matchTimetableSpan(fields.startTime, fields.endTime);
   return {
     key: `${event.id}@${week}`,
     eventId: event.id,
@@ -212,7 +233,8 @@ function classOccurrence(
     description: event.description,
     preparationTaskId: event.preparationTaskId ?? null,
     recurrence: event.recurrence ?? null,
-    period: matchTimetablePeriod(fields.startTime, fields.endTime),
+    period: span?.start ?? null,
+    periodEnd: span?.end ?? null,
     isOverride: fields.isOverride,
     isRepeating: event.classSchedule?.repeating ?? false,
     revision: event.revision,
@@ -252,6 +274,7 @@ export function ordinaryOccurrence(event: EventItem): EventOccurrence {
     preparationTaskId: event.preparationTaskId ?? null,
     recurrence: event.recurrence ?? null,
     period: null,
+    periodEnd: null,
     isOverride: false,
     isRepeating: false,
     revision: event.revision,
@@ -354,14 +377,27 @@ export function isOccurrenceOngoing(
   return Date.parse(occurrence.startAt) <= nowMs && nowMs < Date.parse(occurrence.endAt);
 }
 
-/** Highlights: opted-in, non-canceled, unexpired occurrences, nearest first, stable by key. */
+/** Highlights only look this far ahead of now (v3.3). */
+export const HIGHLIGHT_HORIZON_DAYS = 14;
+
+/**
+ * Highlights: opted-in, non-canceled ordinary events that have not expired and start within
+ * the next 14 days (an ongoing event always qualifies), nearest first, stable by key.
+ * School timetable lessons never appear here.
+ */
 export function selectHighlights(
   occurrences: readonly EventOccurrence[],
   now: Date,
 ): EventOccurrence[] {
+  const limit = now.getTime() + HIGHLIGHT_HORIZON_DAYS * DAY_MS;
   return sortOccurrences(
     occurrences.filter(
-      (o) => o.highlighted && o.status === 'active' && !isOccurrenceExpired(o, now),
+      (o) =>
+        o.kind !== 'class' &&
+        o.highlighted &&
+        o.status === 'active' &&
+        !isOccurrenceExpired(o, now) &&
+        Date.parse(o.startAt) <= limit,
     ),
   );
 }
@@ -650,14 +686,21 @@ export interface ClassConflict {
   /** Monday of the conflicting week. */
   week: string;
   date: string;
-  period: number;
+  startTime: string;
+  endTime: string;
 }
 
-/** Original week whose active occurrence occupies (date, period), or null. */
+/** Two same-day time ranges overlap when each starts before the other ends. */
+function timesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
+  return aStart < bEnd && bStart < aEnd;
+}
+
+/** Original week whose active occurrence overlaps `date` between the given times, or null. */
 export function occupyingWeek(
   event: EventItem,
   date: string,
-  period: number,
+  startTime: string,
+  endTime: string,
   excludeWeek: string | null = null,
 ): string | null {
   const schedule = event.kind === 'class' ? event.classSchedule : null;
@@ -669,7 +712,7 @@ export function occupyingWeek(
       fields !== null &&
       fields.status === 'active' &&
       fields.date === date &&
-      matchTimetablePeriod(fields.startTime, fields.endTime) === period
+      timesOverlap(fields.startTime, fields.endTime, startTime, endTime)
     );
   };
   const home = weekStartOf(date);
@@ -684,7 +727,8 @@ export function occupyingWeek(
 
 interface Segment {
   weekday: number;
-  period: number;
+  startTime: string;
+  endTime: string;
   from: string;
   /** Exclusive Monday, or null for an unbounded weekly schedule. */
   to: string | null;
@@ -701,27 +745,37 @@ function activeSegments(schedule: ClassSchedule): Segment[] {
 
   const segments: Segment[] = [];
   schedule.defaults.forEach((revision, index) => {
-    const period = matchTimetablePeriod(revision.startTime, revision.endTime);
-    if (period === null) return;
     const from =
       revision.effectiveWeek < schedule.startWeek ? schedule.startWeek : revision.effectiveWeek;
     let to: string | null = schedule.defaults[index + 1]?.effectiveWeek ?? null;
     if (limit !== null && (to === null || limit < to)) to = limit;
     if (to !== null && to <= from) return;
-    segments.push({ weekday: revision.weekday, period, from, to });
+    segments.push({
+      weekday: revision.weekday,
+      startTime: revision.startTime,
+      endTime: revision.endTime,
+      from,
+      to,
+    });
   });
   return segments;
 }
 
-function overridePoints(event: EventItem): Array<{ week: string; date: string; period: number }> {
+interface OverridePoint {
+  week: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+function overridePoints(event: EventItem): OverridePoint[] {
   const schedule = event.classSchedule;
   if (!schedule) return [];
-  const points: Array<{ week: string; date: string; period: number }> = [];
+  const points: OverridePoint[] = [];
   for (const week of Object.keys(schedule.overrides)) {
     const fields = resolveClassFields(schedule, week);
     if (!fields || fields.status !== 'active') continue;
-    const period = matchTimetablePeriod(fields.startTime, fields.endTime);
-    if (period !== null) points.push({ week, date: fields.date, period });
+    points.push({ week, date: fields.date, startTime: fields.startTime, endTime: fields.endTime });
   }
   return points;
 }
@@ -739,9 +793,16 @@ export function findClassConflict(
   const schedule = candidate.kind === 'class' ? candidate.classSchedule : null;
   if (!schedule) return null;
   let best: ClassConflict | null = null;
-  const consider = (other: EventItem, date: string, period: number) => {
+  const consider = (other: EventItem, date: string, startTime: string, endTime: string) => {
     if (best === null || date < best.date) {
-      best = { eventId: other.id, title: other.title, week: weekStartOf(date), date, period };
+      best = {
+        eventId: other.id,
+        title: other.title,
+        week: weekStartOf(date),
+        date,
+        startTime,
+        endTime,
+      };
     }
   };
 
@@ -750,8 +811,8 @@ export function findClassConflict(
 
   // A moved occurrence must not land on another week's occurrence of the same series.
   for (const point of candidatePoints) {
-    const week = occupyingWeek(candidate, point.date, point.period, point.week);
-    if (week !== null) consider(candidate, point.date, point.period);
+    const week = occupyingWeek(candidate, point.date, point.startTime, point.endTime, point.week);
+    if (week !== null) consider(candidate, point.date, point.startTime, point.endTime);
   }
 
   for (const other of others) {
@@ -759,13 +820,13 @@ export function findClassConflict(
     const otherSchedule = other.classSchedule;
 
     for (const point of candidatePoints) {
-      if (occupyingWeek(other, point.date, point.period) !== null) {
-        consider(other, point.date, point.period);
+      if (occupyingWeek(other, point.date, point.startTime, point.endTime) !== null) {
+        consider(other, point.date, point.startTime, point.endTime);
       }
     }
     for (const point of overridePoints(other)) {
-      if (occupyingWeek(candidate, point.date, point.period) !== null) {
-        consider(other, point.date, point.period);
+      if (occupyingWeek(candidate, point.date, point.startTime, point.endTime) !== null) {
+        consider(other, point.date, point.startTime, point.endTime);
       }
     }
 
@@ -773,18 +834,20 @@ export function findClassConflict(
       Object.keys(schedule.overrides).length + Object.keys(otherSchedule.overrides).length + 3;
     for (const a of candidateSegments) {
       for (const b of activeSegments(otherSchedule)) {
-        if (a.weekday !== b.weekday || a.period !== b.period) continue;
+        if (a.weekday !== b.weekday) continue;
+        if (!timesOverlap(a.startTime, a.endTime, b.startTime, b.endTime)) continue;
         const from = a.from > b.from ? a.from : b.from;
         const to = a.to === null ? b.to : b.to === null ? a.to : a.to < b.to ? a.to : b.to;
         if (to !== null && to <= from) continue;
         let week = from;
         for (let probe = 0; probe < probeBudget && (to === null || week < to); probe += 1) {
           const date = addDays(week, a.weekday - 1);
+          // Probe with the span both defaults cover, so either side's weekly override still counts.
           if (
-            occupyingWeek(candidate, date, a.period) !== null &&
-            occupyingWeek(other, date, a.period) !== null
+            occupyingWeek(candidate, date, a.startTime, a.endTime) !== null &&
+            occupyingWeek(other, date, a.startTime, a.endTime) !== null
           ) {
-            consider(other, date, a.period);
+            consider(other, date, a.startTime, a.endTime);
             break;
           }
           week = addWeeks(week, 1);

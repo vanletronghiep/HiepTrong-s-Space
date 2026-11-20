@@ -191,13 +191,11 @@ describe('NotificationService (§6.9, §6.10, Epic 4)', () => {
     await notificationService.markAllRead();
     expect((await notificationService.listNotifications()).unreadCount).toBe(0);
 
-    // Completing alerted task replaces due_soon with completed ("Nicely done")
+    // v4.2: completing the alerted task clears its alert and creates no "completed" notification
     await taskService.completeTask(task.id);
     const listAfterComplete = await notificationService.listNotifications();
-    expect(listAfterComplete.items).toHaveLength(1);
-    expect(listAfterComplete.items[0]?.kind).toBe('completed');
-    expect(listAfterComplete.items[0]?.title).toBe('Nicely done');
-    expect(listAfterComplete.items[0]?.message).toBe('"Updated live title" is complete.');
+    expect(listAfterComplete.items).toHaveLength(0);
+    expect(listAfterComplete.unreadCount).toBe(0);
 
     // Deleting task removes its notifications
     await taskService.deleteTask(task.id);

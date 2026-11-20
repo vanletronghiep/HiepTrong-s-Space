@@ -38,6 +38,8 @@ async function buildContainer(): Promise<AppContainer> {
     clock: systemClock,
   });
 
+  await taskService.backfillRepeatCopies().catch(() => undefined);
+
   const notificationService = new NotificationService({
     storage,
     clock: systemClock,

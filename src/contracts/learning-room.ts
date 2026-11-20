@@ -3,6 +3,13 @@ import { z } from 'zod';
 export type FocusMode = 'pomodoro' | 'deep_focus' | 'quick_review';
 export type SessionStatus = 'active' | 'completed' | 'abandoned';
 
+export const focusIntervalSchema = z.object({
+  start: z.string().datetime({ offset: true }),
+  end: z.string().datetime({ offset: true }),
+});
+
+export type FocusInterval = z.infer<typeof focusIntervalSchema>;
+
 export const learningSessionSchema = z.object({
   id: z.string(),
   title: z.string().min(1, 'Title is required'),
@@ -19,6 +26,8 @@ export const learningSessionSchema = z.object({
   status: z.enum(['active', 'completed', 'abandoned']).default('active'),
   reflectionNotes: z.string().default(''),
   rating: z.number().min(1).max(5).default(4),
+  /** When each focus block actually ran. Empty for sessions saved before v4.1. */
+  focusIntervals: z.array(focusIntervalSchema).default([]),
 });
 
 export type LearningSession = z.infer<typeof learningSessionSchema>;
@@ -38,6 +47,7 @@ export const createLearningSessionInputSchema = z.object({
   reflectionNotes: z.string().default(''),
   rating: z.number().min(1).max(5).default(4),
   status: z.enum(['active', 'completed', 'abandoned']).default('completed'),
+  focusIntervals: z.array(focusIntervalSchema).max(64).default([]),
  }).refine(value => value.focusMinutes + value.breakMinutes + value.pausedMinutes <= value.durationMinutes + 0.0001, {
   message: 'Recorded phases cannot exceed session duration', path: ['durationMinutes'],
 }).refine(value => !value.startedAt || !value.completedAt || Date.parse(value.completedAt) >= Date.parse(value.startedAt), {
@@ -46,28 +56,32 @@ export const createLearningSessionInputSchema = z.object({
 
 export type CreateLearningSessionInput = z.input<typeof createLearningSessionInputSchema>;
 
+/** Buckets per day in the time-of-day timeline: one every 15 minutes. */
+export const TIMELINE_BUCKETS = 96;
+
+const dayMinutesSchema = z.object({ date: z.string(), focusMinutes: z.number() });
+
+/**
+ * Focus Room statistics for one calendar year. Sessions from earlier years are kept in the
+ * logbook but never counted here, so every year starts from zero.
+ */
 export const learningRoomStatsSchema = z.object({
-  totalFocusMinutes: z.number(),
-  totalStudyMinutes: z.number(),
-  totalPausedMinutes: z.number(),
-  totalSessions: z.number(),
-  completedSessions: z.number(),
+  year: z.number().int(),
+  todayFocusMinutes: z.number(),
+  weekFocusMinutes: z.number(),
+  /** Mean focus time of sessions that started in the last 30 days. */
+  averageSessionMinutes: z.number(),
   streakDays: z.number(),
-  subjectBreakdown: z.array(
-    z.object({
-      subject: z.string(),
-      minutes: z.number(),
-      percentage: z.number(),
-    }),
-  ),
-  dailyHistory: z.array(
-    z.object({
-      date: z.string(),
-      focusMinutes: z.number(),
-      breakMinutes: z.number(),
-      sessionCount: z.number(),
-    }),
-  ),
+  /** Every day of the year that has focus time, for the activity heatmap. */
+  activity: z.array(dayMinutesSchema),
+  /** Monday to Sunday of the current week. */
+  weekDays: z.array(dayMinutesSchema).length(7),
+  /** The last eight weeks that fall inside the year, oldest first. */
+  recentWeeks: z.array(z.object({ weekStart: z.string(), focusMinutes: z.number() })),
+  /** January to December focus minutes. */
+  months: z.array(z.number()).length(12),
+  /** Per month, focus minutes in each 15-minute slot of the day. */
+  timeline: z.array(z.array(z.number()).length(TIMELINE_BUCKETS)).length(12),
 });
 
 export type LearningRoomStats = z.infer<typeof learningRoomStatsSchema>;

@@ -15,6 +15,7 @@ import {
   isOccurrenceOngoing,
   isoWeekday,
   listOccurrencesInRange,
+  matchTimetableSpan,
   occurrenceDateSpan,
   resolveClassOccurrence,
   selectHighlights,
@@ -407,11 +408,12 @@ describe('timetable conflicts over the full future', () => {
       title: 'Math',
       week: '2026-12-14',
       date: '2026-12-14',
-      period: 0,
+      startTime: '07:30',
+      endTime: '09:30',
     });
   });
 
-  it('ignores ordinary events and out-of-slot classes for occupancy', () => {
+  it('ignores ordinary events for occupancy', () => {
     const ordinary = eventItemSchema.parse({
       id: 'meeting',
       title: 'Meeting',
@@ -421,9 +423,90 @@ describe('timetable conflicts over the full future', () => {
       createdAt: NOW_ISO,
       updatedAt: NOW_ISO,
     });
+    expect(findClassConflict(classEvent(monday), [ordinary])).toBeNull();
+  });
+
+  it('blocks any time overlap, including custom-time lessons, but not touching ranges', () => {
     const outOfSlot = classEvent(mondayClass('Club', '2026-11-16', ['07:45', '09:00']), 'club');
-    expect(findClassConflict(classEvent(monday), [ordinary, outOfSlot])).toBeNull();
     expect(resolveClassOccurrence(outOfSlot, '2026-11-16')?.period).toBeNull();
+    // 07:45–09:00 overlaps the 07:30–09:30 period on every Monday.
+    expect(findClassConflict(classEvent(monday), [outOfSlot])).toMatchObject({
+      eventId: 'club',
+      date: '2026-11-16',
+    });
+    // 09:30–11:30 starts exactly when 07:30–09:30 ends, so the two only touch.
+    const touching = classEvent(mondayClass('Bio', '2026-11-16', ['09:30', '11:30']), 'bio');
+    expect(findClassConflict(touching, [classEvent(monday, 'math')])).toBeNull();
+  });
+
+  it('blocks a multi-period lesson that overlaps another lesson on any covered period', () => {
+    const physics = classEvent(
+      mondayClass('Physics', '2026-11-16', ['15:30', '17:30']),
+      'physics',
+      'Physics',
+    );
+    const calculus = classEvent(
+      mondayClass('Calculus I', '2026-11-16', ['13:30', '17:30']),
+      'calculus',
+      'Calculus I',
+    );
+    expect(findClassConflict(calculus, [physics])).toMatchObject({
+      eventId: 'physics',
+      date: '2026-11-16',
+    });
+    // Shrinking Calculus to the first afternoon period clears the conflict.
+    const shorter = classEvent(
+      mondayClass('Calculus I', '2026-11-16', ['13:30', '15:30']),
+      'calculus',
+      'Calculus I',
+    );
+    expect(findClassConflict(shorter, [physics])).toBeNull();
+  });
+
+  it('blocks extending an existing lesson over another lesson when edited for this week onward', () => {
+    const math = classEvent(monday, 'math', 'Math');
+    const history = classEvent(
+      mondayClass('History', '2026-11-16', ['09:30', '11:30']),
+      'history',
+      'History',
+    );
+    const extended = mutate(history.classSchedule!, {
+      action: 'edit',
+      originalWeek: '2026-11-23',
+      scope: 'this-week-onward',
+      fields: { startTime: '07:30' },
+    });
+    expect(findClassConflict(classEvent(extended, 'history', 'History'), [math])).toMatchObject({
+      eventId: 'math',
+      date: '2026-11-23',
+    });
+  });
+});
+
+describe('timetable spans', () => {
+  it('matches one period or consecutive periods inside the morning or afternoon', () => {
+    expect(matchTimetableSpan('07:30', '09:30')).toEqual({ start: 0, end: 0 });
+    expect(matchTimetableSpan('07:30', '11:30')).toEqual({ start: 0, end: 1 });
+    expect(matchTimetableSpan('13:30', '17:30')).toEqual({ start: 2, end: 3 });
+    expect(matchTimetableSpan('15:30', '17:30')).toEqual({ start: 3, end: 3 });
+  });
+
+  it('rejects spans across lunch, backwards spans, and custom times', () => {
+    expect(matchTimetableSpan('09:30', '15:30')).toBeNull();
+    expect(matchTimetableSpan('15:30', '13:30')).toBeNull();
+    expect(matchTimetableSpan('07:45', '09:30')).toBeNull();
+    expect(matchTimetableSpan('07:30', '10:00')).toBeNull();
+  });
+
+  it('reports the first and last period on a class occurrence', () => {
+    const calculus = classEvent(
+      mondayClass('Calculus I', '2026-11-16', ['13:30', '17:30']),
+      'calculus',
+      'Calculus I',
+    );
+    const occurrence = resolveClassOccurrence(calculus, '2026-11-16')!;
+    expect(occurrence.period).toBe(2);
+    expect(occurrence.periodEnd).toBe(3);
   });
 });
 
@@ -477,6 +560,46 @@ describe('expiry, highlights, and counts', () => {
       '2027-01-01',
     );
     expect(selectHighlights(occurrences, now).map((o) => o.key)).toEqual(['a', 'b', 'later']);
+  });
+
+  it('keeps highlights within 14 days of now and never includes classes', () => {
+    const lesson = classEvent(
+      buildClassSchedule(
+        {
+          title: 'Math',
+          startAt: buildZonedInstant('2026-11-17', '13:30'),
+          endAt: buildZonedInstant('2026-11-17', '15:30'),
+          location: null,
+          url: null,
+          notes: null,
+          highlighted: true,
+        },
+        { weekly: true, endDate: null },
+      ),
+      'math',
+      'Math',
+    );
+    const occurrences = listOccurrencesInRange(
+      [
+        make('day-13', { startAt: '2026-11-30T02:00:00.000Z', highlighted: true }),
+        // Exactly 14 days after now (03:00Z on the 17th) is the last instant that still counts.
+        make('day-14', { startAt: '2026-12-01T03:00:00.000Z', highlighted: true }),
+        make('day-15', { startAt: '2026-12-01T03:00:01.000Z', highlighted: true }),
+        make('ongoing', {
+          startAt: '2026-11-17T02:00:00.000Z',
+          endAt: '2026-11-17T04:00:00.000Z',
+          highlighted: true,
+        }),
+        lesson,
+      ],
+      '2026-11-01',
+      '2027-01-01',
+    );
+    expect(selectHighlights(occurrences, now).map((o) => o.key)).toEqual([
+      'ongoing',
+      'day-13',
+      'day-14',
+    ]);
   });
 
   it('counts this week, upcoming, and upcoming exams including preserved legacy flags', () => {

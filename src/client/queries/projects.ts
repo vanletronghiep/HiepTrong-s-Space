@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CreateProjectInput, ProjectItem } from '@/contracts/project';
+import type { CreateProjectInput, PatchProjectInput, ProjectItem } from '@/contracts/project';
 import { apiRequest } from '../api-client';
 
 export const projectKeys = {
@@ -31,7 +31,10 @@ export function useCreateProject() {
       });
       return res.item;
     },
-    onSuccess: () => {
+    onSuccess: (item) => {
+      queryClient.setQueryData<ProjectItem[]>(projectKeys.list(), (items) =>
+        items ? [...items, item] : [item],
+      );
       queryClient.invalidateQueries({ queryKey: projectKeys.all });
     },
   });
@@ -40,14 +43,40 @@ export function useCreateProject() {
 export function useUpdateProject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: Partial<CreateProjectInput> }) => {
+    mutationFn: async ({ id, patch }: { id: string; patch: PatchProjectInput }) => {
       const res = await apiRequest<{ item: ProjectItem }>(`/api/projects/${id}`, {
         method: 'PATCH',
         body: patch,
       });
       return res.item;
     },
-    onSuccess: () => {
+    // Show edits at once; the server's reply (stamps, history lines) replaces them on settle.
+    onMutate: async ({ id, patch }) => {
+      await queryClient.cancelQueries({ queryKey: projectKeys.list() });
+      const { finished, logNote, editNote, deleteNote, ...fields } = patch;
+      void logNote; // the server stamps new notes, so they appear on settle
+      queryClient.setQueryData<ProjectItem[]>(projectKeys.list(), (items) =>
+        items?.map((item) => {
+          if (item.id !== id) return item;
+          let history = item.history;
+          if (editNote) {
+            history = history.map((entry) =>
+              entry.id === editNote.id ? { ...entry, text: editNote.text } : entry,
+            );
+          }
+          if (deleteNote) history = history.filter((entry) => entry.id !== deleteNote);
+          return {
+            ...item,
+            ...fields,
+            history,
+            ...(finished === undefined
+              ? {}
+              : { finishedAt: finished ? new Date().toISOString() : null }),
+          };
+        }),
+      );
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: projectKeys.all });
     },
   });
@@ -66,4 +95,3 @@ export function useDeleteProject() {
     },
   });
 }
-

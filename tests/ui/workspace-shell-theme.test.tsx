@@ -282,11 +282,11 @@ describe('WorkspaceShell full-page feature theme & overlay isolation', () => {
   });
 
   it('extends learning-room Bonsai Timer Sanctuary palette across shell and Universe menu while keeping Notifications sakura', () => {
-    mockedPathname = '/learning-room';
+    mockedPathname = '/focus-room';
     const { container } = render(
       <ToastProvider>
         <WorkspaceShell>
-          <div>Learning Room Sanctuary</div>
+          <div>Focus Room Sanctuary</div>
         </WorkspaceShell>
       </ToastProvider>,
     );
@@ -311,7 +311,7 @@ describe('WorkspaceShell full-page feature theme & overlay isolation', () => {
   });
 
   it('extends blogs-hub Editorial Woodland palette across shell and Universe menu while keeping Notifications sakura', () => {
-    mockedPathname = '/blogs';
+    mockedPathname = '/writing';
     const { container } = render(
       <ToastProvider>
         <WorkspaceShell>
@@ -369,7 +369,7 @@ describe('WorkspaceShell full-page feature theme & overlay isolation', () => {
   });
 
   it('extends project Eastern Strategy palette across shell and Universe menu while keeping Notifications sakura', () => {
-    mockedPathname = '/projects';
+    mockedPathname = '/focus';
     const { container } = render(
       <ToastProvider>
         <WorkspaceShell>

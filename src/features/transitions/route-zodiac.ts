@@ -1,5 +1,5 @@
 import { getFeatureAccentVar } from '@/features/home/feature-collection/feature-accent';
-import { FEATURE_REGISTRY } from '@/features/registry';
+import { VISIBLE_FEATURES } from '@/features/registry';
 import type { ZodiacSign } from '@/features/zodiac/types';
 import { normalizePathname } from './transition-rules';
 
@@ -19,7 +19,7 @@ export function getRouteZodiacSign(pathname: string): ZodiacSign | null {
   const normalized = normalizePathname(pathname);
   const override = ROUTE_SIGN_OVERRIDES[normalized];
   if (override) return override;
-  const feature = FEATURE_REGISTRY.find((entry) => entry.href === normalized);
+  const feature = findRouteFeature(normalized);
   return feature?.thumbnail.zodiacSign ?? null;
 }
 
@@ -29,15 +29,14 @@ const EXTRA_ROUTE_TITLES: Readonly<Record<string, string>> = {
 };
 
 function findRouteFeature(normalized: string) {
-  return FEATURE_REGISTRY.find((entry) => entry.href === normalized);
+  return VISIBLE_FEATURES.find((entry) => entry.href === normalized);
 }
 
-/** Loader text is "Loading {page title}" (the dots are drawn by the overlay). */
-export function getRouteLoadingLabel(pathname: string): string {
+/** Destination title shown by the loader; the overlay adds the "Loading …" announcement. */
+export function getRouteLoaderTitle(pathname: string): string {
   const normalized = normalizePathname(pathname);
-  if (normalized === '/') return 'Loading home';
-  const title = findRouteFeature(normalized)?.title ?? EXTRA_ROUTE_TITLES[normalized];
-  return title ? `Loading ${title}` : 'Loading page';
+  if (normalized === '/') return 'Home';
+  return findRouteFeature(normalized)?.title ?? EXTRA_ROUTE_TITLES[normalized] ?? 'Page';
 }
 
 /** Per-feature glow accent so the loader background matches the collection card thumbnail. */

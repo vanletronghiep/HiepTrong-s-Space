@@ -117,7 +117,7 @@ describe('Destination zodiac route loader (v3.1 §3.2)', () => {
     expect(getRouteZodiacSign('/tasks/daily')).toBe('aries');
     expect(getRouteZodiacSign('/tasks/hub')).toBe('aries');
     expect(getRouteZodiacSign('/events')).toBe('taurus');
-    expect(getRouteZodiacSign('/blogs')).toBe('cancer');
+    expect(getRouteZodiacSign('/writing')).toBe('cancer');
     expect(getRouteZodiacSign('/')).toBeNull();
     expect(getRouteZodiacSign('/notifications')).toBeNull();
   });
@@ -187,7 +187,7 @@ describe('Destination zodiac route loader (v3.1 §3.2)', () => {
     expect(warn).toHaveBeenCalled();
   });
 
-  it('shows only centred "Loading <title>" text (no spinner, no artwork) for routes without a zodiac', () => {
+  it('shows only the centred title (no spinner, no artwork) for routes without a zodiac', () => {
     render(<Harness readyFor={{}} />);
     fireEvent.click(screen.getByRole('link', { name: 'Go notifications' }));
     const loader = screen.getByTestId('route-loader');
@@ -196,27 +196,30 @@ describe('Destination zodiac route loader (v3.1 §3.2)', () => {
     expect(screen.queryByTestId('route-loader-zodiac')).not.toBeInTheDocument();
     expect(screen.queryByTestId('route-loader-neutral')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Loading Notifications…');
-    expect(loader).toHaveTextContent('Loading Notifications');
+    expect(screen.getByTestId('route-loader-label')).toHaveTextContent('Notifications');
   });
 
-  it('animates three loading dots and places the label below the artwork when a zodiac exists', () => {
+  it('shows the title with three stars below the artwork when a zodiac exists', () => {
     render(<Harness readyFor={{ '/events': false }} />);
     fireEvent.click(screen.getByRole('link', { name: 'Go events' }));
     const loader = screen.getByTestId('route-loader');
     expect(loader).toHaveAttribute('data-has-art', 'true');
-    const dots = screen.getByTestId('route-loader-dots');
-    expect(dots.querySelectorAll('span')).toHaveLength(3);
+    const label = screen.getByTestId('route-loader-label');
+    expect(label).toHaveTextContent('Events');
+    expect(label).not.toHaveTextContent('Loading');
+    expect(label.querySelectorAll('[aria-hidden="true"] b')).toHaveLength(3);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading Events…');
     const art = screen.getByTestId('route-loader-zodiac');
-    expect(art.compareDocumentPosition(dots) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(art.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('shows a static symbol and loading text under reduced motion, with no forced hold', () => {
+  it('shows a static symbol and title under reduced motion, with no forced hold', () => {
     stubMatchMedia(true);
     const { rerender } = render(<Harness readyFor={{ '/events': true }} />);
     fireEvent.click(screen.getByRole('link', { name: 'Go events' }));
-    // Reduced motion keeps the artwork, fully drawn and static, with the label beneath.
+    // Reduced motion keeps the artwork, fully drawn and static, with the title beneath.
     expect(screen.getByTestId('route-loader-zodiac')).toHaveAttribute('data-path', 'fast');
-    expect(screen.getByTestId('route-loader-dots')).toBeInTheDocument();
+    expect(screen.getByTestId('route-loader-label')).toHaveTextContent('Events');
 
     mockedPathname = '/events';
     rerender(<Harness readyFor={{ '/events': true }} />);

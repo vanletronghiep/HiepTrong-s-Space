@@ -1,0 +1,568 @@
+/* Three books on a cabin shelf. Opening a book is a CSS 3D transform, ~1s. */
+.study {
+  --bw: clamp(96px, 21vw, 176px);
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  padding: var(--space-6) var(--space-5) 0;
+  background:
+    radial-gradient(
+      60% 70% at 78% 18%,
+      color-mix(in srgb, var(--journey-flare-gold) 38%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(180deg, var(--shelf-wall-top), var(--shelf-wall-bottom));
+}
+
+.studyTop {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.studyTitle {
+  margin: 0;
+  font-family: var(--font-reading);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 700;
+  color: var(--book-page-ink);
+}
+
+.studySub {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-reading);
+  font-style: italic;
+  color: var(--feature-muted, var(--ws-text-muted));
+}
+
+.lantern {
+  width: clamp(56px, 9vw, 86px);
+  height: auto;
+  opacity: 0.55;
+  filter: grayscale(0.6);
+  transition:
+    opacity var(--dur-slow) var(--ease),
+    filter var(--dur-slow) var(--ease);
+}
+
+.lanternLit {
+  opacity: 1;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--journey-flare-gold) 70%, transparent));
+}
+
+.row {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(14px, 5vw, 64px);
+  min-height: calc(var(--bw) * 1.62);
+  padding: var(--space-6) 0 var(--space-4) calc(var(--bw) * 0.2);
+}
+
+.plank {
+  position: relative;
+  z-index: 2;
+  height: 22px;
+  margin: 0 calc(var(--space-5) * -1);
+  background: linear-gradient(180deg, var(--shelf-wood), var(--shelf-wood-dark));
+  box-shadow:
+    0 -2px 0 color-mix(in srgb, var(--wr-light) 12%, transparent) inset,
+    0 10px 18px color-mix(in srgb, var(--wr-ink) 25%, transparent);
+}
+
+.foot {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin: 0 calc(var(--space-5) * -1);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  background: var(--shelf-wood-dark);
+  color: var(--shelf-wall-top);
+  font-size: var(--fs-small);
+}
+
+.foot b {
+  font-weight: 600;
+  color: var(--book-page);
+}
+
+/* One book */
+.book {
+  all: unset;
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  perspective: 1300px;
+}
+
+.book:focus-visible {
+  outline: 2px solid var(--writing-caret);
+  outline-offset: 8px;
+  border-radius: 6px;
+}
+
+.body {
+  position: relative;
+  width: var(--bw);
+  height: calc(var(--bw) * 1.38);
+  transform-style: preserve-3d;
+  transform: rotateY(-24deg) rotateX(3deg);
+  transition: transform 900ms var(--ease);
+}
+
+.book:hover .body {
+  transform: rotateY(-14deg) rotateX(3deg) translateY(-6px);
+}
+
+.open {
+  z-index: 5;
+}
+
+.open .body {
+  transform: rotateY(-6deg) rotateX(2deg) translateX(46%);
+}
+
+.back,
+.edge,
+.inner,
+.cover {
+  position: absolute;
+}
+
+.back {
+  inset: 0;
+  border-radius: 3px 6px 6px 3px;
+  transform: translateZ(-12px);
+  background: var(--spine-dark);
+  box-shadow: 0 18px 30px color-mix(in srgb, var(--wr-ink) 35%, transparent);
+}
+
+.edge {
+  top: 4px;
+  right: -11px;
+  bottom: 4px;
+  width: 22px;
+  transform: rotateY(90deg);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--book-page) 0 2px,
+    var(--book-page-edge) 2px 3px
+  );
+}
+
+.inner {
+  inset: 4px 3px 4px 2px;
+  transform: translateZ(11px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12% 11%;
+  border-radius: 2px 4px 4px 2px;
+  background: var(--book-page);
+  color: var(--book-page-ink);
+  font-size: clamp(9px, 1.4vw, 12px);
+  line-height: 1.45;
+  text-align: left;
+  box-shadow: inset 10px 0 14px -10px color-mix(in srgb, var(--wr-ink) 35%, transparent);
+}
+
+.innerLabel {
+  font-size: 0.8em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: none;
+  color: var(--book-page-muted);
+}
+
+.innerTitle {
+  font-family: var(--font-reading);
+  font-size: 1.55em;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.innerRule {
+  height: 1px;
+  margin-top: 0.7em;
+  background: var(--book-page-line);
+}
+
+.innerEnter {
+  margin-top: auto;
+  font-weight: 600;
+  color: var(--feature-accent, var(--ws-accent));
+}
+
+.lockbox {
+  display: grid;
+  justify-items: center;
+  gap: 0.7em;
+  margin-top: 0.8em;
+}
+
+.lockDots {
+  font-size: 1.3em;
+  letter-spacing: 0.3em;
+  color: var(--book-leather);
+}
+
+.lockLine {
+  width: 100%;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid var(--book-page-line);
+  text-align: center;
+}
+
+.cover {
+  inset: 0;
+  transform-origin: left center;
+  transform: translateZ(12px);
+  transform-style: preserve-3d;
+  transition: transform 1000ms var(--ease);
+}
+
+.open .cover {
+  transform: translateZ(12px) rotateY(-162deg);
+}
+
+.front,
+.inside {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 3px 6px 6px 3px;
+  backface-visibility: hidden;
+}
+
+.front {
+  background: var(--spine);
+  box-shadow:
+    inset 7px 0 0 -2px color-mix(in srgb, var(--wr-ink) 28%, transparent),
+    inset 9px 0 10px -6px color-mix(in srgb, var(--wr-light) 18%, transparent);
+}
+
+.inside {
+  transform: rotateY(180deg);
+  background: var(--spine-dark);
+}
+
+.inside::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 2px;
+  background: var(--book-page-edge);
+  opacity: 0.9;
+}
+
+.tag {
+  max-width: var(--bw);
+  font-size: var(--fs-small);
+  line-height: 1.35;
+  text-align: center;
+  color: var(--feature-muted, var(--ws-text-muted));
+  transition: opacity var(--dur-base) var(--ease);
+}
+
+.open .tag {
+  opacity: 0;
+}
+
+/* Draft Room: kraft field notebook */
+.draft {
+  --spine: var(--book-kraft);
+  --spine-dark: var(--book-kraft-dark);
+}
+
+.draft .front {
+  background:
+    radial-gradient(
+      circle at 70% 76%,
+      transparent 17%,
+      color-mix(in srgb, var(--wr-ink) 22%, transparent) 18%,
+      color-mix(in srgb, var(--wr-ink) 12%, transparent) 20%,
+      transparent 21%
+    ),
+    repeating-linear-gradient(
+      17deg,
+      color-mix(in srgb, var(--wr-light) 5%, transparent) 0 2px,
+      transparent 2px 5px
+    ),
+    var(--book-kraft);
+}
+
+.band {
+  position: absolute;
+  top: 0;
+  right: 16%;
+  bottom: 0;
+  width: 5%;
+  background: var(--book-band);
+}
+
+.paperLabel {
+  position: absolute;
+  top: 18%;
+  right: 26%;
+  left: 14%;
+  padding: 8% 7%;
+  background: var(--book-page);
+  transform: rotate(-2deg);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--wr-ink) 20%, transparent);
+}
+
+.labelTitle {
+  display: block;
+  font-family: var(--font-reading);
+  font-style: italic;
+  font-size: clamp(11px, 1.9vw, 18px);
+  line-height: 1.1;
+  color: var(--book-page-ink);
+}
+
+.labelSub {
+  font-size: clamp(7px, 1vw, 9.5px);
+  letter-spacing: 0.12em;
+  color: var(--book-page-muted);
+}
+
+.tabs {
+  position: absolute;
+  top: 30%;
+  right: -7px;
+  display: grid;
+  gap: 5px;
+  transform: translateZ(1px);
+}
+
+.tabs i {
+  display: block;
+  width: 10px;
+  height: 14px;
+  border-radius: 0 3px 3px 0;
+}
+
+/* My Perspective: cloth hardcover with foil */
+.persp {
+  --spine: var(--book-cloth);
+  --spine-dark: var(--book-cloth-dark);
+}
+
+.persp .front {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--wr-light) 4.5%, transparent) 0 1px,
+      transparent 1px 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--wr-ink) 5%, transparent) 0 1px,
+      transparent 1px 3px
+    ),
+    var(--book-cloth);
+}
+
+.foil {
+  position: absolute;
+  inset: 8%;
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  border: 1px solid var(--book-gold);
+  border-radius: 2px;
+  text-align: center;
+}
+
+.foil::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid color-mix(in srgb, var(--book-gold) 55%, transparent);
+}
+
+.foilTitle {
+  font-family: var(--font-reading);
+  font-size: clamp(11px, 2vw, 19px);
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  color: var(--book-gold);
+}
+
+.foilSub {
+  font-size: clamp(6.5px, 0.95vw, 9px);
+  letter-spacing: 0.22em;
+  color: color-mix(in srgb, var(--book-gold) 80%, var(--wr-light));
+}
+
+.foilArt {
+  width: 42%;
+  height: auto;
+  margin: 0 auto;
+  opacity: 0.55;
+  filter: sepia(1) saturate(2.4) hue-rotate(-8deg) brightness(1.2);
+}
+
+.ribbon {
+  position: absolute;
+  bottom: -16px;
+  left: 62%;
+  width: 8px;
+  height: 22px;
+  background: var(--book-ribbon);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+  transform: translateZ(-6px);
+}
+
+/* Private Room: oxblood leather diary with a clasp */
+.priv {
+  --spine: var(--book-leather);
+  --spine-dark: var(--book-leather-dark);
+}
+
+.priv .front {
+  background:
+    radial-gradient(
+      120% 80% at 30% 20%,
+      color-mix(in srgb, var(--wr-light) 8%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 20% 80%,
+      color-mix(in srgb, var(--wr-ink) 18%, transparent),
+      transparent 50%
+    ),
+    var(--book-leather);
+}
+
+.stitch {
+  position: absolute;
+  inset: 6%;
+  border: 1.5px dashed color-mix(in srgb, var(--book-gold) 45%, transparent);
+  border-radius: 4px;
+}
+
+.deboss {
+  position: absolute;
+  top: 30%;
+  right: 20%;
+  left: 14%;
+  text-align: center;
+}
+
+.debossTitle {
+  display: block;
+  font-family: var(--font-reading);
+  font-style: italic;
+  font-size: clamp(11px, 2vw, 19px);
+  line-height: 1.1;
+  color: color-mix(in srgb, var(--wr-ink) 45%, transparent);
+  text-shadow: 0 1px 0 color-mix(in srgb, var(--wr-light) 14%, transparent);
+}
+
+.debossSub {
+  font-size: clamp(6.5px, 0.95vw, 9px);
+  letter-spacing: 0.2em;
+  color: color-mix(in srgb, var(--book-gold) 60%, transparent);
+}
+
+.strap {
+  position: absolute;
+  top: 44%;
+  right: -4%;
+  width: 30%;
+  height: 15%;
+  border-radius: 4px 0 0 4px;
+  background: var(--book-leather-dark);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--wr-ink) 35%, transparent);
+}
+
+.clasp {
+  position: absolute;
+  top: 50%;
+  left: 14%;
+  width: 46%;
+  aspect-ratio: 1;
+  translate: 0 -50%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 30%,
+    var(--book-gold),
+    var(--book-brass) 55%,
+    var(--book-brass-dark)
+  );
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--wr-ink) 45%, transparent);
+}
+
+.clasp::after {
+  content: '';
+  position: absolute;
+  top: 32%;
+  left: 50%;
+  width: 18%;
+  height: 40%;
+  translate: -50% 0;
+  border-radius: 50% 50% 2px 2px / 40% 40% 2px 2px;
+  background: var(--book-band);
+}
+
+.corner {
+  position: absolute;
+  width: 14%;
+  aspect-ratio: 1;
+  background: linear-gradient(135deg, var(--book-gold), var(--book-brass));
+}
+
+.cornerTop {
+  top: 0;
+  right: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+.cornerBottom {
+  right: 0;
+  bottom: 0;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+
+@media (max-width: 520px) {
+  .row {
+    gap: var(--space-3);
+    padding-left: 0;
+  }
+
+  .body {
+    transform: rotateY(-10deg) rotateX(2deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .body,
+  .cover,
+  .lantern,
+  .tag {
+    transition: none;
+  }
+
+  .book:hover .body {
+    transform: rotateY(-24deg) rotateX(3deg);
+  }
+
+  .open .body {
+    transform: rotateY(-24deg) rotateX(3deg);
+  }
+
+  .open .cover {
+    transform: translateZ(12px);
+  }
+}

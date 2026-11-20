@@ -137,9 +137,8 @@ describe('TaskService (§6.7)', () => {
     clock.set('2026-10-30T13:00:00.000Z');
     await service.completeTask(alertedTask.id);
 
-    const notifsAfterComplete = await storage.notifications.listItems({ taskId: alertedTask.id });
-    expect(notifsAfterComplete).toHaveLength(1);
-    expect(notifsAfterComplete[0]?.kind).toBe('completed');
+    // v4.2: the pending alert is cleared and no 'completed' notification is created.
+    expect(await storage.notifications.listItems({ taskId: alertedTask.id })).toHaveLength(0);
 
     // Uncompleting restores active status and recomputes reminderAt
     const uncompleted = await service.uncompleteTask(alertedTask.id);
@@ -269,7 +268,7 @@ describe('TaskService (§6.7)', () => {
     const afterRetry = await service.completeTask(task.id);
     expect(afterRetry.status).toBe('completed');
     const alertsAfterRetry = await storage.notifications.listItems({ taskId: task.id });
-    expect(alertsAfterRetry.map((n) => n.kind)).toEqual(['completed']);
+    expect(alertsAfterRetry).toEqual([]);
   });
 
   it('removes stale completed notifications when reopening a task via uncompleteTask (C07)', async () => {
@@ -290,10 +289,18 @@ describe('TaskService (§6.7)', () => {
     });
 
     await service.completeTask(task.id);
-    expect((await storage.notifications.listItems({ taskId: task.id })).map((n) => n.kind)).toEqual(
-      ['completed'],
-    );
+    expect(await storage.notifications.listItems({ taskId: task.id })).toHaveLength(0);
 
+    // Legacy rows written before v4.2 are still removed on reopen.
+    await storage.notifications.saveItem({
+      id: crypto.randomUUID(),
+      kind: 'completed',
+      taskId: task.id,
+      dedupeKey: `task:${task.id}:completed:${task.deadlineAt}`,
+      payload: null,
+      createdAt: clock.now().toISOString(),
+      readAt: null,
+    });
     await service.uncompleteTask(task.id);
     expect(await storage.notifications.listItems({ taskId: task.id })).toHaveLength(0);
   });
@@ -330,5 +337,198 @@ describe('TaskService (§6.7)', () => {
       deadlineTo: '2026-10-31T01:00:00+07:00',
     });
     expect(matchedOffsetRange.map((t) => t.id)).toEqual([created.id]);
+  });
+
+  describe('weekly repeat (v3.3)', () => {
+    const weekly = {
+      title: 'Weekly review',
+      deadlineAt: '2026-10-30T14:00:00.000Z', // Fri 30 Oct 21:00 ICT
+      scheduledDate: '2026-10-30',
+      repeatWeekly: true,
+    };
+
+    it('stores the repeat fields, clears the end date when repeat is off, and validates it', async () => {
+      const created = await service.createTask({ ...weekly, repeatUntil: '2026-12-25' });
+      expect(created).toMatchObject({ repeatWeekly: true, repeatUntil: '2026-12-25' });
+
+      const off = await service.updateTask(created.id, { repeatWeekly: false });
+      expect(off).toMatchObject({ repeatWeekly: false, repeatUntil: null });
+
+      await expect(
+        service.createTask({ ...weekly, repeatUntil: '2026-10-29' }),
+      ).rejects.toBeInstanceOf(ValidationError);
+      const plain = await service.createTask({ title: 'One-off', deadlineAt: weekly.deadlineAt });
+      expect(plain).toMatchObject({ repeatWeekly: false, repeatUntil: null });
+    });
+
+    it('creates next week\'s copy as soon as a repeating task exists', async () => {
+      const created = await service.createTask(weekly);
+
+      const all = await service.listTasks();
+      expect(all).toHaveLength(2);
+      const copy = all.find((task) => task.id !== created.id)!;
+      expect(copy).toMatchObject({
+        title: 'Weekly review',
+        status: 'active',
+        deadlineAt: '2026-11-06T14:00:00.000Z',
+        scheduledDate: '2026-11-06',
+        repeatWeekly: true,
+        completedAt: null,
+      });
+    });
+
+    it('completing it keeps one more week waiting and keeps history', async () => {
+      const created = await service.createTask(weekly);
+      await service.completeTask(created.id);
+
+      const all = await service.listTasks();
+      expect(all).toHaveLength(3);
+      expect(all.find((task) => task.id === created.id)!.status).toBe('completed');
+      const dates = all.map((task) => task.scheduledDate).sort();
+      expect(dates).toEqual(['2026-10-30', '2026-11-06', '2026-11-13']);
+    });
+
+    it('completing the same task again, or an unrepeated one, adds no duplicates', async () => {
+      const created = await service.createTask(weekly);
+      await service.completeTask(created.id);
+      await service.completeTask(created.id);
+      expect(await service.listTasks()).toHaveLength(3);
+
+      // Reopen and complete again: both copies already exist, so nothing new appears.
+      await service.uncompleteTask(created.id);
+      await service.completeTask(created.id);
+      expect(await service.listTasks()).toHaveLength(3);
+
+      const once = await service.createTask({ title: 'Once', deadlineAt: weekly.deadlineAt });
+      await service.completeTask(once.id);
+      expect(await service.listTasks()).toHaveLength(4);
+    });
+
+    it('backfills the next copy for repeating tasks that predate pre-creation', async () => {
+      await storage.tasks.saveItem({
+        id: crypto.randomUUID(),
+        title: 'Old repeat',
+        description: '',
+        priority: 'normal',
+        pinned: false,
+        deadlineAt: weekly.deadlineAt,
+        scheduledDate: weekly.scheduledDate,
+        status: 'active',
+        completedAt: null,
+        reminderAt: null,
+        repeatWeekly: true,
+        repeatUntil: null,
+        createdAt: '2026-10-28T03:00:00.000Z',
+        updatedAt: '2026-10-28T03:00:00.000Z',
+      });
+      await service.backfillRepeatCopies();
+      await service.backfillRepeatCopies();
+      expect(await service.listTasks()).toHaveLength(2);
+    });
+
+    it('stops after the repeat-until date', async () => {
+      const created = await service.createTask({ ...weekly, repeatUntil: '2026-11-05' });
+      await service.completeTask(created.id);
+      // Next copy would land on 6 Nov, past the end date.
+      expect(await service.listTasks()).toHaveLength(1);
+    });
+
+    it('moves a late completion forward by whole weeks so the copy is in the future', async () => {
+      const created = await service.createTask(weekly);
+      clock.set('2026-11-20T03:00:00.000Z'); // three weeks later, the task is long overdue
+      await service.completeTask(created.id);
+      const upcoming = (await service.listTasks()).filter(
+        (task) => task.status === 'active' && task.id !== created.id,
+      );
+      // The pre-created 6 Nov copy is also overdue by now; the freshly queued ones are not.
+      expect(upcoming.some((task) => task.deadlineAt === '2026-11-20T14:00:00.000Z')).toBe(true);
+      expect(upcoming.find((task) => task.deadlineAt === '2026-11-20T14:00:00.000Z')).toMatchObject({
+        scheduledDate: '2026-11-20',
+        isOverdue: false,
+      });
+    });
+  });
+
+  describe('subtasks and transfers (v3.4)', () => {
+    const base = { title: 'Parent', deadlineAt: '2026-10-30T14:00:00.000Z', scheduledDate: '2026-10-30' };
+    const sub = (title: string, priority: 'urgent' | 'normal' | 'optional' = 'normal') => ({
+      id: crypto.randomUUID(),
+      title,
+      priority,
+      done: false,
+      createdAt: '2026-10-30T03:00:00.000Z',
+    });
+
+    it('starts with no subtasks and stores the checklist sent on update', async () => {
+      const created = await service.createTask(base);
+      expect(created.subtasks).toEqual([]);
+
+      const list = [sub('Outline', 'urgent'), sub('Tidy up', 'optional')];
+      const updated = await service.updateTask(created.id, { subtasks: list });
+      expect(updated.subtasks).toEqual(list);
+      expect((await service.getTask(created.id)).subtasks).toEqual(list);
+
+      const cleared = await service.updateTask(created.id, { subtasks: [] });
+      expect(cleared.subtasks).toEqual([]);
+    });
+
+    it('accepts subtasks when a task is created', async () => {
+      const list = [sub('First step', 'urgent')];
+      const created = await service.createTask({ ...base, subtasks: list });
+      expect(created.subtasks).toEqual(list);
+    });
+
+    it('rejects more than 20 subtasks', async () => {
+      const created = await service.createTask(base);
+      const many = Array.from({ length: 21 }, (_, i) => sub(`Item ${i}`));
+      await expect(service.updateTask(created.id, { subtasks: many })).rejects.toThrow();
+    });
+
+    it('promotes a subtask into its own task on the same day and removes it from the parent', async () => {
+      const created = await service.createTask(base);
+      const keep = sub('Keep');
+      const lift = sub('Lift me', 'urgent');
+      await service.updateTask(created.id, { subtasks: [keep, lift] });
+
+      const promoted = await service.promoteSubtask(created.id, lift.id);
+      expect(promoted).toMatchObject({
+        title: 'Lift me',
+        priority: 'urgent',
+        status: 'active',
+        scheduledDate: '2026-10-30',
+        deadlineAt: base.deadlineAt,
+        subtasks: [],
+      });
+      expect((await service.getTask(created.id)).subtasks).toEqual([keep]);
+      await expect(service.promoteSubtask(created.id, lift.id)).rejects.toBeInstanceOf(
+        NotFoundError,
+      );
+    });
+
+    it('gives a promoted subtask a future deadline when the parent is overdue', async () => {
+      const created = await service.createTask(base);
+      const lift = sub('Late bloomer');
+      await service.updateTask(created.id, { subtasks: [lift] });
+      clock.set('2026-11-02T03:00:00.000Z');
+
+      const promoted = await service.promoteSubtask(created.id, lift.id);
+      expect(promoted.isOverdue).toBe(false);
+      expect(promoted.deadlineAt).toBe('2026-11-02T16:59:00.000Z'); // 23:59 ICT
+    });
+
+    it('counts each Transfer on the task', async () => {
+      const created = await service.createTask(base);
+      clock.set('2026-11-02T03:00:00.000Z');
+      const once = await service.transferTask(created.id, {
+        scheduledDate: '2026-11-03',
+        deadlineAt: '2026-11-03T14:00:00.000Z',
+      });
+      expect(once.transferCount).toBe(1);
+      const twice = await service.transferTask(created.id, {
+        scheduledDate: '2026-11-04',
+        deadlineAt: '2026-11-04T14:00:00.000Z',
+      });
+      expect(twice.transferCount).toBe(2);
+    });
   });
 });

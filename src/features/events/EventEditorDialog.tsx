@@ -23,7 +23,7 @@ import {
   type EventDraftRecord,
 } from '@/contracts/event-draft';
 import { isWebUrl } from '@/domain/event-domain';
-import { localDateOf, matchTimetablePeriod } from '@/domain/event-occurrence';
+import { localDateOf, matchTimetableSpan } from '@/domain/event-occurrence';
 import { Button } from '@/ui/Button';
 import { Checkbox } from '@/ui/Checkbox';
 import { DatePickerField } from '@/ui/DatePickerField';
@@ -66,6 +66,8 @@ export interface EditorSaveResult {
   eventId: string;
   occurrenceKey: string | null;
   startAt: string;
+  /** True when a class was saved; classes stay out of the Events dashboard. */
+  isClass: boolean;
 }
 
 export interface EventEditorDialogProps {
@@ -140,14 +142,9 @@ export function EventEditorDialog({
     request.mode === 'draft' ? request.draft : null,
   );
   const [loadedDraft, setLoadedDraft] = useState<EventDraftRecord | null>(() => {
-    if (request.mode !== 'edit-event' && request.mode !== 'edit-occurrence') return null;
-    const key = eventDraftSourceKey({
-      sourceEventId: request.record.id,
-      occurrence:
-        request.mode === 'edit-occurrence' && request.occurrence.originalWeek
-          ? { originalWeek: request.occurrence.originalWeek, scope: 'this-week' }
-          : null,
-    });
+    // Classes belong to the School timetable and never use Events drafts (v3.3).
+    if (request.mode !== 'edit-event') return null;
+    const key = eventDraftSourceKey({ sourceEventId: request.record.id, occurrence: null });
     return drafts.find((draft) => eventDraftSourceKey(draft) === key) ?? null;
   });
   const [error, setError] = useState(() =>
@@ -183,9 +180,31 @@ export function EventEditorDialog({
   const isDirty = !sameEditorValues(baseline, values);
   const missingSource =
     request.mode === 'draft' && Boolean(request.draft.sourceEventId) && !record && sourceLoaded;
-  const periodMatch = isClass
-    ? matchTimetablePeriod(values.time.trim(), values.endTime.trim())
-    : null;
+  const periodSpan = isClass ? matchTimetableSpan(values.time.trim(), values.endTime.trim()) : null;
+  const startPeriod = TIMETABLE_PERIODS.find((p) => p.start === values.time.trim()) ?? null;
+  const endPeriod = TIMETABLE_PERIODS.find((p) => p.end === values.endTime.trim()) ?? null;
+  const startPeriodOptions: readonly SelectOption<string>[] = TIMETABLE_PERIODS.map((p) => ({
+    value: String(p.index),
+    label: `${p.label} · starts ${p.start}`,
+  }));
+  // A lesson stays inside the morning or the afternoon, so the end choices follow the start.
+  const endPeriodOptions: readonly SelectOption<string>[] = TIMETABLE_PERIODS.filter(
+    (p) =>
+      startPeriod === null ||
+      (p.index >= startPeriod.index && p.index < 2 === startPeriod.index < 2),
+  ).map((p) => ({ value: String(p.index), label: `${p.label} · ends ${p.end}` }));
+
+  const chooseStartPeriod = (value: string) => {
+    const next = TIMETABLE_PERIODS.find((p) => String(p.index) === value);
+    if (!next) return;
+    const keepEnd =
+      endPeriod !== null && endPeriod.index >= next.index && endPeriod.index < 2 === next.index < 2;
+    update({ time: next.start, endTime: keepEnd ? values.endTime : next.end });
+  };
+  const chooseEndPeriod = (value: string) => {
+    const next = TIMETABLE_PERIODS.find((p) => String(p.index) === value);
+    if (next) update({ endTime: next.end });
+  };
 
   const categoryOptions: readonly SelectOption<string>[] =
     values.category === 'school' || baseline.category === 'school'
@@ -244,7 +263,7 @@ export function EventEditorDialog({
       const { startAt, endAt } = editorTimes(values);
       const location = values.location.trim() || null;
       const notes = values.notes.trim() || null;
-      let result: EditorSaveResult;
+      let result: Omit<EditorSaveResult, 'isClass'>;
 
       if (activeDraft) {
         if (!sameEditorValues(activeDraft.values, values)) {
@@ -322,7 +341,7 @@ export function EventEditorDialog({
       }
 
       if (loadedDraft) await deleteDraftMutation.mutateAsync(loadedDraft.id).catch(() => undefined);
-      onSaved(result);
+      onSaved({ ...result, isClass });
     } catch (submitError) {
       if (submitError instanceof ClientApiError && submitError.code === 'CONFLICT' && activeDraft) {
         setStaleConflict(true);
@@ -364,6 +383,7 @@ export function EventEditorDialog({
           ? `${converted.id}@${converted.classSchedule.startWeek}`
           : converted.id,
         startAt: converted.startAt,
+        isClass: true,
       });
     } catch (conversionError) {
       setError(errorText(conversionError, 'Could not convert this event.'));
@@ -406,7 +426,7 @@ export function EventEditorDialog({
         open
         onClose={onClose}
         title={title}
-        description="Dates and times use the 24-hour Asia/Saigon schedule."
+        description="Dates and times use the 24-hour format."
         formId="event-large-editor-form"
         isDirty={isDirty}
         isSubmitting={submitting}
@@ -468,7 +488,7 @@ export function EventEditorDialog({
               }
             : null
         }
-        onSaveDraft={handleSaveDraft}
+        onSaveDraft={isClass ? undefined : handleSaveDraft}
       >
         <form id="event-large-editor-form" onSubmit={handleSubmit} className="space-y-4">
           {missingSource ? (
@@ -538,7 +558,7 @@ export function EventEditorDialog({
                       Type
                     </span>
                     <p className="text-[length:var(--fs-small)] text-ws-text-muted">
-                      Class · shown in the School timetable when it matches a full period
+                      Class · managed in the School timetable and the Week calendar
                     </p>
                   </div>
                 ) : (
@@ -562,23 +582,39 @@ export function EventEditorDialog({
                     onChange={(date) => update({ date })}
                     error={Boolean(fieldErrors.date)}
                   />
-                  <TimeFieldControl
-                    id="event-editor-time"
-                    label="Start time"
-                    value={values.time}
-                    onChange={(time) => update({ time })}
-                    placeholder="HH:mm"
-                    error={Boolean(fieldErrors.time)}
-                  />
+                  {isClass ? (
+                    <SelectField<string>
+                      id="event-editor-start-period"
+                      label="From period"
+                      placeholder="Custom time"
+                      value={startPeriod ? String(startPeriod.index) : ''}
+                      error={Boolean(fieldErrors.time)}
+                      onChange={chooseStartPeriod}
+                      options={startPeriodOptions}
+                    />
+                  ) : (
+                    <TimeFieldControl
+                      id="event-editor-time"
+                      label="Start time"
+                      value={values.time}
+                      onChange={(time) => update({ time })}
+                      placeholder="HH:mm"
+                      error={Boolean(fieldErrors.time)}
+                    />
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   {isClass ? (
-                    <div className="flex flex-col justify-end pb-2 text-[length:var(--fs-micro)] text-ws-text-muted">
-                      {periodMatch !== null
-                        ? `Matches ${TIMETABLE_PERIODS[periodMatch]?.start}–${TIMETABLE_PERIODS[periodMatch]?.end}`
-                        : 'Outside the timetable periods'}
-                    </div>
+                    <SelectField<string>
+                      id="event-editor-end-period"
+                      label="To period"
+                      placeholder="Custom time"
+                      value={endPeriod ? String(endPeriod.index) : ''}
+                      error={Boolean(fieldErrors.endTime)}
+                      onChange={chooseEndPeriod}
+                      options={endPeriodOptions}
+                    />
                   ) : (
                     <DatePickerField
                       id="event-editor-end-date"
@@ -590,14 +626,22 @@ export function EventEditorDialog({
                       error={Boolean(fieldErrors.endDate)}
                     />
                   )}
-                  <TimeFieldControl
-                    id="event-editor-end-time"
-                    label={isClass ? 'End time' : 'End time (optional)'}
-                    value={values.endTime}
-                    onChange={(endTime) => update({ endTime })}
-                    placeholder="HH:mm"
-                    error={Boolean(fieldErrors.endTime)}
-                  />
+                  {isClass ? (
+                    <div className="flex flex-col justify-end pb-2 text-[length:var(--fs-micro)] text-ws-text-muted">
+                      {periodSpan !== null
+                        ? `Runs ${values.time}–${values.endTime}`
+                        : `Custom time ${values.time}–${values.endTime}. Pick periods to move it onto the timetable.`}
+                    </div>
+                  ) : (
+                    <TimeFieldControl
+                      id="event-editor-end-time"
+                      label="End time (optional)"
+                      value={values.endTime}
+                      onChange={(endTime) => update({ endTime })}
+                      placeholder="HH:mm"
+                      error={Boolean(fieldErrors.endTime)}
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -628,12 +672,14 @@ export function EventEditorDialog({
                 </div>
 
                 <div className="space-y-1 pt-1">
-                  <Checkbox
-                    id="event-editor-highlight"
-                    checked={values.highlighted}
-                    onCheckedChange={(highlighted) => update({ highlighted })}
-                    label="Highlight this event"
-                  />
+                  {isClass ? null : (
+                    <Checkbox
+                      id="event-editor-highlight"
+                      checked={values.highlighted}
+                      onCheckedChange={(highlighted) => update({ highlighted })}
+                      label="Highlight this event"
+                    />
+                  )}
 
                   {request.mode === 'create-class' ||
                   (request.mode === 'draft' && isClass && !request.draft.sourceEventId) ? (
@@ -641,7 +687,7 @@ export function EventEditorDialog({
                       id="event-editor-set-default"
                       checked={values.classWeekly}
                       onCheckedChange={(classWeekly) => update({ classWeekly })}
-                      label="Set Default · repeat weekly"
+                      label="Set default"
                     />
                   ) : null}
 
@@ -650,7 +696,7 @@ export function EventEditorDialog({
                       id="event-editor-set-default"
                       checked={setDefault}
                       onCheckedChange={setSetDefault}
-                      label="Set Default · apply from this week onward"
+                      label="Set default"
                     />
                   ) : null}
                 </div>
@@ -727,10 +773,10 @@ export function EventEditorDialog({
             />
           ) : null}
           <p className="text-[length:var(--fs-micro)] text-ws-text-muted">
-            {matchTimetablePeriod(values.time.trim(), (values.endTime || convertEndTime).trim()) !==
+            {matchTimetableSpan(values.time.trim(), (values.endTime || convertEndTime).trim()) !==
             null
-              ? 'This time matches a timetable period and will occupy that cell.'
-              : 'This time does not match a timetable period; the class stays visible in lists and the Week calendar only.'}
+              ? 'This time covers whole timetable periods and will appear in the School timetable.'
+              : 'This time does not match whole timetable periods; the class stays visible in the Week calendar only.'}
           </p>
         </fieldset>
       </Dialog>

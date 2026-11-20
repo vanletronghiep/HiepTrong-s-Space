@@ -28,7 +28,7 @@ import {
 } from './load-estimate';
 import {
   getRouteAccent,
-  getRouteLoadingLabel,
+  getRouteLoaderTitle,
   getRouteZodiacSign,
   isHardLoadRoute,
 } from './route-zodiac';
@@ -135,7 +135,7 @@ function buildHardLoadOverlay(pathname: string): OverlayState | null {
     mode: sign ? 'zodiac' : 'text',
     phase: 'loading',
     sign,
-    label: getRouteLoadingLabel(pathname),
+    label: getRouteLoaderTitle(pathname),
     accent: getRouteAccent(pathname),
     reducedMotion: false,
     path: 'pending',
@@ -415,7 +415,7 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
           mode: sign ? 'zodiac' : 'text',
           phase: 'loading',
           sign,
-          label: getRouteLoadingLabel(parsed.pathname),
+          label: getRouteLoaderTitle(parsed.pathname),
           accent: getRouteAccent(parsed.pathname),
           reducedMotion: isReducedMotionPreferred(),
           path: plan.path,

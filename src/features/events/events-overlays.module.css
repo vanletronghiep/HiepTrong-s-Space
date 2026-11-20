@@ -118,47 +118,96 @@
 /* ─── Week Calendar ─── */
 .weekOverview {
   display: grid;
-  grid-template-columns: repeat(7, minmax(132px, 1fr));
+  grid-template-columns: repeat(7, minmax(124px, 1fr));
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 4px;
 }
 
+/* Every day column has the same height: a header plus room for exactly four chips. */
 .dayColumn {
+  --day-bg: color-mix(in srgb, white 74%, var(--feature-canvas));
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-  min-height: 12rem;
   padding: 10px;
   border-radius: var(--radius-item);
   border: 1px solid color-mix(in srgb, var(--ws-border) 82%, transparent);
-  background: color-mix(in srgb, white 74%, var(--feature-canvas));
+  background: var(--day-bg);
   text-align: left;
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease);
-}
-
-.dayColumn:hover {
-  border-color: color-mix(in srgb, var(--feature-accent) 46%, var(--ws-border));
 }
 
 .dayColumnToday {
+  --day-bg: color-mix(in srgb, var(--feature-soft) 46%, white);
   border-color: var(--ws-accent);
-  background: color-mix(in srgb, var(--feature-soft) 46%, white);
+}
+
+.dayColumnHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  padding: 0 0 6px;
+  border: 0;
+  border-bottom: 1px solid var(--ws-border);
+  text-align: left;
+}
+
+.dayBodyWrap {
+  position: relative;
+}
+
+.dayBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: calc(4 * 2.75rem + 3 * 6px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.dayBody::-webkit-scrollbar {
+  display: none;
+}
+
+.moreHint {
+  position: absolute;
+  inset: auto 0 0;
+  padding-top: 1.6rem;
+  background: linear-gradient(to bottom, transparent, var(--day-bg) 65%);
+  font-size: var(--fs-micro);
+  text-align: center;
+  color: var(--ws-text-muted);
+  pointer-events: none;
 }
 
 .dayChip {
   display: block;
+  flex: 0 0 2.75rem;
   width: 100%;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 4px 8px;
+  overflow: hidden;
   border-radius: var(--radius-sm);
   border: 1px solid var(--ws-border);
   background: var(--ws-surface);
   font-size: var(--fs-micro);
   line-height: 1.35;
   text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.dayChip:hover {
+  border-color: color-mix(in srgb, var(--feature-accent) 46%, var(--ws-border));
+}
+
+.dayChip .chipTitle {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
 }
 
 .chipCanceled {
@@ -179,18 +228,6 @@
   overflow-wrap: anywhere;
 }
 
-.agendaDay {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.agendaDay + .agendaDay {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--ws-border);
-}
-
 /* ─── Detail preview ─── */
 .previewClamp {
   display: -webkit-box;
@@ -200,6 +237,74 @@
   overflow: hidden;
   overflow-wrap: anywhere;
   white-space: pre-line;
+}
+
+/* ─── Agenda scroller (Upcoming, Past, Drafts) ─── */
+.agendaScrollWrap {
+  position: relative;
+}
+
+/* Fixed-height, scrollbar-free box: about five events tall. Wheel easing is done in script. */
+.agendaScroller {
+  max-height: 44rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  border-radius: var(--radius-item);
+}
+
+.agendaScroller::-webkit-scrollbar {
+  display: none;
+}
+
+.agendaScroller:focus-visible {
+  outline: 2px solid var(--ws-focus);
+  outline-offset: 2px;
+}
+
+/* Only a hint to scroll: it never takes clicks and fades out as soon as scrolling starts. */
+.showMoreOverlay {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  justify-content: center;
+  padding: 3rem 0 0.7rem;
+  background: linear-gradient(to bottom, transparent, var(--ws-surface) 70%);
+  pointer-events: none;
+  transition: opacity 160ms var(--ease);
+}
+
+.showMoreCue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0 1rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--ws-border);
+  background: var(--ws-surface);
+  color: var(--ws-text);
+  font-size: var(--fs-small);
+  font-weight: 500;
+}
+
+/* Month headers stay pinned while their month scrolls. */
+.monthHeader {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.4rem 0.15rem 0.3rem;
+  background: var(--ws-surface);
+  border-bottom: 1px solid var(--ws-border);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ws-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .showMoreOverlay {
+    transition: none;
+  }
 }
 
 /* ─── Highlights ─── */
@@ -215,33 +320,56 @@
   }
 }
 
+/* Show all keeps the same card grid inside a fixed-height scroll area. */
 .highlightsExpanded {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 22rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  max-height: 16.5rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding-right: 4px;
   scrollbar-width: thin;
 }
 
+@media (min-width: 768px) {
+  .highlightsExpanded {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Identical size for every highlight card; long titles clamp to two lines. */
 .highlightCard {
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 100%;
+  height: 7.75rem;
   min-width: 0;
   padding: 12px 14px;
+  overflow: hidden;
   border-radius: var(--radius-item);
-  border: 1px solid color-mix(in srgb, var(--feature-accent) 28%, var(--ws-border));
-  background: color-mix(in srgb, var(--feature-soft) 30%, var(--ws-surface));
+  border: 1px solid var(--tint-highlight-border);
+  background: var(--tint-highlight-bg);
   text-align: left;
   cursor: pointer;
   transition: border-color var(--dur-fast) var(--ease);
 }
 
 .highlightCard:hover {
-  border-color: var(--ws-accent);
+  border-color: var(--tint-highlight-border-hover);
+}
+
+.highlightTitle {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.highlightMeta {
+  margin-top: auto;
 }
 
 /* ─── School timetable ─── */
@@ -256,6 +384,8 @@
 .timetable {
   display: grid;
   grid-template-columns: 4.75rem repeat(7, minmax(7.5rem, 1fr));
+  /* Header, two morning periods, the afternoon divider, two afternoon periods. */
+  grid-template-rows: auto repeat(2, minmax(5.25rem, auto)) auto repeat(2, minmax(5.25rem, auto));
   gap: 6px;
   min-width: 61rem;
   padding: 10px;
@@ -376,7 +506,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .closeButton,
-  .dayColumn,
+  .dayChip,
   .highlightCard,
   .slot,
   .slotAddHint {

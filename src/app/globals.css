@@ -238,6 +238,14 @@ body:has(> [data-home-journey]) {
   outline: none;
 }
 
+/*
+ * Focus outlines only after real keyboard navigation (see src/ui/FocusModality.tsx). A lone
+ * Shift/Ctrl/Alt press or a mouse click never draws an outline. Background focus tints stay.
+ */
+html:not([data-keyboard-nav]) :focus-visible {
+  outline: none !important;
+}
+
 /* Frameless menu search stays continuous with its surface; its row carries the tint. */
 [data-frameless-search='true'],
 [data-frameless-search='true']:focus,
@@ -458,6 +466,15 @@ body:has(> [data-home-journey]) {
   background-attachment: scroll;
 }
 
+/* Focus Room hides its scrollbars; scrolling itself keeps working. */
+html[data-hide-scrollbar] {
+  scrollbar-width: none;
+}
+
+html[data-hide-scrollbar]::-webkit-scrollbar {
+  display: none;
+}
+
 [data-theme='workspace'][data-fullpage-theme='true'][data-feature-theme='learning-room'] {
   background-image:
     radial-gradient(
@@ -561,4 +578,9 @@ body:has(> [data-home-journey]) {
 [data-fullpage-topbar='true'] {
   background-color: color-mix(in srgb, var(--feature-canvas) 84%, transparent);
   backdrop-filter: blur(10px);
+}
+
+/* v4.0: soft emerald text selection across the app. */
+::selection {
+  background: var(--selection-bg);
 }

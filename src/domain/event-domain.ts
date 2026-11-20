@@ -70,7 +70,6 @@ export function getUpcomingExams(events: EventItem[], now: Date = new Date()): E
     .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
 }
 
-
 /** Monday-first calendar dates in the application's timezone. */
 export function getEventWeekDates(now: Date = new Date()): string[] {
   const today = formatScheduledDate(now);
@@ -79,9 +78,13 @@ export function getEventWeekDates(now: Date = new Date()): string[] {
   return Array.from({ length: 7 }, (_, index) => shiftScheduledDate(monday, index));
 }
 
-export function eventsForWeekday(events: EventItem[], index: number, now = new Date()): EventItem[] {
+export function eventsForWeekday(
+  events: EventItem[],
+  index: number,
+  now = new Date(),
+): EventItem[] {
   const date = getEventWeekDates(now)[index];
-  return events.filter(event => formatScheduledDate(event.startAt) === date);
+  return events.filter((event) => formatScheduledDate(event.startAt) === date);
 }
 
 const WEB_URL_RE = /^(?:https?:\/\/|www\.)[^\s]+$/i;

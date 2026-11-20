@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CalendarDays, Command, LayoutGrid } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { FocusSessionPill } from '@/features/focus-room/FocusSessionPill';
 import { BellButton } from '@/features/notifications/BellButton';
 import { DailyHeaderDate } from '@/features/tasks/daily/DailyDashboard';
 import { DailySky, OrbitPlanetIcon } from '@/features/tasks/daily/DailySky';
+import { QuickNote } from '@/features/writing/QuickNote';
 import dailyStyles from '@/features/tasks/daily/daily-foundation.module.css';
 import { TransitionLink } from '@/features/transitions/TransitionLink';
 import { StarIcon } from './StarIcon';
@@ -44,17 +46,18 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
     '/notifications': 'notification',
     '/events': 'events',
     '/ai-engineering': 'ai-engineering',
-    '/blogs': 'blogs-hub',
+    '/writing': 'blogs-hub',
     '/apcs': 'apcs-hub',
     '/flashcards': 'flashcards',
     '/entertainment': 'entertainment-hub',
     '/tracking': 'tracking',
-    '/projects': 'project',
+    '/focus': 'project',
     '/milestones': 'annual-milestones',
-    '/learning-room': 'learning-room',
+    '/focus-room': 'learning-room',
     '/achievements': 'personal-achievements',
   };
-  const featureTheme = themes[pathname];
+  const featureTheme =
+    themes[pathname] ?? (pathname.startsWith('/writing/') ? 'blogs-hub' : undefined);
   const fullPageTheme =
     featureTheme && FULL_PAGE_FEATURE_THEMES.has(featureTheme) ? featureTheme : undefined;
   const topbar = useRef<HTMLElement>(null);
@@ -179,6 +182,7 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
               </TransitionLink>
             )}
             {daily && <DailyHeaderDate />}
+            <FocusSessionPill />
             <button
               type="button"
               onClick={() => setUniverseOpen(true)}
@@ -233,6 +237,7 @@ export function WorkspaceShell({ children, bellSlot }: WorkspaceShellProps) {
         onClose={() => setUniverseOpen(false)}
         featureTheme={fullPageTheme}
       />
+      <QuickNote />
     </div>
   );
 }

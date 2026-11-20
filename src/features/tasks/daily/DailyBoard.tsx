@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Telescope } from 'lucide-react';
 import { AnimatePresence, LayoutGroup, motion, useIsPresent, useReducedMotion } from 'motion/react';
 import {
   getDailyViewPreference,
@@ -15,6 +15,7 @@ import {
   useTasks,
   useTransferTask,
   useUncompleteTask,
+  usePromoteSubtask,
   useUpdateTask,
 } from '@/client/queries/tasks';
 import { useMinuteTicker } from '@/client/use-minute-ticker';
@@ -30,8 +31,6 @@ import {
 import { PageReady } from '@/features/transitions/TransitionProvider';
 import { Button } from '@/ui/Button';
 import { ConfirmDialog } from '@/ui/Dialog';
-import { Drawer } from '@/ui/Drawer';
-import { EmptyState } from '@/ui/EmptyState';
 import { IconButton } from '@/ui/IconButton';
 import { SegmentedControl, type SegmentedOption } from '@/ui/SegmentedControl';
 import { Skeleton } from '@/ui/Skeleton';
@@ -43,6 +42,7 @@ import { DailyDashboard } from './DailyDashboard';
 import foundation from './daily-foundation.module.css';
 import { FinishedCounter } from './FinishedCounter';
 import { MonthView } from './MonthView';
+import { Observatory } from './Observatory';
 import { OverdueList } from './OverdueList';
 import { TaskCard } from '../shared/TaskCard';
 import { TaskForm } from '../shared/TaskForm';
@@ -136,7 +136,6 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
   const viewMode = localViewOverride ?? storedViewMode;
   const [weekAnchorDate, setWeekAnchorDate] = useState<string>(todayStr);
   const [monthAnchorDate, setMonthAnchorDate] = useState<string>(todayStr);
-  const [statsOpen, setStatsOpen] = useState(false);
 
   // Editor / Dialog state
   const [formState, setFormState] = useState<{
@@ -165,8 +164,15 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
   };
 
   const tasksQuery = useTasks();
+  const scrollToObservatory = () => {
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    document
+      .getElementById('observatory')
+      ?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  };
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
+  const promoteSubtask = usePromoteSubtask();
   const completeTask = useCompleteTask();
   const uncompleteTask = useUncompleteTask();
   const transferTask = useTransferTask();
@@ -327,8 +333,7 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
             Task <span className={masthead.titleEmphasis}>management</span>
           </h1>
           <p className={masthead.subtitle}>
-            Plan each day under a calm sky, keep today in orbit, and let unfinished tasks drift
-            gently toward tomorrow.
+            Organize your day, track your progress.
           </p>
         </div>
         <div className={foundation.titleActions}>
@@ -391,8 +396,8 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
             variant="secondary"
             pill
             size="sm"
-            leftIcon={<Search size={15} strokeWidth={1.5} />}
-            onClick={() => setStatsOpen(true)}
+            leftIcon={<Telescope size={15} strokeWidth={1.5} />}
+            onClick={scrollToObservatory}
           >
             Observatory
           </Button>
@@ -403,6 +408,9 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
         done={todayTasks.filter((task) => task.status === 'completed').length}
         total={todayTasks.length}
         timeZone={timeZone}
+        tasks={todayTasks}
+        todayKey={todayStr}
+        onCompleteTask={handleToggleComplete}
       />
 
       {tasksQuery.isLoading ? (
@@ -593,6 +601,12 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
             onOpenTransfer={(target) => setTransferTarget(target)}
             onRequestDelete={(target) => setDeleteTarget(target)}
           />
+          <Observatory
+            tasks={allTasks}
+            todayKey={todayStr}
+            nowMs={now.getTime()}
+            timeZone={timeZone}
+          />
         </LayoutGroup>
       )}
 
@@ -620,6 +634,12 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
           setTransferTarget(target);
         }}
         onRequestDelete={(target) => setDeleteTarget(target)}
+        onSubtasksChange={(target, subtasks) =>
+          updateTask.mutate({ id: target.id, input: { subtasks } })
+        }
+        onPromoteSubtask={(target, subtaskId) =>
+          promoteSubtask.mutate({ taskId: target.id, subtaskId })
+        }
       />
 
       {/* Shared Add / Edit Drawer */}
@@ -687,13 +707,6 @@ export function DailyBoard({ timeZone = DEFAULT_APP_TIMEZONE }: { timeZone?: str
         isSubmitting={deleteTask.isPending}
       />
 
-      {/* Statistics Placeholder Drawer (§2.9 & §9.3) */}
-      <Drawer portal open={statsOpen} onClose={() => setStatsOpen(false)} title="Statistics">
-        <EmptyState
-          title="Statistics will live here."
-          description="Completion history is already being recorded so your personal insights will be ready when specified."
-        />
-      </Drawer>
     </div>
   );
 }

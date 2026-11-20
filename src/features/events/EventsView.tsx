@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import {
   AlertTriangle,
@@ -29,12 +29,7 @@ import {
   usePublishEventDraft,
   useSaveEventDraft,
 } from '@/client/queries/event-drafts';
-import {
-  useDeleteEvent,
-  useEventOccurrenceWindow,
-  useEvents,
-  useMutateOccurrence,
-} from '@/client/queries/events';
+import { useDeleteEvent, useEvents, useMutateOccurrence } from '@/client/queries/events';
 import type { EventCategory, EventOccurrence, OccurrenceScope } from '@/contracts/event';
 import type { EventDraftRecord } from '@/contracts/event-draft';
 import {
@@ -48,6 +43,7 @@ import {
   addDays,
   computeOccurrenceStats,
   isOccurrenceExpired,
+  ordinaryOccurrence,
   localDateOf,
   occurrenceDateSpan,
   pastOccurrences,
@@ -62,7 +58,9 @@ import { Button } from '@/ui/Button';
 import { cn } from '@/ui/cn';
 import { Dialog } from '@/ui/Dialog';
 import { Skeleton } from '@/ui/Skeleton';
+import { useToast } from '@/ui/Toast';
 import { useItemAnchor } from '@/ui/use-item-anchor';
+import { AgendaScroller } from './AgendaScroller';
 import { KindBadge, StatusBadges } from './EventBadges';
 import { EventDetailPane } from './EventDetailPane';
 import { EventEditorDialog, type EditorRequest, type EditorSaveResult } from './EventEditorDialog';
@@ -70,7 +68,6 @@ import { EventReader } from './EventReader';
 import { isEventDraftPublishable } from './event-editor';
 import {
   formatDayHeader,
-  formatRangeLabel,
   formatShortDay,
   formatTime,
   formatTimestamp,
@@ -79,6 +76,7 @@ import {
 import { HighlightsSection } from './HighlightsSection';
 import { SchoolTimetable } from './SchoolTimetable';
 import { WeekCalendarPanel, type WeekCalendarState } from './WeekCalendarPanel';
+import overlays from './events-overlays.module.css';
 import styles from './events.module.css';
 
 type AgendaTab = 'upcoming' | 'past' | 'drafts';
@@ -86,8 +84,8 @@ type CategoryFilter = 'all' | Exclude<EventCategory, 'school'>;
 
 const FALLBACK_TODAY = '2026-11-13';
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
-/** Upcoming and Past load in 12-week batches (v3.1 §6.3, §8.4). */
-const BATCH_WEEKS = 12;
+/** The agenda scrolls (with the Show more cue) only beyond this many events (v3.3). */
+const SCROLL_THRESHOLD = 5;
 const FILTERS: readonly CategoryFilter[] = ['all', 'exam', 'meeting', 'deadline', 'contest'];
 const FILTER_LABEL: Record<CategoryFilter, string> = {
   all: 'All',
@@ -96,6 +94,14 @@ const FILTER_LABEL: Record<CategoryFilter, string> = {
   deadline: 'Deadlines',
   contest: 'Contests',
 };
+
+/** School timetable lessons live in the Week calendar and the timetable, never the dashboard. */
+function isOrdinary(occurrence: EventOccurrence): boolean {
+  return occurrence.kind !== 'class';
+}
+
+/** Success toasts match Task Management: gone after one second. */
+const SUCCESS_TOAST_MS = 1000;
 
 function matchesFilter(occurrence: EventOccurrence, filter: CategoryFilter): boolean {
   if (filter === 'all') return true;
@@ -113,7 +119,16 @@ export function EventsView() {
   const eventsQuery = useEvents();
   const records = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
   const draftsQuery = useEventDrafts();
-  const drafts = useMemo(() => draftsQuery.data ?? [], [draftsQuery.data]);
+  // Classes belong to the School timetable; their drafts never show among event drafts.
+  const drafts = useMemo(
+    () => (draftsQuery.data ?? []).filter((draft) => draft.values.kind !== 'class'),
+    [draftsQuery.data],
+  );
+  const { pushToast } = useToast();
+  const notify = useCallback(
+    (message: string) => pushToast(message, 'success', { durationMs: SUCCESS_TOAST_MS }),
+    [pushToast],
+  );
   const deleteMutation = useDeleteEvent();
   const occurrenceMutation = useMutateOccurrence();
   const saveDraftMutation = useSaveEventDraft();
@@ -134,16 +149,12 @@ export function EventsView() {
   const [filter, setFilter] = useState<CategoryFilter>('all');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => monthKeyFromDateStr(FALLBACK_TODAY));
-  const [upcomingWeeks, setUpcomingWeeks] = useState(BATCH_WEEKS);
-  const [pastWeeks, setPastWeeks] = useState(BATCH_WEEKS);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [selectedSnapshot, setSelectedSnapshot] = useState<EventOccurrence | null>(null);
   const [readerOccurrence, setReaderOccurrence] = useState<EventOccurrence | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarState, setCalendarState] = useState<WeekCalendarState>({
     weekStart: weekStartOf(FALLBACK_TODAY),
-    mode: 'overview',
-    day: null,
   });
   const [timetableWeek, setTimetableWeek] = useState(weekStartOf(FALLBACK_TODAY));
   const [editorRequest, setEditorRequest] = useState<EditorRequest | null>(null);
@@ -152,7 +163,6 @@ export function EventsView() {
   const [scopeChoice, setScopeChoice] = useState<OccurrenceScope>('this-week');
   const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
   const [actionError, setActionError] = useState('');
-  const [statusMessage, setStatusMessage] = useState('');
   const [browserDrafts, setBrowserDrafts] = useState<BrowserEventDraftEntry[]>([]);
   const [isImportingBrowserDrafts, setIsImportingBrowserDrafts] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
@@ -180,7 +190,7 @@ export function EventsView() {
       if (!clockSyncedRef.current) {
         clockSyncedRef.current = true;
         setCalendarMonth(monthKeyFromDateStr(zoned));
-        setCalendarState({ weekStart: weekStartOf(zoned), mode: 'overview', day: null });
+        setCalendarState({ weekStart: weekStartOf(zoned) });
         setTimetableWeek(weekStartOf(zoned));
         setClockReady(true);
       }
@@ -207,25 +217,10 @@ export function EventsView() {
 
   const now = useMemo(() => new Date(nowMs), [nowMs]);
 
-  /* ─── Occurrence windows ─── */
-  const upcomingTo = addDays(today, upcomingWeeks * 7);
-  const pastFrom = addDays(today, -pastWeeks * 7);
-  const currentWeek = weekStartOf(today);
-  const upcomingWindow = useEventOccurrenceWindow(today, upcomingTo, { enabled: clockReady });
-  const pastWindow = useEventOccurrenceWindow(pastFrom, addDays(today, 1), {
-    enabled: clockReady && (tab === 'past' || Boolean(selectedDate)),
-  });
-  const weekWindow = useEventOccurrenceWindow(currentWeek, addDays(currentWeek, 7), {
-    enabled: clockReady,
-  });
   const monthDays = useMemo(() => getMonthGridDays(calendarMonth), [calendarMonth]);
-  const monthFrom = monthDays[0]?.dateStr ?? today;
-  const monthWindow = useEventOccurrenceWindow(monthFrom, addDays(monthFrom, 42), {
-    enabled: clockReady,
-  });
 
-  // Ready once the primary agenda (or a visible error) is usable — not on shell mount.
-  usePageReady(clockReady && !upcomingWindow.isLoading && !eventsQuery.isLoading);
+  // Ready once the stored events are usable — not on shell mount.
+  usePageReady(clockReady && !eventsQuery.isLoading);
   useItemAnchor(records);
 
   const recordsById = useMemo(
@@ -233,49 +228,43 @@ export function EventsView() {
     [records],
   );
 
+  // Every dashboard surface works on ordinary events only, straight from the stored records, so
+  // Upcoming and Past hold every event with no date window (v3.3). Lessons never appear here.
+  const allEvents = useMemo(
+    () => records.filter((record) => record.kind !== 'class').map(ordinaryOccurrence),
+    [records],
+  );
+  const currentWeek = weekStartOf(today);
+  const weekEvents = useMemo(
+    () =>
+      allEvents.filter((occurrence) => {
+        const span = occurrenceDateSpan(occurrence);
+        return span.first < addDays(currentWeek, 7) && span.last >= currentWeek;
+      }),
+    [allEvents, currentWeek],
+  );
+
   const occurrenceIndex = useMemo(() => {
     const index = new Map<string, EventOccurrence>();
-    for (const list of [
-      monthWindow.occurrences,
-      pastWindow.occurrences,
-      weekWindow.occurrences,
-      upcomingWindow.occurrences,
-    ]) {
-      for (const occurrence of list) index.set(occurrence.key, occurrence);
-    }
+    for (const occurrence of allEvents) index.set(occurrence.key, occurrence);
     return index;
-  }, [
-    monthWindow.occurrences,
-    pastWindow.occurrences,
-    upcomingWindow.occurrences,
-    weekWindow.occurrences,
-  ]);
+  }, [allEvents]);
 
   const selectedOccurrence = selectedKey
     ? (occurrenceIndex.get(selectedKey) ??
-      (selectedSnapshot?.key === selectedKey ? selectedSnapshot : null))
+      (selectedSnapshot?.key === selectedKey && isOrdinary(selectedSnapshot)
+        ? selectedSnapshot
+        : null))
     : null;
 
-  const upcomingList = useMemo(
-    () => upcomingOccurrences(upcomingWindow.occurrences, now),
-    [now, upcomingWindow.occurrences],
-  );
-  const pastList = useMemo(
-    () => pastOccurrences(pastWindow.occurrences, now),
-    [now, pastWindow.occurrences],
-  );
-  const highlights = useMemo(
-    () => selectHighlights(upcomingWindow.occurrences, now),
-    [now, upcomingWindow.occurrences],
-  );
+  const upcomingList = useMemo(() => upcomingOccurrences(allEvents, now), [now, allEvents]);
+  const pastList = useMemo(() => pastOccurrences(allEvents, now), [now, allEvents]);
+  const highlights = useMemo(() => selectHighlights(allEvents, now), [now, allEvents]);
   const stats = useMemo(() => {
-    const horizon = computeOccurrenceStats(upcomingWindow.occurrences, now);
-    const week = computeOccurrenceStats(weekWindow.occurrences, now);
+    const horizon = computeOccurrenceStats(allEvents, now);
+    const week = computeOccurrenceStats(weekEvents, now);
     return { ...horizon, thisWeekCount: week.thisWeekCount };
-  }, [now, upcomingWindow.occurrences, weekWindow.occurrences]);
-
-  const horizonLabel = formatRangeLabel(today, addDays(upcomingTo, -1));
-  const pastLabel = formatRangeLabel(pastFrom, today);
+  }, [now, allEvents, weekEvents]);
 
   const visibleAgenda = useMemo(() => {
     if (selectedDate) {
@@ -293,7 +282,7 @@ export function EventsView() {
 
   const dayIndicators = useMemo(() => {
     const map = new Map<string, { count: number; hasExam: boolean }>();
-    for (const occurrence of monthWindow.occurrences) {
+    for (const occurrence of allEvents) {
       if (occurrence.status === 'canceled') continue;
       const span = occurrenceDateSpan(occurrence);
       for (let day = span.first; day <= span.last; day = addDays(day, 1)) {
@@ -305,31 +294,22 @@ export function EventsView() {
       }
     }
     return map;
-  }, [monthWindow.occurrences]);
+  }, [allEvents]);
 
   /* ─── Deep link ?item=<eventId> ─── */
   useEffect(() => {
     const itemId = new URLSearchParams(window.location.search).get('item');
     if (!itemId || anchoredItemRef.current === itemId) return;
-    const match =
-      upcomingWindow.occurrences.find((o) => o.eventId === itemId) ??
-      pastWindow.occurrences.find((o) => o.eventId === itemId);
+    const match = allEvents.find((o) => o.eventId === itemId);
     if (!match) {
-      if (!upcomingWindow.isLoading && recordsById.has(itemId) && tab !== 'past') setTab('past');
+      if (!eventsQuery.isLoading && recordsById.has(itemId) && tab !== 'past') setTab('past');
       return;
     }
     anchoredItemRef.current = itemId;
     if (isOccurrenceExpired(match, now)) setTab('past');
     setSelectedKey(match.key);
     setSelectedSnapshot(match);
-  }, [
-    now,
-    pastWindow.occurrences,
-    recordsById,
-    tab,
-    upcomingWindow.isLoading,
-    upcomingWindow.occurrences,
-  ]);
+  }, [allEvents, eventsQuery.isLoading, now, recordsById, tab]);
 
   /* ─── Selection and overlays ─── */
   const selectOccurrence = (occurrence: EventOccurrence) => {
@@ -372,11 +352,22 @@ export function EventsView() {
   const handleSaved = (result: EditorSaveResult) => {
     setEditorRequest(null);
     setActionError('');
+    // A saved class stays in the School timetable; the Events dashboard is not touched.
+    if (result.isClass) return;
     if (result.occurrenceKey) {
       setSelectedKey(result.occurrenceKey);
       setSelectedSnapshot(null);
     }
     if (Date.parse(result.startAt) < nowMs && tab === 'upcoming') setTab('past');
+  };
+
+  /** Lessons open straight in the reader; only ordinary events also sync the detail pane. */
+  const openInReader = (occurrence: EventOccurrence) => {
+    if (isOrdinary(occurrence)) {
+      setSelectedKey(occurrence.key);
+      setSelectedSnapshot(occurrence);
+    }
+    setReaderOccurrence(occurrence);
   };
 
   const switchDashboard = (next: 'regular' | 'school') => {
@@ -407,17 +398,16 @@ export function EventsView() {
         },
       });
       setScopeAction(null);
-      setStatusMessage(
+      notify(
         action === 'cancel'
-          ? 'Class canceled. It stays visible, marked as canceled.'
+          ? 'Class canceled.'
           : result.removed
             ? 'Class deleted.'
             : 'Class removed for the chosen weeks.',
       );
-      if (action === 'delete') {
-        setSelectedKey(null);
-        setReaderOccurrence(null);
-      }
+      // Cancel and delete both come from the reader or pane; close whichever opened the class.
+      setSelectedKey(null);
+      setReaderOccurrence(null);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Could not update this class.');
       setScopeAction(null);
@@ -430,7 +420,7 @@ export function EventsView() {
       onSuccess: () => {
         setSelectedKey(null);
         setReaderOccurrence(null);
-        setStatusMessage('Event deleted.');
+        notify('Event deleted.');
       },
       onError: (error) =>
         setActionError(
@@ -451,7 +441,6 @@ export function EventsView() {
   /* ─── Drafts ─── */
   const handlePublishDraft = async (draft: EventDraftRecord) => {
     setActionError('');
-    setStatusMessage('');
     if (!isEventDraftPublishable(draft.values, { hasSource: Boolean(draft.sourceEventId) })) {
       openDraft(draft, { initialError: 'Complete the required fields before adding to schedule.' });
       return;
@@ -463,7 +452,7 @@ export function EventsView() {
           ? `${published.event.id}@${draft.occurrence.originalWeek}`
           : published.event.id,
       );
-      setStatusMessage(
+      notify(
         published.mode === 'update' ? 'Changes applied to schedule.' : 'Event added to schedule.',
       );
     } catch (error) {
@@ -481,7 +470,7 @@ export function EventsView() {
     setActionError('');
     try {
       await deleteDraftMutation.mutateAsync(draft.id);
-      setStatusMessage('Draft deleted.');
+      notify('Draft deleted.');
     } catch (error) {
       setActionError(
         error instanceof Error ? error.message : 'Could not delete this draft right now.',
@@ -522,9 +511,7 @@ export function EventsView() {
           : `Could not import browser drafts (${firstError}). Local copies were kept.`,
       );
     } else if (imported > 0) {
-      setStatusMessage(
-        imported === 1 ? 'Imported 1 browser draft.' : `Imported ${imported} browser drafts.`,
-      );
+      notify(imported === 1 ? 'Imported 1 browser draft.' : `Imported ${imported} browser drafts.`);
     }
   };
 
@@ -550,7 +537,7 @@ export function EventsView() {
           Events <span className={styles.displayTitleEmphasis}>&amp; schedule</span>
         </h1>
         <p className="mt-3 text-[length:var(--fs-ui)] text-ws-text-muted tabular-nums">
-          {stats.upcomingCount} upcoming ({horizonLabel}) · {stats.thisWeekCount} this week ·{' '}
+          {stats.upcomingCount} upcoming · {stats.thisWeekCount} this week ·{' '}
           {stats.upcomingExamsCount} upcoming {stats.upcomingExamsCount === 1 ? 'exam' : 'exams'}{' '}
           <span className="whitespace-nowrap">(next 7 days)</span>
         </p>
@@ -596,7 +583,7 @@ export function EventsView() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="font-display text-[1.4rem] font-medium leading-tight text-ws-text">
+          <h2 className="font-display text-[1.4rem] font-semibold leading-tight text-ws-text">
             {formatMonthTitle(calendarMonth)}
           </h2>
           <p className="text-[length:var(--fs-micro)] text-ws-text-muted">
@@ -747,8 +734,6 @@ export function EventsView() {
     );
   };
 
-  const activeWindow = selectedDate ? monthWindow : tab === 'past' ? pastWindow : upcomingWindow;
-
   const renderDrafts = () => (
     <div className="space-y-4">
       {browserDrafts.length > 0 ? (
@@ -808,7 +793,7 @@ export function EventsView() {
             unoptimized
             className={styles.emptyShellArt}
           />
-          <h2 className="font-display text-[1.5rem] font-medium text-ws-text">
+          <h2 className="font-display text-[1.5rem] font-semibold text-ws-text">
             No saved drafts yet.
           </h2>
           <p className="max-w-md text-[length:var(--fs-ui)] text-ws-text-muted">
@@ -816,125 +801,132 @@ export function EventsView() {
           </p>
         </div>
       ) : (
-        <ul className="space-y-3" aria-label="Saved event drafts">
-          {drafts.map((draft) => {
-            const source = draft.sourceEventId
-              ? (recordsById.get(draft.sourceEventId) ?? null)
-              : null;
-            const isEditDraft = draft.sourceEventId !== null;
-            const missingSource =
-              isEditDraft && !eventsQuery.isLoading && !eventsQuery.isError && !source;
-            const stale = Boolean(
-              source &&
-              ((draft.sourceRevision !== null && draft.sourceRevision !== source.revision) ||
-                (draft.sourceRevision === null &&
-                  draft.sourceUpdatedAt &&
-                  source.updatedAt !== draft.sourceUpdatedAt)),
-            );
-            const preview = draft.values.notes ? extractNotePlainText(draft.values.notes) : '';
-            const publishable = isEventDraftPublishable(draft.values, { hasSource: isEditDraft });
-            return (
-              <li key={draft.id} className={styles.draftCard}>
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {draft.values.kind === 'class' || draft.values.category ? (
-                      <KindBadge
-                        occurrence={{
-                          kind: draft.values.kind,
-                          category: draft.values.category,
-                          isExam: draft.values.isExam,
-                        }}
-                      />
-                    ) : null}
-                    <span className="inline-flex items-center rounded-pill border border-ws-border bg-ws-surface px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-ws-text-muted">
-                      {isEditDraft
-                        ? draft.occurrence
-                          ? `Class edit · week of ${formatShortDay(draft.occurrence.originalWeek)}${
-                              draft.occurrence.scope === 'this-week-onward' ? ' onward' : ''
-                            }`
-                          : 'Edit draft'
-                        : 'New draft'}
+        <AgendaScroller
+          label="Saved event drafts scroll area"
+          isDesktop={isDesktop}
+          scrollable={drafts.length > SCROLL_THRESHOLD}
+          contentKey={drafts.length}
+        >
+          <ul className="space-y-3" aria-label="Saved event drafts">
+            {drafts.map((draft) => {
+              const source = draft.sourceEventId
+                ? (recordsById.get(draft.sourceEventId) ?? null)
+                : null;
+              const isEditDraft = draft.sourceEventId !== null;
+              const missingSource =
+                isEditDraft && !eventsQuery.isLoading && !eventsQuery.isError && !source;
+              const stale = Boolean(
+                source &&
+                ((draft.sourceRevision !== null && draft.sourceRevision !== source.revision) ||
+                  (draft.sourceRevision === null &&
+                    draft.sourceUpdatedAt &&
+                    source.updatedAt !== draft.sourceUpdatedAt)),
+              );
+              const preview = draft.values.notes ? extractNotePlainText(draft.values.notes) : '';
+              const publishable = isEventDraftPublishable(draft.values, { hasSource: isEditDraft });
+              return (
+                <li key={draft.id} className={styles.draftCard}>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {draft.values.kind === 'class' || draft.values.category ? (
+                        <KindBadge
+                          occurrence={{
+                            kind: draft.values.kind,
+                            category: draft.values.category,
+                            isExam: draft.values.isExam,
+                          }}
+                        />
+                      ) : null}
+                      <span className="inline-flex items-center rounded-pill border border-ws-border bg-ws-surface px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-ws-text-muted">
+                        {isEditDraft
+                          ? draft.occurrence
+                            ? `Class edit · week of ${formatShortDay(draft.occurrence.originalWeek)}${
+                                draft.occurrence.scope === 'this-week-onward' ? ' onward' : ''
+                              }`
+                            : 'Edit draft'
+                          : 'New draft'}
+                      </span>
+                      {stale ? (
+                        <span className="inline-flex items-center gap-1 rounded-pill border border-tint-due-soon-border bg-tint-due-soon-bg px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-text-due-soon">
+                          <AlertTriangle size={12} aria-hidden="true" />
+                          <span>Stale — source changed</span>
+                        </span>
+                      ) : null}
+                      {missingSource ? (
+                        <span className="inline-flex items-center gap-1 rounded-pill border border-tint-overdue-border bg-tint-overdue-bg px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-text-overdue">
+                          <AlertTriangle size={12} aria-hidden="true" />
+                          <span>Original event missing</span>
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums">
+                      Saved {formatTimestamp(draft.updatedAt)}
                     </span>
-                    {stale ? (
-                      <span className="inline-flex items-center gap-1 rounded-pill border border-tint-due-soon-border bg-tint-due-soon-bg px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-text-due-soon">
-                        <AlertTriangle size={12} aria-hidden="true" />
-                        <span>Stale — source changed</span>
-                      </span>
-                    ) : null}
-                    {missingSource ? (
-                      <span className="inline-flex items-center gap-1 rounded-pill border border-tint-overdue-border bg-tint-overdue-bg px-2.5 py-0.5 text-[length:var(--fs-micro)] font-medium text-text-overdue">
-                        <AlertTriangle size={12} aria-hidden="true" />
-                        <span>Original event missing</span>
-                      </span>
-                    ) : null}
                   </div>
-                  <span className="text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums">
-                    Saved {formatTimestamp(draft.updatedAt)}
-                  </span>
-                </div>
-                <h3 className={styles.eventTitle}>
-                  {draft.values.title.trim() || 'Untitled event'}
-                </h3>
-                {source ? (
-                  <p className="mt-1 text-[length:var(--fs-micro)] text-ws-text-muted">
-                    Editing: {source.title}
-                  </p>
-                ) : null}
-                {preview ? (
-                  <p className="mt-1.5 line-clamp-2 text-[length:var(--fs-small)] text-ws-text-muted [overflow-wrap:anywhere]">
-                    {preview}
-                  </p>
-                ) : null}
-                <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--fs-small)] text-ws-text-muted tabular-nums">
-                  <span>
-                    {draft.values.date || 'No date'} · {draft.values.time || 'No time'}
-                    {draft.values.endTime ? `–${draft.values.endTime}` : ''}
-                  </span>
-                  {draft.values.location.trim() ? (
-                    <span className="truncate">{draft.values.location.trim()}</span>
+                  <h3 className={styles.eventTitle}>
+                    {draft.values.title.trim() || 'Untitled event'}
+                  </h3>
+                  {source ? (
+                    <p className="mt-1 text-[length:var(--fs-micro)] text-ws-text-muted">
+                      Editing: {source.title}
+                    </p>
                   ) : null}
-                </div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-ws-border pt-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-text-overdue hover:bg-tint-overdue-bg"
-                    onClick={() => void handleDeleteDraft(draft)}
-                  >
-                    Delete
-                  </Button>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => openDraft(draft)}>
-                      Resume
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={publishDraftMutation.isPending}
-                      onClick={() =>
-                        publishable
-                          ? void handlePublishDraft(draft)
-                          : openDraft(draft, {
-                              initialError:
-                                'Complete the required fields before adding to schedule.',
-                            })
-                      }
-                    >
-                      {isEditDraft ? 'Apply changes' : 'Add to schedule'}
-                    </Button>
+                  {preview ? (
+                    <p className="mt-1.5 line-clamp-2 text-[length:var(--fs-small)] text-ws-text-muted [overflow-wrap:anywhere]">
+                      {preview}
+                    </p>
+                  ) : null}
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--fs-small)] text-ws-text-muted tabular-nums">
+                    <span>
+                      {draft.values.date || 'No date'} · {draft.values.time || 'No time'}
+                      {draft.values.endTime ? `–${draft.values.endTime}` : ''}
+                    </span>
+                    {draft.values.location.trim() ? (
+                      <span className="truncate">{draft.values.location.trim()}</span>
+                    ) : null}
                   </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-ws-border pt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-text-overdue hover:bg-tint-overdue-bg"
+                      onClick={() => void handleDeleteDraft(draft)}
+                    >
+                      Delete
+                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button variant="secondary" size="sm" onClick={() => openDraft(draft)}>
+                        Resume
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={publishDraftMutation.isPending}
+                        onClick={() =>
+                          publishable
+                            ? void handlePublishDraft(draft)
+                            : openDraft(draft, {
+                                initialError:
+                                  'Complete the required fields before adding to schedule.',
+                              })
+                        }
+                      >
+                        {isEditDraft ? 'Apply changes' : 'Add to schedule'}
+                      </Button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </AgendaScroller>
       )}
     </div>
   );
 
   const renderAgenda = () => {
     if (tab === 'drafts') return renderDrafts();
-    if ((!clockReady || activeWindow.isLoading) && visibleAgenda.length === 0) {
+    if ((!clockReady || eventsQuery.isLoading) && visibleAgenda.length === 0) {
       return (
         <div className="space-y-3" aria-label="Loading events">
           <Skeleton className="h-24 w-full rounded-item" />
@@ -945,88 +937,81 @@ export function EventsView() {
     }
     return (
       <div className="space-y-3">
-        {!selectedDate ? (
-          <p className="text-[length:var(--fs-micro)] text-ws-text-muted tabular-nums">
-            {tab === 'past' ? `Past · ${pastLabel}` : `Upcoming · ${horizonLabel}`} ·{' '}
-            {pluralize(visibleAgenda.length, 'item')}
-          </p>
-        ) : null}
-        {visibleAgenda.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
-            <Image
-              src="/visuals/events/hermit-shell-haven.svg"
-              alt=""
-              aria-hidden="true"
-              width={320}
-              height={280}
-              loading="eager"
-              unoptimized
-              className={styles.emptyShellArt}
-            />
-            <h2 className="font-display text-[1.5rem] font-medium text-ws-text">
-              {eventsQuery.isError || activeWindow.isError
-                ? 'Schedule unavailable right now.'
-                : selectedDate
-                  ? `Nothing on ${formatShortDay(selectedDate)}.`
-                  : tab === 'past'
-                    ? 'No past events in this range.'
-                    : 'No upcoming events in this range.'}
-            </h2>
-            <p className="max-w-md text-[length:var(--fs-ui)] text-ws-text-muted">
-              {selectedDate
-                ? 'Clear the day filter to see the full horizon, or add an event on this date.'
-                : 'Your harbor is quiet. Load more weeks or add an exam, meeting, deadline, or contest.'}
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-              {selectedDate ? (
-                <Button variant="secondary" size="sm" onClick={() => setSelectedDate(null)}>
-                  Show all upcoming
+        <AgendaScroller
+          label="Events agenda scroll area"
+          isDesktop={isDesktop}
+          scrollable={visibleAgenda.length > SCROLL_THRESHOLD}
+          contentKey={`${tab}-${filter}-${selectedDate ?? ''}-${visibleAgenda.length}`}
+        >
+          {visibleAgenda.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
+              <Image
+                src="/visuals/events/hermit-shell-haven.svg"
+                alt=""
+                aria-hidden="true"
+                width={320}
+                height={280}
+                loading="eager"
+                unoptimized
+                className={styles.emptyShellArt}
+              />
+              <h2 className="font-display text-[1.5rem] font-semibold text-ws-text">
+                {eventsQuery.isError
+                  ? 'Schedule unavailable right now.'
+                  : selectedDate
+                    ? `Nothing on ${formatShortDay(selectedDate)}.`
+                    : tab === 'past'
+                      ? 'No past events yet.'
+                      : 'No upcoming events.'}
+              </h2>
+              <p className="max-w-md text-[length:var(--fs-ui)] text-ws-text-muted">
+                {selectedDate
+                  ? 'Clear the day filter to see the full horizon, or add an event on this date.'
+                  : 'Your harbor is quiet. Add an exam, meeting, deadline, or contest.'}
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                {selectedDate ? (
+                  <Button variant="secondary" size="sm" onClick={() => setSelectedDate(null)}>
+                    Show all upcoming
+                  </Button>
+                ) : null}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => openEditor({ mode: 'create-event', date: selectedDate ?? today })}
+                >
+                  Add event
                 </Button>
-              ) : null}
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => openEditor({ mode: 'create-event', date: selectedDate ?? today })}
-              >
-                Add event
-              </Button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <ul
-            aria-label="Events agenda"
-            className={cn(
-              'space-y-3',
-              tab === 'past' &&
-                !selectedDate &&
-                visibleAgenda.length > 3 &&
-                styles.pastEventsScroller,
-            )}
-          >
-            {visibleAgenda.map(renderAgendaRow)}
-          </ul>
-        )}
-        {!selectedDate ? (
-          <div className="flex justify-center pt-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={activeWindow.isLoading}
-              onClick={() =>
-                tab === 'past'
-                  ? setPastWeeks((weeks) => weeks + BATCH_WEEKS)
-                  : setUpcomingWeeks((weeks) => weeks + BATCH_WEEKS)
-              }
-            >
-              {tab === 'past' ? 'Load older (12 weeks)' : 'Load more (12 weeks)'}
-            </Button>
-          </div>
-        ) : null}
+          ) : (
+            <ul aria-label="Events agenda" className="space-y-3">
+              {visibleAgenda.map((occurrence, index) => {
+                // Month headers (Past newest first, Upcoming soonest first); one day needs none.
+                const month = monthKeyFromDateStr(localDateOf(occurrence.startAt));
+                const previous = visibleAgenda[index - 1];
+                const startsMonth =
+                  !selectedDate &&
+                  (!previous || monthKeyFromDateStr(localDateOf(previous.startAt)) !== month);
+                return (
+                  <Fragment key={occurrence.key}>
+                    {startsMonth ? (
+                      <li role="presentation" className={overlays.monthHeader}>
+                        {formatMonthTitle(month)}
+                      </li>
+                    ) : null}
+                    {renderAgendaRow(occurrence)}
+                  </Fragment>
+                );
+              })}
+            </ul>
+          )}
+        </AgendaScroller>
       </div>
     );
   };
 
-  const loadFailed = eventsQuery.isError || upcomingWindow.isError;
+  const loadFailed = eventsQuery.isError;
 
   return (
     <div className={styles.pageStack}>
@@ -1055,7 +1040,6 @@ export function EventsView() {
             leftIcon={<RotateCcw size={14} aria-hidden="true" />}
             onClick={() => {
               void eventsQuery.refetch();
-              upcomingWindow.refetch();
             }}
           >
             Retry
@@ -1068,14 +1052,6 @@ export function EventsView() {
           className="rounded-card border border-tint-overdue-border bg-tint-overdue-bg px-4 py-3 text-[length:var(--fs-ui)] text-text-overdue"
         >
           {actionError}
-        </div>
-      ) : null}
-      {statusMessage ? (
-        <div
-          role="status"
-          className="rounded-card border border-ws-border bg-ws-accent-soft px-4 py-3 text-[length:var(--fs-small)] text-ws-text"
-        >
-          {statusMessage}
         </div>
       ) : null}
 
@@ -1093,11 +1069,7 @@ export function EventsView() {
             weekStart={timetableWeek}
             today={today}
             onWeekChange={setTimetableWeek}
-            onOpenOccurrence={(occurrence) => {
-              setSelectedKey(occurrence.key);
-              setSelectedSnapshot(occurrence);
-              setReaderOccurrence(occurrence);
-            }}
+            onOpenOccurrence={openInReader}
             onCreateClass={(date, periodIndex) =>
               openEditor({ mode: 'create-class', date, periodIndex })
             }
@@ -1107,10 +1079,9 @@ export function EventsView() {
         <>
           <HighlightsSection
             highlights={highlights}
-            rangeLabel={horizonLabel}
             now={now}
             selectedKey={selectedKey}
-            isLoading={!clockReady || upcomingWindow.isLoading}
+            isLoading={!clockReady || eventsQuery.isLoading}
             onSelect={selectOccurrence}
           />
 
@@ -1123,7 +1094,7 @@ export function EventsView() {
                 className="flex w-full items-center justify-between gap-2 text-left cursor-pointer"
               >
                 <span>
-                  <span className="block font-display text-[1.25rem] font-medium leading-tight text-ws-text">
+                  <span className="block font-display text-[1.25rem] font-semibold leading-tight text-ws-text">
                     {selectedDate
                       ? `Filtered: ${formatShortDay(selectedDate)}`
                       : formatMonthTitle(calendarMonth)}
@@ -1163,7 +1134,6 @@ export function EventsView() {
                       onClick={() => {
                         setTab(value);
                         setSelectedDate(null);
-                        setStatusMessage('');
                       }}
                       className={cn(
                         'min-h-9 whitespace-nowrap rounded-pill px-3 py-1.5 text-[length:var(--fs-small)] font-medium cursor-pointer transition-colors duration-[var(--dur-fast)] sm:px-3.5',
@@ -1283,14 +1253,9 @@ export function EventsView() {
         open={calendarOpen}
         state={calendarState}
         today={today}
-        now={now}
         onChange={setCalendarState}
         onClose={() => setCalendarOpen(false)}
-        onSelect={(occurrence) => {
-          setSelectedKey(occurrence.key);
-          setSelectedSnapshot(occurrence);
-          setReaderOccurrence(occurrence);
-        }}
+        onSelect={openInReader}
       />
 
       <EventReader
@@ -1300,6 +1265,15 @@ export function EventsView() {
         onEdit={(occurrence) => {
           setReaderOccurrence(null);
           openEditFor(occurrence);
+        }}
+        onCancelClass={(occurrence) => {
+          setReaderOccurrence(null);
+          setScopeChoice('this-week');
+          setScopeAction({ action: 'cancel', occurrence });
+        }}
+        onDeleteClass={(occurrence) => {
+          setReaderOccurrence(null);
+          requestDelete(occurrence);
         }}
       />
 

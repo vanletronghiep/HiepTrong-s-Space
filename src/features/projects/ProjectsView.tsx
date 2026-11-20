@@ -1,381 +1,161 @@
 'use client';
 
-import { usePageReady } from '@/features/transitions/TransitionProvider';
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import {
-  AlertCircle,
-  ArrowRight,
-  Calendar,
-  Code,
-  Compass,
-  ExternalLink,
-  Plus,
-  RotateCcw,
-} from 'lucide-react';
-import {
-  clearEditorDraft,
-  isEditorDraftStale,
-  listSavedEditDraftRecordIds,
-  loadEditorDraft,
-  saveEditorDraft,
-  type EditorDraftPayload,
-} from '@/client/editor-drafts';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { Compass, Plus, RotateCcw } from 'lucide-react';
 import {
   useCreateProject,
   useDeleteProject,
   useProjects,
   useUpdateProject,
 } from '@/client/queries/projects';
-import type { ProjectItem, ProjectStatus } from '@/contracts/project';
-import { computeProjectStats } from '@/domain/project-domain';
-import { DEFAULT_APP_TIMEZONE, formatDisplayDate } from '@/domain/time';
-import { Badge, type BadgeTone } from '@/ui/Badge';
-import { Button } from '@/ui/Button';
-import { Chip } from '@/ui/Chip';
-import { cn } from '@/ui/cn';
-import { ConfirmDialog } from '@/ui/Dialog';
-import { EmptyState } from '@/ui/EmptyState';
-import { DatePickerField } from '@/ui/DatePickerField';
-import { FeatureThemeProvider, useFeatureTheme } from '@/ui/FeatureTheme';
-import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
 import {
-  LargeEditorDialog,
-  LargeEditorTwoColumn,
-  type DraftSaveOutcome,
-} from '@/ui/LargeEditorDialog';
-import { RichNoteEditor } from '@/ui/RichNoteEditor';
-import { SelectField } from '@/ui/SelectField';
+  projectItemSchema,
+  type PatchProjectInput,
+  type ProjectItem,
+  type ProjectPriority,
+} from '@/contracts/project';
+import { MOTION_DURATION, MOTION_EASE } from '@/design/motion';
+import { applyDraftPatch, isFinished, sortFocuses } from '@/domain/project-domain';
+import { DEFAULT_APP_TIMEZONE, formatScheduledDate } from '@/domain/time';
+import { usePageReady } from '@/features/transitions/TransitionProvider';
+import { Button } from '@/ui/Button';
+import { EmptyState } from '@/ui/EmptyState';
+import { FeatureThemeProvider, useFeatureTheme } from '@/ui/FeatureTheme';
 import { Skeleton } from '@/ui/Skeleton';
 import { useItemAnchor } from '@/ui/use-item-anchor';
-import {
-  defaultProjectEditorValues,
-  isProjectDraftValues,
-  projectEditorCreateInput,
-  projectEditorPatch,
-  projectEditorValues,
-  sameProjectEditorValues,
-  type ProjectEditorValues,
-} from './project-editor';
+import { FocusCard } from './FocusCard';
+import { PriorityEmblem } from './FocusBits';
+import { artSrc } from './focus-art';
+import { FocusPanel } from './FocusPanel';
+import { TierSwitch, type TierOption } from './TierSwitch';
 import styles from './projects.module.css';
 
-const PROJECT_FORM_ID = 'project';
-const PROJECT_EDITOR_DOM_FORM_ID = 'project-large-editor-form';
+type Tier = 'all' | ProjectPriority;
 
-const STATUS_META: Record<ProjectStatus, { label: string; tone: BadgeTone; badgeClass?: string }> =
-  {
-    active: { label: 'Active', tone: 'general' },
-    in_progress: { label: 'In progress', tone: 'due-soon' },
-    completed: { label: 'Completed', tone: 'completed' },
-    on_hold: { label: 'On hold', tone: 'optional', badgeClass: styles.statusBadgeOnHold },
-  };
-
-const FILTER_OPTIONS: readonly { key: 'all' | ProjectStatus; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'active', label: 'Active' },
-  { key: 'in_progress', label: 'In progress' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'on_hold', label: 'On hold' },
-];
-
-function formatDraftTimestamp(iso: string): string {
-  const ms = Date.parse(iso);
-  if (Number.isNaN(ms)) {
-    return 'recently';
-  }
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: DEFAULT_APP_TIMEZONE,
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(ms));
-}
-
-function formatTargetDate(deadlineAt: string): string {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(deadlineAt)) {
-    return formatDisplayDate(`${deadlineAt}T12:00:00+07:00`, new Date(), DEFAULT_APP_TIMEZONE);
-  }
-  const parsed = Date.parse(deadlineAt);
-  if (Number.isNaN(parsed)) {
-    return deadlineAt;
-  }
-  return formatDisplayDate(new Date(parsed), new Date(), DEFAULT_APP_TIMEZONE);
-}
-
-function isSafeExternalUrl(raw: string | null | undefined): raw is string {
-  if (!raw) {
-    return false;
-  }
-  return /^https?:\/\//i.test(raw.trim());
-}
+const TIER_LABEL: Record<Tier, string> = {
+  all: 'All',
+  background: 'Background',
+  active: 'Active',
+  critical: 'Critical',
+};
+const TIER_ORDER: Tier[] = ['all', 'background', 'active', 'critical'];
 
 export function ProjectsView() {
   const inheritedTheme = useFeatureTheme();
+  const reduced = useReducedMotion();
   const { data: projects = [], isLoading, isError: loadFailed, refetch } = useProjects();
   usePageReady(!isLoading);
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
   const deleteMutation = useDeleteProject();
+  const now = useMemo(() => new Date(), []);
+  const todayIso = formatScheduledDate(now, DEFAULT_APP_TIMEZONE);
 
-  const savingRef = useRef(false);
-  const editorTitleInputRef = useRef<HTMLInputElement>(null);
-
-  const [activeFilter, setActiveFilter] = useState<'all' | ProjectStatus>('all');
+  const [tier, setTier] = useState<Tier>('all');
+  const [openId, setOpenId] = useState<string | null>(null);
+  // A new focus stays in the panel, unsaved, until the owner saves it.
+  const [draft, setDraftState] = useState<ProjectItem | null>(null);
+  const draftRef = useRef<ProjectItem | null>(null);
+  const setDraft = (next: ProjectItem | null) => {
+    draftRef.current = next;
+    setDraftState(next);
+  };
   const [actionError, setActionError] = useState('');
-  const [pendingProgressId, setPendingProgressId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ProjectItem | null>(null);
-
-  // Unified LargeEditorDialog + explicit local drafts state
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<ProjectItem | null>(null);
-  const [initialFormValues, setInitialFormValues] = useState<ProjectEditorValues>(() =>
-    defaultProjectEditorValues(),
-  );
-  const [formValues, setFormValues] = useState<ProjectEditorValues>(() =>
-    defaultProjectEditorValues(),
-  );
-  const [editorError, setEditorError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loadedDraft, setLoadedDraft] = useState<EditorDraftPayload<ProjectEditorValues> | null>(
-    null,
-  );
-  const [draftSyncVersion, setDraftSyncVersion] = useState(0);
 
   useItemAnchor(projects);
 
-  const refreshOrphanedDrafts = useCallback(() => {
-    setDraftSyncVersion((v) => v + 1);
-  }, []);
+  const live = useMemo(() => projects.filter((project) => !isFinished(project)), [projects]);
+  const finished = useMemo(() => projects.filter(isFinished), [projects]);
+  const shown = useMemo(
+    () => sortFocuses(live.filter((project) => tier === 'all' || project.priority === tier)),
+    [live, tier],
+  );
+  const options: TierOption<Tier>[] = TIER_ORDER.map((key) => ({
+    key,
+    label: TIER_LABEL[key],
+    count: key === 'all' ? live.length : live.filter((project) => project.priority === key).length,
+    icon: key === 'all' ? undefined : <PriorityEmblem priority={key} size={16} />,
+  }));
 
-  const orphanedDraftIds = useMemo(() => {
-    void draftSyncVersion;
-    if (isLoading || loadFailed) {
-      return [];
-    }
-    const ids = listSavedEditDraftRecordIds(PROJECT_FORM_ID);
-    return ids.filter((id) => !projects.some((project) => project.id === id));
-  }, [draftSyncVersion, isLoading, loadFailed, projects]);
+  const openProject = openId ? (projects.find((project) => project.id === openId) ?? null) : null;
 
-  const stats = useMemo(() => computeProjectStats(projects), [projects]);
-
-  const filteredProjects = useMemo(() => {
-    if (activeFilter === 'all') {
-      return projects;
-    }
-    return projects.filter((project) => project.status === activeFilter);
-  }, [activeFilter, projects]);
-
-  const isEditorDirty = editorOpen && !sameProjectEditorValues(initialFormValues, formValues);
-
-  const openCreateEditor = () => {
-    const base = defaultProjectEditorValues();
-    const existing = loadEditorDraft<ProjectEditorValues>(
-      PROJECT_FORM_ID,
-      null,
-      isProjectDraftValues,
-    );
-    setEditingProject(null);
-    setInitialFormValues(base);
-    setFormValues(base);
-    setEditorError('');
-    setLoadedDraft(existing.ok ? existing.draft : null);
-    setEditorOpen(true);
+  const closePanel = () => {
+    const id = openId;
+    setOpenId(null);
+    if (id) requestAnimationFrame(() => document.getElementById(`item-${id}`)?.focus());
   };
 
-  const openEditEditor = (project: ProjectItem) => {
-    const base = projectEditorValues(project);
-    const existing = loadEditorDraft<ProjectEditorValues>(
-      PROJECT_FORM_ID,
-      project.id,
-      isProjectDraftValues,
-    );
-    setEditingProject(project);
-    setInitialFormValues(base);
-    setFormValues(base);
-    setEditorError('');
-    setLoadedDraft(existing.ok ? existing.draft : null);
-    setEditorOpen(true);
-  };
-
-  const closeEditor = useCallback(() => {
-    setEditorOpen(false);
-    setEditingProject(null);
-    setEditorError('');
-    setLoadedDraft(null);
-  }, []);
-
-  const handleSaveDraft = (): DraftSaveOutcome => {
-    const result = saveEditorDraft({
-      formId: PROJECT_FORM_ID,
-      recordId: editingProject?.id ?? null,
-      recordUpdatedAt: editingProject?.updatedAt ?? null,
-      values: formValues,
-    });
-    if (!result.ok) {
-      return { ok: false, error: result.error };
-    }
-    setLoadedDraft(null);
-    setInitialFormValues(formValues);
-    refreshOrphanedDrafts();
-    return {
-      ok: true,
-      message: `Draft saved locally (${formatDraftTimestamp(result.draft.savedAt)}).`,
-    };
-  };
-
-  const submitEditor = useCallback(async () => {
-    if (savingRef.current) {
-      return;
-    }
-    const trimmedTitle = formValues.title.trim();
-    if (!trimmedTitle) {
-      setEditorError('Enter a project title.');
-      editorTitleInputRef.current?.focus();
-      return;
-    }
-    if (trimmedTitle.length > 200) {
-      setEditorError('Project title must be 200 characters or fewer.');
-      editorTitleInputRef.current?.focus();
-      return;
-    }
-    if (
-      !Number.isFinite(formValues.progressPercent) ||
-      formValues.progressPercent < 0 ||
-      formValues.progressPercent > 100
-    ) {
-      setEditorError('Progress must be between 0 and 100.');
-      return;
-    }
-
-    savingRef.current = true;
-    setIsSubmitting(true);
-    setEditorError('');
+  const patchProject = (id: string, patch: PatchProjectInput) => {
     setActionError('');
-
-    try {
-      if (editingProject) {
-        const patch = projectEditorPatch(editingProject, formValues);
-        await updateMutation.mutateAsync({
-          id: editingProject.id,
-          patch,
-        });
-        clearEditorDraft(PROJECT_FORM_ID, editingProject.id);
-      } else {
-        await createMutation.mutateAsync(projectEditorCreateInput(formValues));
-        clearEditorDraft(PROJECT_FORM_ID, null);
-      }
-      refreshOrphanedDrafts();
-      closeEditor();
-    } catch (error) {
-      setEditorError(
-        error instanceof Error
-          ? error.message
-          : 'Could not save this project. Your input is retained.',
-      );
-    } finally {
-      savingRef.current = false;
-      setIsSubmitting(false);
-    }
-  }, [
-    closeEditor,
-    createMutation,
-    editingProject,
-    formValues,
-    refreshOrphanedDrafts,
-    updateMutation,
-  ]);
-
-  const handleEditorSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    void submitEditor();
-  };
-
-  useEffect(() => {
-    if (!editorOpen || deleteTarget !== null) {
-      return undefined;
-    }
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        void submitEditor();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [deleteTarget, editorOpen, submitEditor]);
-
-  const handleProgressChange = (project: ProjectItem, delta: number) => {
-    if (pendingProgressId === project.id) {
-      return;
-    }
-    const nextProgress = Math.max(0, Math.min(100, project.progressPercent + delta));
-    const nextStatus =
-      nextProgress === 100
-        ? 'completed'
-        : project.status === 'completed'
-          ? 'in_progress'
-          : project.status;
-    setActionError('');
-    setPendingProgressId(project.id);
     updateMutation.mutate(
+      { id, patch },
       {
-        id: project.id,
-        patch: {
-          progressPercent: nextProgress,
-          status: nextStatus,
-        },
-      },
-      {
-        onError: (error) => {
+        onError: (error) =>
           setActionError(
             error instanceof Error
               ? error.message
-              : 'Could not update project progress right now. Retry when ready.',
-          );
-        },
-        onSettled: () => {
-          setPendingProgressId((current) => (current === project.id ? null : current));
-        },
+              : 'Could not save that change. Retry when ready.',
+          ),
       },
     );
   };
 
-  const handleConfirmDelete = () => {
-    if (!deleteTarget) {
-      return;
-    }
-    const targetId = deleteTarget.id;
+  const startDraft = () => {
     setActionError('');
-    deleteMutation.mutate(targetId, {
-      onSuccess: () => {
-        clearEditorDraft(PROJECT_FORM_ID, targetId);
-        refreshOrphanedDrafts();
-        setDeleteTarget(null);
-        if (editingProject?.id === targetId) {
-          closeEditor();
-        }
-      },
-      onError: (error) => {
+    const nowIso = new Date().toISOString();
+    setDraft(
+      projectItemSchema.parse({
+        id: 'draft',
+        title: '',
+        priority: tier === 'all' ? 'active' : tier,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      }),
+    );
+  };
+
+  const patchDraft = (patch: PatchProjectInput) => {
+    const current = draftRef.current;
+    if (current) setDraft(applyDraftPatch(current, patch, new Date().toISOString()));
+  };
+
+  const saveDraft = async (closeAfter: boolean): Promise<string | null> => {
+    const draft = draftRef.current;
+    if (!draft) return null;
+    try {
+      const item = await createMutation.mutateAsync({
+        title: draft.title.trim(),
+        why: draft.why,
+        priority: draft.priority,
+        status: draft.status,
+        deadlineAt: draft.deadlineAt,
+        deadlinePhrase: draft.deadlinePhrase,
+        roadmap: draft.roadmap,
+      });
+      setDraft(null);
+      setOpenId(closeAfter ? null : item.id);
+      return null;
+    } catch (error) {
+      return error instanceof Error
+        ? error.message
+        : 'Could not save this focus right now. Retry when ready.';
+    }
+  };
+
+  const deleteFocus = (id: string) => {
+    setActionError('');
+    deleteMutation.mutate(id, {
+      onSuccess: () => setOpenId(null),
+      onError: (error) =>
         setActionError(
-          error instanceof Error
-            ? error.message
-            : 'Could not delete this project right now. Retry when ready.',
-        );
-        setDeleteTarget(null);
-      },
+          error instanceof Error ? error.message : 'Could not delete this focus right now.',
+        ),
     });
   };
 
-  const handleDiscardOrphanedDrafts = () => {
-    for (const orphanId of orphanedDraftIds) {
-      clearEditorDraft(PROJECT_FORM_ID, orphanId);
-    }
-    refreshOrphanedDrafts();
-  };
-
-  const workspaceContent = (
+  const content = (
     <div data-feature-theme={inheritedTheme ? undefined : 'project'} className={styles.pageStack}>
       <Image
         src="/visuals/project/auspicious-cloud-pillar.svg"
@@ -388,39 +168,37 @@ export function ProjectsView() {
         className={styles.cloudPillarDecor}
       />
 
-      {/* Eastern Strategy Masthead */}
       <section className={styles.masthead} aria-labelledby="projects-page-heading">
+        <div className={styles.mastheadText}>
+          <div className={styles.eyebrow}>
+            <Compass size={15} strokeWidth={1.6} aria-hidden="true" />
+            <span>Life in Motion </span>
+          </div>
+          <h1 id="projects-page-heading" className={styles.displayTitle}>
+            Current <span className={styles.displayTitleEmphasis}>focus</span>
+          </h1>
+          <p className={styles.mastheadSubtitle}>
+            Where your attention goes, and how things move forward.
+          </p>
+        </div>
         <Image
-          src="/visuals/project/dragon-over-the-ridge.svg"
+          src={artSrc('ridge-and-rising-sun')}
           alt=""
           aria-hidden="true"
           width={480}
           height={300}
           loading="eager"
           unoptimized
-          className={styles.dragonMastheadArt}
+          className={styles.mastheadArt}
         />
-        <div className={styles.mastheadText}>
-          <div className={styles.eyebrow}>
-            <Compass size={15} strokeWidth={1.6} aria-hidden="true" />
-            <span>Eastern strategy &amp; engineering</span>
-          </div>
-          <h1 id="projects-page-heading" className={styles.displayTitle}>
-            In progress <span className={styles.displayTitleEmphasis}>projects</span>
-          </h1>
-          <p className={styles.mastheadSubtitle}>
-            Keep active builds legible with clear next steps, blockers, and steady progress.
-          </p>
-        </div>
-
         <div className={styles.mastheadActions}>
           <Button
             variant="primary"
             size="sm"
             leftIcon={<Plus size={16} aria-hidden="true" />}
-            onClick={openCreateEditor}
+            onClick={startDraft}
           >
-            New project
+            New focus
           </Button>
         </div>
       </section>
@@ -430,7 +208,7 @@ export function ProjectsView() {
           role="alert"
           className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-tint-overdue-border bg-tint-overdue-bg px-4 py-3 text-[length:var(--fs-ui)] text-text-overdue"
         >
-          <span>Could not load your projects right now. Check connection or retry.</span>
+          <span>Could not load your focuses right now. Check connection or retry.</span>
           <Button
             variant="secondary"
             size="sm"
@@ -451,592 +229,154 @@ export function ProjectsView() {
         </div>
       ) : null}
 
-      {orphanedDraftIds.length > 0 ? (
-        <div
-          role="status"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-ws-border bg-ws-accent-soft px-4 py-3 text-[length:var(--fs-small)] text-ws-text"
-        >
-          <span>
-            {orphanedDraftIds.length === 1
-              ? '1 saved local edit draft refers to a project that is no longer in your workspace.'
-              : `${orphanedDraftIds.length} saved local edit drafts refer to projects no longer in your workspace.`}
-          </span>
-          <Button variant="secondary" size="sm" onClick={handleDiscardOrphanedDrafts}>
-            Discard missing drafts
-          </Button>
-        </div>
-      ) : null}
-
-      {/* Overview Statistics */}
-      <section className={styles.statsGrid} aria-label="Project statistics">
-        <div className={styles.statCard}>
-          <span className={styles.statValue}>{stats.total}</span>
-          <span className={styles.statLabel}>Total projects</span>
-        </div>
-        <div className={styles.statCard}>
-          <span className={cn(styles.statValue, styles.statValueAccent)}>{stats.activeCount}</span>
-          <span className={styles.statLabel}>Active development</span>
-        </div>
-        <div className={styles.statCard}>
-          <span className={cn(styles.statValue, styles.statValueCompleted)}>
-            {stats.completedCount}
-          </span>
-          <span className={styles.statLabel}>Completed</span>
-        </div>
-        <div className={styles.statCard}>
-          <span className={styles.statValue}>{stats.averageProgress}%</span>
-          <span className={styles.statLabel}>Average progress</span>
-        </div>
-      </section>
-
-      {/* Filter Chips */}
-      <div className={styles.controlsBar}>
-        <div className={styles.filterGroup} role="group" aria-label="Project status filter">
-          {FILTER_OPTIONS.map((option) => (
-            <Chip
-              key={option.key}
-              active={activeFilter === option.key}
-              onClick={() => setActiveFilter(option.key)}
-              className={styles.filterChip}
-            >
-              {option.label}
-            </Chip>
-          ))}
-        </div>
-        <span className="text-[length:var(--fs-small)] text-ws-text-muted tabular-nums">
-          Showing {filteredProjects.length} of {projects.length}
-        </span>
-      </div>
-
-      {/* Cloud Scroll Divider */}
-      <div className={styles.cloudScrollDividerWrap} aria-hidden="true">
+      <TierSwitch label="Focus tier" options={options} value={tier} onChange={setTier} />
+      <div className={styles.bambooRule} aria-hidden="true">
         <Image
-          src="/visuals/project/auspicious-cloud-scroll.svg"
+          src={artSrc('bamboo-rule')}
           alt=""
           aria-hidden="true"
           width={720}
-          height={100}
-          loading="eager"
+          height={34}
           unoptimized
-          className={styles.cloudScrollDivider}
         />
       </div>
 
-      {/* Projects Grid / Loading / Empty */}
       {isLoading && projects.length === 0 ? (
-        <div className={styles.projectsGrid} aria-label="Loading projects">
-          <Skeleton className="h-64 w-full rounded-card" />
-          <Skeleton className="h-64 w-full rounded-card" />
-          <Skeleton className="h-64 w-full rounded-card" />
+        <div className={styles.grid} aria-label="Loading focuses">
+          <Skeleton className="h-44 w-full rounded-card" />
+          <Skeleton className="h-44 w-full rounded-card" />
+          <Skeleton className="h-44 w-full rounded-card" />
         </div>
-      ) : filteredProjects.length === 0 ? (
+      ) : shown.length === 0 ? (
         <div className={styles.emptyContainer}>
+          {projects.length === 0 && !loadFailed ? (
+            <Image
+              src="/visuals/project/wooden-training-dummy.svg"
+              alt=""
+              aria-hidden="true"
+              width={160}
+              height={160}
+              unoptimized
+              className={styles.emptyDummy}
+            />
+          ) : null}
           <EmptyState
             title={
               loadFailed
-                ? 'Projects unavailable right now.'
+                ? 'Focuses unavailable right now.'
                 : projects.length === 0
-                  ? 'No projects in progress yet.'
-                  : `No ${STATUS_META[activeFilter === 'all' ? 'active' : activeFilter].label.toLowerCase()} projects right now.`
+                  ? 'Nothing in focus. Pick one thing to train on.'
+                  : `No ${tier === 'all' ? '' : `${TIER_LABEL[tier].toLowerCase()} `}focuses right now.`
             }
             description={
               loadFailed
                 ? 'Retry loading above once your connection is restored.'
                 : projects.length === 0
-                  ? 'Create a project to track your overview, next meaningful step, blockers, and target date.'
-                  : 'Try another status filter or view all projects.'
+                  ? 'Add a focus with a reason and a few checkpoints.'
+                  : 'Try another tier.'
             }
             action={
-              loadFailed ? (
-                <Button variant="secondary" size="sm" onClick={() => void refetch()}>
-                  Retry
+              projects.length === 0 && !loadFailed ? (
+                <Button variant="primary" size="sm" onClick={startDraft}>
+                  New focus
                 </Button>
-              ) : projects.length === 0 ? (
-                <Button variant="primary" size="sm" onClick={openCreateEditor}>
-                  New project
+              ) : tier !== 'all' ? (
+                <Button variant="secondary" size="sm" onClick={() => setTier('all')}>
+                  Show all
                 </Button>
-              ) : (
-                <Button variant="secondary" size="sm" onClick={() => setActiveFilter('all')}>
-                  Show all projects
-                </Button>
-              )
+              ) : undefined
             }
           />
         </div>
       ) : (
-        <div className={styles.projectsGrid}>
-          {filteredProjects.map((project) => {
-            const statusMeta = STATUS_META[project.status];
-            const isProgressPending = pendingProgressId === project.id;
-            const hasRepoUrl = isSafeExternalUrl(project.repoUrl);
-            const hasLiveUrl = isSafeExternalUrl(project.liveUrl);
-
-            return (
-              <article
-                id={`item-${project.id}`}
-                tabIndex={-1}
+        <div className={styles.grid}>
+          <AnimatePresence mode="popLayout" initial={false}>
+            {shown.map((project) => (
+              <motion.div
                 key={project.id}
-                className={styles.projectCard}
+                layout={reduced ? false : 'position'}
+                initial={reduced ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.97 }}
+                transition={{ duration: reduced ? 0 : MOTION_DURATION.layout, ease: MOTION_EASE }}
               >
-                <div className={styles.projectCardTop}>
-                  <div className={styles.cardHeaderRow}>
-                    <h2 className={styles.cardTitle}>{project.title}</h2>
-                    <Badge tone={statusMeta.tone} withDot className={statusMeta.badgeClass}>
-                      {statusMeta.label}
-                    </Badge>
-                  </div>
-
-                  {project.overview ? (
-                    <FormattedNoteContent
-                      value={project.overview}
-                      className={styles.cardOverview}
-                    />
-                  ) : null}
-
-                  {project.deadlineAt ? (
-                    <div className={styles.deadlineLine}>
-                      <Calendar size={14} className="text-ws-accent shrink-0" aria-hidden="true" />
-                      <span>Target {formatTargetDate(project.deadlineAt)}</span>
-                    </div>
-                  ) : null}
-
-                  {/* Progress Bar & Controls */}
-                  <div className={styles.progressSection}>
-                    <div className={styles.progressHeader}>
-                      <span className="text-ws-text-muted">Manual progress</span>
-                      <div className={styles.progressControls}>
-                        <button
-                          type="button"
-                          disabled={isProgressPending}
-                          onClick={() => handleProgressChange(project, -5)}
-                          aria-label={`Decrease progress for ${project.title} by 5%`}
-                          className={styles.progressStepButton}
-                        >
-                          -5%
-                        </button>
-                        <span className={styles.progressPercent}>{project.progressPercent}%</span>
-                        <button
-                          type="button"
-                          disabled={isProgressPending}
-                          onClick={() => handleProgressChange(project, 5)}
-                          aria-label={`Increase progress for ${project.title} by 5%`}
-                          className={styles.progressStepButton}
-                        >
-                          +5%
-                        </button>
-                      </div>
-                    </div>
-                    <div
-                      className={styles.progressBar}
-                      role="progressbar"
-                      aria-label={`${project.title} progress`}
-                      aria-valuenow={project.progressPercent}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                    >
-                      <div
-                        className={styles.progressFill}
-                        style={{ transform: `scaleX(${project.progressPercent / 100})` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Next Step */}
-                  {project.nextStep ? (
-                    <div className={styles.nextStepBox}>
-                      <div className="flex items-center gap-1.5 text-ws-accent">
-                        <ArrowRight size={13} aria-hidden="true" />
-                        <span className={styles.nextStepLabel}>Next meaningful step</span>
-                      </div>
-                      <p className="text-ws-text font-medium [overflow-wrap:anywhere]">
-                        {project.nextStep}
-                      </p>
-                    </div>
-                  ) : null}
-
-                  {/* Blocker */}
-                  {project.blockers ? (
-                    <div className={styles.blockerBox}>
-                      <div className="flex items-center gap-1.5 text-text-overdue">
-                        <AlertCircle size={13} aria-hidden="true" />
-                        <span className={styles.blockerLabel}>Current blocker</span>
-                      </div>
-                      <FormattedNoteContent
-                        value={project.blockers}
-                        className="text-ws-text [overflow-wrap:anywhere]"
-                      />
-                    </div>
-                  ) : null}
-
-                  {/* Tech stack tags */}
-                  {project.techStack.length > 0 ? (
-                    <div className={styles.techTags}>
-                      {project.techStack.map((tech) => (
-                        <span key={tech} className={styles.techTag}>
-                          {tech}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className={styles.cardFooter}>
-                  <div className="flex flex-wrap items-center gap-3">
-                    {hasRepoUrl ? (
-                      <a
-                        href={project.repoUrl!}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[length:var(--fs-micro)] font-medium text-ws-accent hover:underline"
-                      >
-                        <Code size={13} aria-hidden="true" />
-                        <span>Source</span>
-                      </a>
-                    ) : null}
-                    {hasLiveUrl ? (
-                      <a
-                        href={project.liveUrl!}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[length:var(--fs-micro)] font-medium text-ws-accent hover:underline"
-                      >
-                        <ExternalLink size={13} aria-hidden="true" />
-                        <span>Launch</span>
-                      </a>
-                    ) : null}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`Delete ${project.title}`}
-                      className="text-text-overdue hover:bg-tint-overdue-bg"
-                      onClick={() => setDeleteTarget(project)}
-                    >
-                      Delete
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      aria-label={`Edit details for ${project.title}`}
-                      onClick={() => openEditEditor(project)}
-                    >
-                      Edit details
-                    </Button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+                <FocusCard project={project} now={now} todayIso={todayIso} onOpen={setOpenId} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       )}
 
-      {/* Unified LargeEditorDialog + Two-Column Layout + Local Drafts */}
-      <LargeEditorDialog
-        open={editorOpen}
-        onClose={closeEditor}
-        eyebrow="Eastern strategy ledger"
-        title={editingProject ? 'Edit project' : 'New project'}
-        description="Update project scope, next meaningful step, blockers, and target schedule."
-        formId={PROJECT_EDITOR_DOM_FORM_ID}
-        isDirty={isEditorDirty}
-        isSubmitting={isSubmitting}
-        submitLabel={editingProject ? 'Save changes' : 'Create project'}
-        submittingLabel={editingProject ? 'Saving…' : 'Creating…'}
-        closeAriaLabel="Close project editor"
-        initialFocusRef={editorTitleInputRef}
-        errorMessage={editorError}
-        draftRecovery={
-          loadedDraft
-            ? {
-                savedAtLabel: formatDraftTimestamp(loadedDraft.savedAt),
-                stale: Boolean(
-                  editingProject && isEditorDraftStale(loadedDraft, editingProject.updatedAt),
-                ),
-                staleMessage:
-                  'This project was updated after your local draft was saved. Review changes before saving.',
-                onResume: () => {
-                  setFormValues(loadedDraft.values);
-                  setLoadedDraft(null);
-                },
-                onDiscard: () => {
-                  clearEditorDraft(PROJECT_FORM_ID, editingProject?.id ?? null);
-                  setLoadedDraft(null);
-                  refreshOrphanedDrafts();
-                },
-              }
-            : null
-        }
-        onSaveDraft={handleSaveDraft}
-        footerActions={
-          editingProject ? (
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={isSubmitting}
-              onClick={() => setDeleteTarget(editingProject)}
-            >
-              Delete project
-            </Button>
-          ) : null
-        }
-      >
-        <form id={PROJECT_EDITOR_DOM_FORM_ID} noValidate onSubmit={handleEditorSubmit}>
-          <LargeEditorTwoColumn
-            primary={
-              <>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="project-editor-title"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
-                  >
-                    Title
-                  </label>
-                  <input
-                    ref={editorTitleInputRef}
-                    id="project-editor-title"
-                    type="text"
-                    value={formValues.title}
-                    onChange={(e) => {
-                      setFormValues((prev) => ({ ...prev, title: e.target.value }));
-                      if (editorError) setEditorError('');
-                    }}
-                    placeholder="e.g. Go Game AI or Compiler"
-                    className={cn(styles.editorControl, styles.editorControlInput)}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    id="project-editor-overview-label"
-                    htmlFor="project-editor-overview"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
-                  >
-                    Overview
-                  </label>
-                  <RichNoteEditor
-                    id="project-editor-overview"
-                    ariaLabel="Overview"
-                    value={formValues.overview}
-                    onChange={(nextValue) =>
-                      setFormValues((prev) => ({ ...prev, overview: nextValue }))
-                    }
-                    placeholder="What is this project and what outcome does it deliver?"
-                    className="max-w-[66ch]"
-                    minHeightClassName="min-h-[108px]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="project-editor-next-step"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
-                  >
-                    Next meaningful step
-                  </label>
-                  <input
-                    id="project-editor-next-step"
-                    type="text"
-                    value={formValues.nextStep}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, nextStep: e.target.value }))
-                    }
-                    placeholder="The next concrete action to move this build forward"
-                    className={cn(styles.editorControl, styles.editorControlInput)}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="project-editor-blockers"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
-                  >
-                    Current blockers
-                  </label>
-                  <RichNoteEditor
-                    id="project-editor-blockers"
-                    ariaLabel="Current blockers"
-                    value={formValues.blockers}
-                    onChange={(nextValue) =>
-                      setFormValues((prev) => ({ ...prev, blockers: nextValue }))
-                    }
-                    placeholder="Dependencies, unknowns, or constraints currently blocking progress"
-                    minHeightClassName="min-h-[84px]"
-                  />
-                </div>
-              </>
-            }
-            metadata={
-              <>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="project-editor-status"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
-                  >
-                    Status
-                  </label>
-                  <SelectField<ProjectStatus>
-                    id="project-editor-status"
-                    ariaLabel="Status"
-                    value={formValues.status}
-                    onChange={(nextStatus) =>
-                      setFormValues((prev) => ({
-                        ...prev,
-                        status: nextStatus,
-                      }))
-                    }
-                    options={[
-                      { value: 'active', label: 'Active' },
-                      { value: 'in_progress', label: 'In progress' },
-                      { value: 'completed', label: 'Completed' },
-                      { value: 'on_hold', label: 'On hold' },
-                    ]}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="project-editor-progress"
-                      className="text-[length:var(--fs-small)] font-medium text-ws-text block"
-                    >
-                      Progress (%)
-                    </label>
-                    <input
-                      id="project-editor-progress"
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={formValues.progressPercent}
-                      onChange={(e) => {
-                        const parsed = Number(e.target.value);
-                        setFormValues((prev) => ({
-                          ...prev,
-                          progressPercent: Number.isNaN(parsed) ? 0 : parsed,
-                        }));
-                        if (editorError) setEditorError('');
-                      }}
-                      className={cn(
-                        styles.editorControl,
-                        styles.editorControlInput,
-                        'tabular-nums',
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="project-editor-deadline"
-                      className="text-[length:var(--fs-small)] font-medium text-ws-text block"
-                    >
-                      Target date
-                    </label>
-                    <DatePickerField
-                      id="project-editor-deadline"
-                      mode="iso"
-                      ariaLabel="Target date"
-                      value={formValues.deadlineDate}
-                      onChange={(nextDate) =>
-                        setFormValues((prev) => ({ ...prev, deadlineDate: nextDate }))
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="project-editor-tech-stack"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
-                  >
-                    Tech stack (comma-separated)
-                  </label>
-                  <input
-                    id="project-editor-tech-stack"
-                    type="text"
-                    value={formValues.techStackText}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, techStackText: e.target.value }))
-                    }
-                    placeholder="e.g. TypeScript, Next.js, SQLite"
-                    className={cn(styles.editorControl, styles.editorControlInput)}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="project-editor-repo-url"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
-                  >
-                    Repository URL
-                  </label>
-                  <input
-                    id="project-editor-repo-url"
-                    type="text"
-                    value={formValues.repoUrl}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, repoUrl: e.target.value }))
-                    }
-                    placeholder="https://github.com/..."
-                    className={cn(styles.editorControl, styles.editorControlInput)}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="project-editor-live-url"
-                    className="text-[length:var(--fs-small)] font-medium text-ws-text block"
-                  >
-                    Live URL
-                  </label>
-                  <input
-                    id="project-editor-live-url"
-                    type="text"
-                    value={formValues.liveUrl}
-                    onChange={(e) =>
-                      setFormValues((prev) => ({ ...prev, liveUrl: e.target.value }))
-                    }
-                    placeholder="https://..."
-                    className={cn(styles.editorControl, styles.editorControlInput)}
-                  />
-                </div>
-
+      {finished.length > 0 ? (
+        <details className={styles.finishedList}>
+          <summary>Finished ({finished.length})</summary>
+          <ul>
+            {finished.map((project) => (
+              <li key={project.id}>
                 <Image
-                  src="/visuals/project/jade-knot-talisman.svg"
+                  src={artSrc('jade-stamp-check')}
                   alt=""
                   aria-hidden="true"
-                  width={240}
-                  height={240}
-                  loading="eager"
+                  width={40}
+                  height={40}
                   unoptimized
-                  className={styles.jadeEditorOrnament}
+                  className={styles.finishedSeal}
                 />
-              </>
-            }
-          />
-        </form>
-      </LargeEditorDialog>
+                <button
+                  type="button"
+                  id={`item-${project.id}`}
+                  onClick={() => setOpenId(project.id)}
+                >
+                  {project.title.trim() || 'Untitled focus'}
+                </button>
+                <span>
+                  {project.finishedAt
+                    ? formatScheduledDate(project.finishedAt, DEFAULT_APP_TIMEZONE)
+                    : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
 
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDialog
-        portal
-        open={deleteTarget !== null}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleConfirmDelete}
-        title="Delete project?"
-        description={
-          deleteTarget
-            ? `“${deleteTarget.title}” and any saved local draft for it will be permanently removed.`
-            : ''
-        }
-        isSubmitting={deleteMutation.isPending}
-      />
+      <div className={styles.footerBand} aria-hidden="true">
+        <Image
+          src={artSrc('distant-mountains')}
+          alt=""
+          aria-hidden="true"
+          width={960}
+          height={140}
+          unoptimized
+        />
+      </div>
+
+      {draft ? (
+        <FocusPanel
+          key="draft"
+          project={draft}
+          now={now}
+          todayIso={todayIso}
+          isDraft
+          onPatch={patchDraft}
+          onSaveDraft={saveDraft}
+          onDelete={() => setDraft(null)}
+          onClose={() => setDraft(null)}
+        />
+      ) : openProject ? (
+        <FocusPanel
+          key={openProject.id}
+          project={openProject}
+          now={now}
+          todayIso={todayIso}
+          onPatch={(patch) => patchProject(openProject.id, patch)}
+          onDelete={() => deleteFocus(openProject.id)}
+          onClose={closePanel}
+        />
+      ) : null}
     </div>
   );
 
-  if (inheritedTheme) {
-    return workspaceContent;
-  }
-
-  return <FeatureThemeProvider name="project">{workspaceContent}</FeatureThemeProvider>;
+  if (inheritedTheme) return content;
+  return <FeatureThemeProvider name="project">{content}</FeatureThemeProvider>;
 }

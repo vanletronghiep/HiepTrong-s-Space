@@ -123,7 +123,7 @@ export function EventDetailPane({
                   disabled={busy}
                   onClick={() => onCancelClass(occurrence)}
                 >
-                  Cancel class…
+                  Cancel class
                 </Button>
               ) : null}
               <Button
@@ -133,7 +133,7 @@ export function EventDetailPane({
                 className="text-text-overdue hover:bg-tint-overdue-bg"
                 onClick={() => onDelete(occurrence)}
               >
-                Delete…
+                Delete
               </Button>
             </>
           ) : (

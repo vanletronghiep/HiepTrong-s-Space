@@ -33,3 +33,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function DELETE() {
+  try {
+    const removed = await learningRoomService.clearSessions();
+    return NextResponse.json({ success: true, data: { removed } });
+  } catch (err: unknown) {
+    return handleApiError(err);
+  }
+}

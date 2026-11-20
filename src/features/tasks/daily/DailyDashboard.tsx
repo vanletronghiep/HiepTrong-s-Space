@@ -1,16 +1,15 @@
 'use client';
 
 import { CalendarDays } from 'lucide-react';
+import type { TaskDto } from '@/contracts';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { useMinuteTicker } from '@/client/use-minute-ticker';
 import { DEFAULT_APP_TIMEZONE } from '@/domain/time';
-import { StarIcon } from '@/ui/StarIcon';
+import { ActiveTaskPanel } from './ActiveTaskPanel';
 import { getDailyClock } from './daily-dashboard-time';
 import styles from './daily-foundation.module.css';
 
-const FORECAST =
-  'Focus tends to peak between 8 and 10 PM. One urgent task is still due before midnight.';
 const ARC = 'M0 78 Q500 -18 1000 78';
 const MINUTE_MS = 60_000;
 
@@ -141,25 +140,31 @@ export function DailyDashboard({
   done,
   total,
   timeZone,
+  tasks = [],
+  todayKey = '',
+  onCompleteTask,
 }: {
   done: number;
   total: number;
   timeZone: string;
+  /** Tasks scheduled today, for the Active task picker. */
+  tasks?: readonly TaskDto[];
+  todayKey?: string;
+  onCompleteTask?: (task: TaskDto) => void;
 }) {
   const reduced = useReducedMotion();
+  const now = useMinuteTicker();
   const percent = total ? Math.round((done / total) * 100) : 0;
   return (
     <div className={styles.dashboard}>
       <div className={styles.topCards}>
-        <section className={styles.forecast} aria-label="Cosmic forecast">
-          <span className={styles.forecastStar} aria-hidden="true">
-            <StarIcon size={27} />
-          </span>
-          <div>
-            <h2 className={styles.eyebrow}>Cosmic forecast</h2>
-            <p>{FORECAST}</p>
-          </div>
-        </section>
+        <ActiveTaskPanel
+          tasks={tasks}
+          todayKey={todayKey}
+          now={now}
+          timeZone={timeZone}
+          onCompleteTask={onCompleteTask}
+        />
         <section className={styles.progress} aria-label="Today's progress">
           <div className={styles.progressHeader}>
             <h2 className={styles.eyebrow}>Progress</h2>

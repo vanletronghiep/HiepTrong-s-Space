@@ -42,6 +42,7 @@ vi.mock('@/client/queries/tasks', () => {
     useUncompleteTask: noopMutation,
     useTransferTask: noopMutation,
     useDeleteTask: noopMutation,
+    usePromoteSubtask: noopMutation,
   };
 });
 

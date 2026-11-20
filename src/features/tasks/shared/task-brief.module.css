@@ -84,3 +84,36 @@
 .meta {
   min-width: 0;
 }
+
+/* Subtask progress (v3.4): sits in the bottom-right corner; the meta row leaves room for it. */
+.subBadge {
+  position: absolute;
+  right: 12px;
+  bottom: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 5px;
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--ws-surface);
+  color: var(--text-accent);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.subBadgeDone {
+  color: var(--daily-priority-optional);
+}
+
+.metaPad {
+  padding-inline-end: 58px;
+}
+
+/* In-flow variant: sits at the left of the Overdue action row, away from the buttons. */
+.subBadgeInline {
+  position: static;
+  margin-right: auto;
+}

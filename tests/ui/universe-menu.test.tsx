@@ -93,6 +93,23 @@ describe('UniverseMenu frameless search and keyboard flow', () => {
     expect(pushMock).toHaveBeenCalledWith('/tasks/hub');
   });
 
+  it('does not list hidden spaces', () => {
+    render(<UniverseMenu open onClose={vi.fn()} />);
+
+    const hrefs = screen.getAllByRole('option').map((option) => option.getAttribute('href'));
+    for (const hidden of [
+      '/ai-engineering',
+      '/apcs',
+      '/flashcards',
+      '/entertainment',
+      '/milestones',
+      '/achievements',
+    ]) {
+      expect(hrefs).not.toContain(hidden);
+    }
+    expect(hrefs).toContain('/events');
+  });
+
   it('includes Notifications inbox destination without altering FEATURE_REGISTRY', () => {
     const onClose = vi.fn();
     render(<UniverseMenu open onClose={onClose} />);

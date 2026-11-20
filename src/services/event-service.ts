@@ -54,7 +54,7 @@ function normalize(raw: EventItem): EventItem {
 }
 
 function conflictMessage(conflict: ClassConflict): string {
-  return `“${conflict.title}” already occupies that timetable slot in the week of ${conflict.week}. Choose another slot, or cancel or delete that class first.`;
+  return `“${conflict.title}” already occupies that timetable slot on ${conflict.date} (${conflict.startTime}–${conflict.endTime}). Choose another time, or cancel or delete that class first.`;
 }
 
 function toDomainError(error: unknown): never {

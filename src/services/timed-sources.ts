@@ -1,3 +1,4 @@
+import { isRouteHidden } from '@/domain/feature-visibility';
 import { buildZonedInstant } from '@/domain/time';
 import { eventService } from './event-service';
 import { projectService } from './project-service';
@@ -37,11 +38,14 @@ export async function listTimedSources(): Promise<TimedSource[]> {
     if (e.kind !== 'class' && e.status !== 'canceled')
       add('event', e.id, e.title, e.startAt, '/events');
   for (const p of projects)
-    if (p.status !== 'completed' && p.status !== 'on_hold')
-      add('project', p.id, p.title, p.deadlineAt, '/projects');
-  for (const m of milestones)
-    if (m.status !== 'achieved') add('milestone', m.id, m.title, m.targetDate, '/milestones');
-  for (const a of achievements)
-    if (a.reminderEnabled) add('achievement', a.id, a.title, a.futureDate, '/achievements');
+    if (p.finishedAt === null && p.status !== 'paused')
+      add('project', p.id, p.title, p.deadlineAt, '/focus');
+  // Reminders for hidden pages would link to a 404; they resume when the page is unhidden.
+  if (!isRouteHidden('/milestones'))
+    for (const m of milestones)
+      if (m.status !== 'achieved') add('milestone', m.id, m.title, m.targetDate, '/milestones');
+  if (!isRouteHidden('/achievements'))
+    for (const a of achievements)
+      if (a.reminderEnabled) add('achievement', a.id, a.title, a.futureDate, '/achievements');
   return sources;
 }

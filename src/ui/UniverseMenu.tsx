@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 import { Search } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { MOTION_DURATION, MOTION_EASE } from '@/design/motion';
-import { FEATURE_REGISTRY } from '@/features/registry';
+import { VISIBLE_FEATURES } from '@/features/registry';
 import { TransitionLink } from '@/features/transitions/TransitionLink';
 import { useTransitionRouter } from '@/features/transitions/TransitionProvider';
 import { cn } from './cn';
@@ -25,7 +25,7 @@ interface UniverseDestination {
 }
 
 const UNIVERSE_DESTINATIONS: readonly UniverseDestination[] = [
-  ...FEATURE_REGISTRY,
+  ...VISIBLE_FEATURES,
   {
     id: 'notifications',
     title: 'Notifications',

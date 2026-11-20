@@ -21,7 +21,9 @@ export function useLearningRoomData() {
   return useQuery<LearningRoomResponse>({
     queryKey: learningRoomKeys.all,
     queryFn: async () => {
-      const res = await apiRequest<{ success: boolean; data: LearningRoomResponse }>('/api/learning-room');
+      const res = await apiRequest<{ success: boolean; data: LearningRoomResponse }>(
+        '/api/learning-room',
+      );
       return res.data;
     },
   });
@@ -32,11 +34,31 @@ export function useCreateLearningSession() {
 
   return useMutation({
     mutationFn: async (input: CreateLearningSessionInput) => {
-      const res = await apiRequest<{ success: boolean; data: LearningSession }>('/api/learning-room', {
-        method: 'POST',
-        body: input,
-      });
+      const res = await apiRequest<{ success: boolean; data: LearningSession }>(
+        '/api/learning-room',
+        {
+          method: 'POST',
+          body: input,
+        },
+      );
       return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: learningRoomKeys.all });
+    },
+  });
+}
+
+export function useClearLearningRoom() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest<{ success: boolean; data: { removed: number } }>(
+        '/api/learning-room',
+        { method: 'DELETE' },
+      );
+      return res.data.removed;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: learningRoomKeys.all });

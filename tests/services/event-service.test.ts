@@ -165,6 +165,42 @@ describe('EventService classes and scoped occurrences', () => {
     ).resolves.toBeTruthy();
   });
 
+  it('keeps a multi-period lesson as one occurrence and blocks overlaps and extensions over it', async () => {
+    const { service } = await setup([]);
+    const calculus = await service.createEvent(
+      classInput('Calculus I', '2026-11-16', '13:30', '17:30'),
+    );
+    const [occurrence, ...rest] = await service.listOccurrences('2026-11-16', '2026-11-23');
+    expect(rest).toHaveLength(0);
+    expect(occurrence).toMatchObject({ period: 2, periodEnd: 3, title: 'Calculus I' });
+
+    // Any overlap with the covered span is refused, with the clashing lesson named.
+    await expect(
+      service.createEvent(classInput('Physics', '2026-11-16', '15:30', '17:30')),
+    ).rejects.toThrow(/Calculus I.*2026-11-16/);
+
+    // A neighbouring period is free; extending the lesson over it is then refused.
+    const bio = await service.createEvent(classInput('Bio', '2026-11-16', '09:30', '11:30'));
+    await expect(
+      service.mutateOccurrence(bio.id, {
+        action: 'edit',
+        originalWeek: '2026-11-16',
+        scope: 'this-week',
+        expectedRevision: bio.revision,
+        fields: { endTime: '11:30', startTime: '07:30' },
+      }),
+    ).resolves.toBeTruthy();
+    await expect(
+      service.mutateOccurrence(calculus.id, {
+        action: 'edit',
+        originalWeek: '2026-11-16',
+        scope: 'this-week-onward',
+        expectedRevision: calculus.revision,
+        fields: { startTime: '09:30' },
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
   it('applies scoped edits through the occurrence command and rejects stale revisions', async () => {
     const { service } = await setup([]);
     const math = await service.createEvent(classInput('Math', '2026-11-16'));

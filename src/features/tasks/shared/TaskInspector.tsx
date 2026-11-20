@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { CalendarClock, CalendarDays, Clock, Pin } from 'lucide-react';
-import type { TaskDto } from '@/contracts';
+import type { Subtask, TaskDto } from '@/contracts';
 import { deriveTaskState, formatTimeLeftLabel } from '@/domain/task-status';
 import {
   DEFAULT_APP_TIMEZONE,
@@ -17,6 +17,7 @@ import { cn } from '@/ui/cn';
 import { ChooseDayMenu } from './ChooseDayMenu';
 import { DueSoonDot } from './DueSoonDot';
 import { PriorityBadge } from './PriorityBadge';
+import { SubtaskList } from './SubtaskList';
 
 export interface TaskInspectorProps {
   task: TaskDto | null;
@@ -30,6 +31,9 @@ export interface TaskInspectorProps {
   onOpenPickDate: (task: TaskDto) => void;
   onOpenTransfer: (task: TaskDto, initialDate?: string) => void;
   onRequestDelete: (task: TaskDto) => void;
+  /** When provided, the inspector shows the subtask checklist under the description. */
+  onSubtasksChange?: (task: TaskDto, subtasks: Subtask[]) => void;
+  onPromoteSubtask?: (task: TaskDto, subtaskId: string) => void;
   portal?: boolean;
 }
 
@@ -45,6 +49,8 @@ export function TaskInspector({
   onOpenPickDate,
   onOpenTransfer,
   onRequestDelete,
+  onSubtasksChange,
+  onPromoteSubtask,
   portal = true,
 }: TaskInspectorProps) {
   const [cachedTask, setCachedTask] = useState<TaskDto | null>(task);
@@ -144,15 +150,24 @@ export function TaskInspector({
         </div>
 
         {/* Formatted description */}
-        <div className="rounded-input border border-ws-border bg-ws-bg px-3.5 py-2.5">
+        <div className="rounded-item border border-ws-border bg-ws-bg px-3.5 py-2.5">
           <FormattedNoteContent
             value={currentTask.description}
             emptyFallback="No description added."
           />
         </div>
 
+        {onSubtasksChange ? (
+          <SubtaskList
+            collapsible
+            subtasks={currentTask.subtasks ?? []}
+            onChange={(next) => onSubtasksChange(currentTask, next)}
+            onPromote={onPromoteSubtask ? (id) => onPromoteSubtask(currentTask, id) : undefined}
+          />
+        ) : null}
+
         {/* Complete deadline and Daily schedule metadata */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-input border border-ws-border bg-ws-surface px-3.5 py-3 text-[length:var(--fs-small)]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-item border border-ws-border bg-ws-surface px-3.5 py-3 text-[length:var(--fs-small)]">
           <div className="space-y-1">
             <span className="inline-flex items-center gap-1.5 text-[length:var(--fs-micro)] font-medium text-ws-text-muted">
               <CalendarClock size={14} strokeWidth={1.5} className="shrink-0" />

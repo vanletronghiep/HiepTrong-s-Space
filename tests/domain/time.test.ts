@@ -98,9 +98,13 @@ describe('domain/time', () => {
 
   it('formats Hub deadlines as HH:mm · ddd · d MMM without year in timezone', () => {
     // 2026-11-15T12:00:00Z = 19:00 on Sun 15 Nov 2026 in Asia/Saigon (+07:00)
-    expect(formatHubDeadline('2026-11-15T12:00:00.000Z', 'Asia/Saigon')).toBe('19:00 · Sun · 15 Nov');
+    expect(formatHubDeadline('2026-11-15T12:00:00.000Z', 'Asia/Saigon')).toBe(
+      '19:00 · Sun · 15 Nov',
+    );
     // 2026-11-04T18:05:00Z = 01:05 on Thu 5 Nov 2026 in Asia/Saigon (+07:00)
-    expect(formatHubDeadline('2026-11-04T18:05:00.000Z', 'Asia/Saigon')).toBe('01:05 · Thu · 5 Nov');
+    expect(formatHubDeadline('2026-11-04T18:05:00.000Z', 'Asia/Saigon')).toBe(
+      '01:05 · Thu · 5 Nov',
+    );
   });
 
   it('formats Inspector deadlines and scheduled dates with full year', () => {

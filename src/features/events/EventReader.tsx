@@ -16,7 +16,7 @@ import { Button } from '@/ui/Button';
 import { FormattedNoteContent } from '@/ui/FormattedNoteContent';
 import { KindBadge, StatusBadges } from './EventBadges';
 import { EventsModal } from './EventsModal';
-import { formatDetailDate, formatShortDay, formatTimeRange } from './events-format';
+import { formatDetailDate, formatShortDay, formatTime, formatTimeRange } from './events-format';
 import styles from './events.module.css';
 
 /** Location or link: supported web URLs become links; venues stay plain text. */
@@ -36,14 +36,19 @@ export function LocationValue({ value }: { value: string }) {
   return <span className="[overflow-wrap:anywhere]">{value}</span>;
 }
 
-/** Date, time, place, link, recurrence, and links — available independently of notes. */
+/**
+ * Date and time sit in a tinted card (the v2.1 look); an event that ends on a later date gets
+ * its own "Ends" line. Place, link, repeat, and task rows follow as plain icon rows.
+ */
 export function OccurrenceMetadata({ occurrence }: { occurrence: EventOccurrence }) {
   const movedFrom =
     occurrence.originalWeek && occurrence.isOverride
       ? localDateOf(occurrence.startAt) < occurrence.originalWeek ||
         localDateOf(occurrence.startAt) >= addSevenDays(occurrence.originalWeek)
       : false;
-  const rows: Array<{ icon: ReactNode; label: string; value: ReactNode }> = [
+  const endsLater =
+    occurrence.endAt !== null && localDateOf(occurrence.endAt) !== localDateOf(occurrence.startAt);
+  const scheduleRows: Array<{ icon: ReactNode; label: string; value: ReactNode }> = [
     {
       icon: <CalendarIcon size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />,
       label: 'Date',
@@ -52,27 +57,38 @@ export function OccurrenceMetadata({ occurrence }: { occurrence: EventOccurrence
     {
       icon: <Clock size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />,
       label: 'Time',
-      value: `${formatTimeRange(occurrence)} · Saigon`,
+      value: endsLater ? formatTime(occurrence.startAt) : formatTimeRange(occurrence),
     },
   ];
+  if (endsLater && occurrence.endAt) {
+    scheduleRows.push({
+      icon: <Clock size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />,
+      label: 'Ends',
+      value: `${formatTime(occurrence.endAt)} · ${formatDetailDate(occurrence.endAt)}`,
+    });
+  }
+
+  const plainRows: Array<{ key: string; icon: ReactNode; value: ReactNode }> = [];
   if (occurrence.location) {
-    rows.push({
-      icon: <MapPin size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />,
-      label: 'Location',
+    plainRows.push({
+      key: 'location',
+      icon: <MapPin size={15} className="mt-0.5 shrink-0 text-ws-accent" aria-hidden="true" />,
       value: <LocationValue value={occurrence.location} />,
     });
   }
   if (occurrence.url && occurrence.url !== occurrence.location) {
-    rows.push({
-      icon: <ExternalLink size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />,
-      label: 'Link',
+    plainRows.push({
+      key: 'link',
+      icon: (
+        <ExternalLink size={15} className="mt-0.5 shrink-0 text-ws-accent" aria-hidden="true" />
+      ),
       value: <LocationValue value={occurrence.url} />,
     });
   }
   if (occurrence.kind === 'class') {
-    rows.push({
-      icon: <Repeat size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />,
-      label: 'Schedule',
+    plainRows.push({
+      key: 'schedule',
+      icon: <Repeat size={15} className="mt-0.5 shrink-0 text-ws-accent" aria-hidden="true" />,
       value: occurrence.isRepeating
         ? movedFrom && occurrence.originalWeek
           ? `Weekly class · moved from the week of ${formatShortDay(occurrence.originalWeek)}`
@@ -82,31 +98,41 @@ export function OccurrenceMetadata({ occurrence }: { occurrence: EventOccurrence
         : 'Single class',
     });
   } else if (occurrence.recurrence) {
-    rows.push({
-      icon: <Repeat size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />,
-      label: 'Repeats',
-      value: `${occurrence.recurrence.frequency}${occurrence.recurrence.until ? ` until ${occurrence.recurrence.until}` : ''}`,
+    plainRows.push({
+      key: 'repeats',
+      icon: <Repeat size={15} className="mt-0.5 shrink-0 text-ws-accent" aria-hidden="true" />,
+      value: `Repeats ${occurrence.recurrence.frequency}${occurrence.recurrence.until ? ` until ${occurrence.recurrence.until}` : ''}`,
     });
   }
   if (occurrence.preparationTaskId) {
-    rows.push({
-      icon: <FileText size={15} className="shrink-0 text-ws-accent" aria-hidden="true" />,
-      label: 'Preparation task',
-      value: occurrence.preparationTaskId,
+    plainRows.push({
+      key: 'preparation',
+      icon: <FileText size={15} className="mt-0.5 shrink-0 text-ws-accent" aria-hidden="true" />,
+      value: `Linked preparation task (${occurrence.preparationTaskId})`,
     });
   }
   return (
-    <dl className={styles.detailScheduleList}>
-      {rows.map((row) => (
-        <div key={row.label} className={styles.detailScheduleRow}>
-          <dt className="inline-flex shrink-0 items-center gap-1.5 text-ws-text-muted">
-            {row.icon}
-            <span>{row.label}</span>
-          </dt>
-          <dd className="min-w-0 text-right font-medium text-ws-text tabular-nums">{row.value}</dd>
+    <div className="space-y-2.5 text-[length:var(--fs-small)]">
+      <dl className={styles.detailScheduleList}>
+        {scheduleRows.map((row) => (
+          <div key={row.label} className={styles.detailScheduleRow}>
+            <dt className="inline-flex shrink-0 items-center gap-1.5 text-ws-text-muted">
+              {row.icon}
+              <span>{row.label}</span>
+            </dt>
+            <dd className="min-w-0 text-right font-medium text-ws-text tabular-nums">
+              {row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {plainRows.map((row) => (
+        <div key={row.key} className="flex items-start gap-2 text-ws-text-muted">
+          {row.icon}
+          <span className="min-w-0 flex-1">{row.value}</span>
         </div>
       ))}
-    </dl>
+    </div>
   );
 }
 
@@ -120,10 +146,20 @@ export interface EventReaderProps {
   now: Date;
   onClose: () => void;
   onEdit: (occurrence: EventOccurrence) => void;
+  /** Lessons are managed from here, since they never appear in the Events dashboard. */
+  onCancelClass?: (occurrence: EventOccurrence) => void;
+  onDeleteClass?: (occurrence: EventOccurrence) => void;
 }
 
-/** Read-only full reader: complete formatted notes and metadata, with Edit and Close. */
-export function EventReader({ occurrence, now, onClose, onEdit }: EventReaderProps) {
+/** Full reader: complete formatted notes and metadata, with Edit and Close (plus class actions). */
+export function EventReader({
+  occurrence,
+  now,
+  onClose,
+  onEdit,
+  onCancelClass,
+  onDeleteClass,
+}: EventReaderProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   return (
     <EventsModal
@@ -148,6 +184,25 @@ export function EventReader({ occurrence, now, onClose, onEdit }: EventReaderPro
       footer={
         occurrence ? (
           <>
+            {occurrence.kind === 'class' ? (
+              <div className="mr-auto flex flex-wrap items-center gap-1.5">
+                {occurrence.status === 'active' && onCancelClass ? (
+                  <Button variant="ghost" size="sm" onClick={() => onCancelClass(occurrence)}>
+                    Cancel class
+                  </Button>
+                ) : null}
+                {onDeleteClass ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-text-overdue hover:bg-tint-overdue-bg"
+                    onClick={() => onDeleteClass(occurrence)}
+                  >
+                    Delete
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             <Button ref={closeRef} variant="secondary" size="sm" onClick={onClose}>
               Close
             </Button>

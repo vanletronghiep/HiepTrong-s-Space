@@ -316,33 +316,6 @@
   background: color-mix(in srgb, var(--feature-soft) 50%, white);
 }
 
-.pastEventsScroller {
-  max-height: 31rem;
-  overflow-y: auto;
-  padding-right: 0.35rem;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--feature-accent) 34%, var(--ws-border)) transparent;
-}
-
-.pastEventsScroller::-webkit-scrollbar {
-  display: block;
-  width: 6px;
-}
-
-.pastEventsScroller::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.pastEventsScroller::-webkit-scrollbar-thumb {
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--feature-accent) 34%, var(--ws-border));
-}
-
-.pastEventsScroller::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--feature-accent) 56%, var(--ws-border));
-}
-
 .draftCard {
   border-radius: var(--radius-item);
   border: 1px solid color-mix(in srgb, var(--ws-border) 82%, transparent);
@@ -374,15 +347,21 @@
   gap: 1rem;
 }
 
-/* Event titles: heavier than the thin display default for readability (v3.1 §6.1, §8.4). */
+/* Event titles in lists, highlights, and the calendar: heavier than the thin display default
+   for readability (v3.3). */
 .eventTitle,
 .eventTitleLarge,
 .eventTitleCompact {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ws-text);
   overflow-wrap: anywhere;
+}
+
+/* The Event Details pane keeps its original light weight (v3.3 revert of v3.1). */
+.eventTitleLarge {
+  font-weight: 400;
 }
 
 .eventTitle {

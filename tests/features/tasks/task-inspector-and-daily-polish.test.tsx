@@ -40,6 +40,8 @@ vi.mock('@/client/preferences', () => ({
   },
   getRouteLoadHistoryRaw: () => null,
   setRouteLoadHistoryRaw: () => {},
+  getActiveTaskRaw: () => null,
+  setActiveTaskRaw: () => {},
 }));
 
 vi.mock('@/client/queries/tasks', () => ({
@@ -55,6 +57,7 @@ vi.mock('@/client/queries/tasks', () => ({
   useUncompleteTask: () => ({ mutate: queryState.uncomplete, isPending: false }),
   useTransferTask: () => ({ mutateAsync: queryState.transfer, isPending: false }),
   useDeleteTask: () => ({ mutate: queryState.del, isPending: false }),
+  usePromoteSubtask: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('@/client/use-minute-ticker', () => ({

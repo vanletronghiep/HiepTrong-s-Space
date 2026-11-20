@@ -7,7 +7,7 @@ import {
   type FeatureCollectionLayout,
 } from '@/client/preferences';
 import type { CollectionRevealState } from '@/features/home/home-journey';
-import { FEATURE_REGISTRY } from '@/features/registry';
+import { VISIBLE_FEATURES } from '@/features/registry';
 import { HorizontalGallery } from './HorizontalGallery';
 import { VerticalGrid } from './VerticalGrid';
 import styles from './feature-collection.module.css';
@@ -15,7 +15,7 @@ import styles from './feature-collection.module.css';
 const FADE_OUT_MS = 150;
 const FADE_IN_MS = 170;
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
-const COLLECTION_FEATURES = FEATURE_REGISTRY.filter((feature) => feature.id !== 'tasks-hub');
+const COLLECTION_FEATURES = VISIBLE_FEATURES.filter((feature) => feature.id !== 'tasks-hub');
 
 type LayoutTransitionPhase = 'idle' | 'fading-out' | 'fading-in';
 

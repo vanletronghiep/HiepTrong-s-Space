@@ -234,8 +234,10 @@ export interface EventOccurrence {
   description: string | null;
   preparationTaskId: string | null;
   recurrence: EventRecurrence | null;
-  /** Timetable period index when this active-or-canceled class matches a period exactly. */
+  /** First timetable period when this class covers whole consecutive periods, else null. */
   period: number | null;
+  /** Last timetable period it covers (equals `period` for a single period). */
+  periodEnd: number | null;
   /** Class only: whether this occurrence comes from a weekly override. */
   isOverride: boolean;
   /** Class only: whether the series repeats weekly. */

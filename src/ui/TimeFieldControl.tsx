@@ -124,58 +124,69 @@ export function TimeFieldControl({
             style={{ zIndex: 'var(--z-toast)' }}
             className="w-[244px] rounded-card border border-ws-border bg-ws-surface p-3 text-ws-text shadow-popover outline-none"
           >
-            <AriaDialog aria-label="24-hour time entry" className="space-y-3 outline-none">
-              <I18nProvider locale="en-GB">
-                <div className="space-y-1">
-                  <span className="text-[length:var(--fs-micro)] font-medium text-ws-text-muted block">
-                    24-hour time (1-minute steps)
-                  </span>
-                  <AriaTimeField
-                    aria-label="24-hour time"
-                    hourCycle={24}
-                    granularity="minute"
-                    value={parsedTime ?? new Time(9, 0)}
-                    onChange={(nextTime) => {
-                      if (nextTime) {
-                        onChange(formatTimeValue(nextTime));
-                      }
-                    }}
-                  >
-                    <DateInput className="inline-flex w-full items-center justify-center gap-0.5 rounded-item border border-ws-border bg-[color-mix(in_srgb,var(--ws-bg)_45%,var(--ws-surface))] px-3 py-1.5 text-[length:var(--fs-body)] font-medium tabular-nums">
-                      {(segment) => (
-                        <DateSegment
-                          segment={segment}
-                          className="rounded-[4px] px-1 py-0.5 outline-none focus:bg-[var(--focus-tint-selected)] focus:text-ws-text data-[placeholder]:text-ws-text-muted"
-                        />
-                      )}
-                    </DateInput>
-                  </AriaTimeField>
-                </div>
-              </I18nProvider>
-
-              <div className="space-y-1.5">
-                <span className="text-[length:var(--fs-micro)] font-medium text-ws-text-muted block">
-                  Quick times
-                </span>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {TIME_PRESETS.map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => {
-                        onChange(preset);
-                        setOpen(false);
+            <AriaDialog aria-label="24-hour time entry" className="outline-none">
+              <div
+                className="space-y-3"
+                onKeyDown={(event) => {
+                  // Enter saves: the time is already applied live, so Enter just closes the popover.
+                  if (event.key === 'Enter' && !(event.target as HTMLElement).closest('button')) {
+                    event.preventDefault();
+                    setOpen(false);
+                  }
+                }}
+              >
+                <I18nProvider locale="en-GB">
+                  <div className="space-y-1">
+                    <span className="text-[length:var(--fs-micro)] font-medium text-ws-text-muted block">
+                      24-hour time (1-minute steps)
+                    </span>
+                    <AriaTimeField
+                      aria-label="24-hour time"
+                      hourCycle={24}
+                      granularity="minute"
+                      value={parsedTime ?? new Time(9, 0)}
+                      onChange={(nextTime) => {
+                        if (nextTime) {
+                          onChange(formatTimeValue(nextTime));
+                        }
                       }}
-                      className={cn(
-                        'rounded-sm border px-1.5 py-1 text-[length:var(--fs-micro)] tabular-nums cursor-pointer transition-colors duration-[var(--dur-fast)]',
-                        value === preset
-                          ? 'border-ws-accent bg-ws-accent-soft font-medium text-ws-text'
-                          : 'border-ws-border bg-ws-surface text-ws-text-muted hover:bg-ws-accent-soft hover:text-ws-text',
-                      )}
                     >
-                      {preset}
-                    </button>
-                  ))}
+                      <DateInput className="inline-flex w-full items-center justify-center gap-0.5 rounded-item border border-ws-border bg-[color-mix(in_srgb,var(--ws-bg)_45%,var(--ws-surface))] px-3 py-1.5 text-[length:var(--fs-body)] font-medium tabular-nums">
+                        {(segment) => (
+                          <DateSegment
+                            segment={segment}
+                            className="rounded-[4px] px-1 py-0.5 outline-none focus:bg-[var(--focus-tint-selected)] focus:text-ws-text data-[placeholder]:text-ws-text-muted"
+                          />
+                        )}
+                      </DateInput>
+                    </AriaTimeField>
+                  </div>
+                </I18nProvider>
+
+                <div className="space-y-1.5">
+                  <span className="text-[length:var(--fs-micro)] font-medium text-ws-text-muted block">
+                    Quick times
+                  </span>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {TIME_PRESETS.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => {
+                          onChange(preset);
+                          setOpen(false);
+                        }}
+                        className={cn(
+                          'rounded-sm border px-1.5 py-1 text-[length:var(--fs-micro)] tabular-nums cursor-pointer transition-colors duration-[var(--dur-fast)]',
+                          value === preset
+                            ? 'border-ws-accent bg-ws-accent-soft font-medium text-ws-text'
+                            : 'border-ws-border bg-ws-surface text-ws-text-muted hover:bg-ws-accent-soft hover:text-ws-text',
+                        )}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </AriaDialog>

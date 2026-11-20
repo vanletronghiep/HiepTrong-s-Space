@@ -1,0 +1,409 @@
+/* Notion-style editor surface. Colors and fonts come from design tokens. */
+.shell {
+  position: relative;
+  min-width: 0;
+}
+
+.fixedToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px dashed var(--ws-border);
+}
+
+.fixedToolbar button,
+.bubble button {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ws-text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.fixedToolbar button:hover,
+.bubble button:hover {
+  background: var(--feature-soft, var(--ws-accent-soft));
+}
+
+.fixedToolbar button[aria-pressed='true'],
+.bubble button[aria-pressed='true'] {
+  background: var(--feature-soft, var(--ws-accent-soft));
+  color: var(--feature-accent, var(--ws-accent));
+}
+
+.italicBtn {
+  font-family: var(--font-reading) !important;
+  font-style: italic;
+}
+
+.underlineBtn {
+  text-decoration: underline;
+}
+
+.strikeBtn {
+  text-decoration: line-through;
+}
+
+.toolbarHint {
+  margin-left: auto;
+  font-size: var(--fs-micro);
+  color: var(--ws-text-muted);
+}
+
+/* ProseMirror root */
+.prose {
+  min-height: 12rem;
+  outline: none;
+  caret-color: var(--writing-caret);
+  font-family: var(--font-reading);
+  font-size: 1.0625rem;
+  line-height: var(--lh-relaxed);
+  color: var(--feature-ink, var(--ws-text));
+  overflow-wrap: anywhere;
+}
+
+/* A gentler focus tint than form fields get: the whole page is the field here. */
+.shell .prose.prose:focus-visible {
+  background-color: color-mix(
+    in srgb,
+    var(--feature-soft, var(--ws-accent-soft)) 30%,
+    var(--ws-surface)
+  );
+}
+
+.reading {
+  font-size: 1.1875rem;
+  line-height: 1.75;
+  max-width: 62ch;
+}
+
+.reading > p:first-of-type::first-letter {
+  float: left;
+  padding: 0.35rem 0.5rem 0 0;
+  font-size: 3.4em;
+  line-height: 0.85;
+  font-weight: 600;
+  color: var(--feature-accent, var(--ws-accent));
+}
+
+.prose > * + * {
+  margin-top: 0.75rem;
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+  font-family: var(--font-reading);
+  font-weight: 600;
+  line-height: 1.2;
+  margin-top: 1.5rem;
+  text-wrap: balance;
+}
+
+.prose h1 {
+  font-size: 1.9rem;
+}
+
+.prose h2 {
+  font-size: 1.5rem;
+}
+
+.prose h3 {
+  font-size: 1.2rem;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.5rem;
+  margin-block: 0;
+}
+
+.prose li > p {
+  margin: 0;
+}
+
+.prose ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.25rem;
+}
+
+.prose ul[data-type='taskList'] li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+}
+
+.prose ul[data-type='taskList'] li > label {
+  flex: none;
+  padding-top: 0.3rem;
+}
+
+.prose ul[data-type='taskList'] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.prose ul[data-type='taskList'] li[data-checked='true'] > div {
+  color: var(--ws-text-muted);
+  text-decoration: line-through;
+}
+
+.prose ul[data-type='taskList'] input {
+  accent-color: var(--feature-accent, var(--ws-accent));
+}
+
+.prose blockquote {
+  margin-inline: 0;
+  padding-left: 1rem;
+  border-left: 3px solid var(--feature-accent, var(--ws-accent));
+  font-style: italic;
+  color: var(--feature-muted, var(--ws-text-muted));
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--ws-border);
+  margin-block: 1.25rem;
+}
+
+.prose a {
+  color: var(--text-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.prose mark {
+  background: var(--selection-bg);
+  color: inherit;
+  border-radius: 2px;
+  padding-inline: 1px;
+}
+
+.prose code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--feature-soft, var(--ws-accent-soft));
+  font-family: var(--font-ui);
+  font-size: 0.9em;
+}
+
+.prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-item);
+}
+
+.prose :global(.wr-callout) {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-item);
+  background: color-mix(in srgb, var(--feature-soft, var(--ws-accent-soft)) 80%, var(--ws-surface));
+  font-family: var(--font-ui);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-body);
+}
+
+.prose :global(.wr-callout) > * + * {
+  margin-top: var(--space-2);
+}
+
+.prose :global(.wr-page-link) {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--feature-soft, var(--ws-accent-soft));
+  color: var(--feature-accent, var(--ws-accent));
+  font-family: var(--font-ui);
+  font-size: 0.9em;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.prose :global(.wr-page-link):hover {
+  text-decoration: underline;
+}
+
+.prose details {
+  display: flex;
+  gap: 0.4rem;
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+}
+
+.prose details > button {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ws-text-muted);
+  cursor: pointer;
+}
+
+.prose details > button::before {
+  content: '▸';
+}
+
+.prose details.is-open > button::before {
+  content: '▾';
+}
+
+.prose details > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.prose details > div > [data-type='detailsContent'] {
+  display: none;
+  margin-top: 0.5rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--ws-border);
+}
+
+.prose details.is-open > div > [data-type='detailsContent'] {
+  display: block;
+}
+
+.prose :global(p.is-editor-empty:first-child)::before,
+.prose :global(.is-empty)::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--ws-text-muted);
+  opacity: 0.8;
+}
+
+/* Floating pieces */
+.bubble {
+  position: fixed;
+  z-index: var(--z-popover);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--radius-item);
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  box-shadow: var(--shadow-task-hover);
+}
+
+.bubble form {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.bubble input,
+.inlineForm input {
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--feature-soft, var(--ws-accent-soft));
+  color: var(--ws-text);
+  font-size: var(--fs-small);
+  min-width: 12rem;
+}
+
+.menu {
+  position: fixed;
+  z-index: var(--z-popover);
+  display: grid;
+  gap: 2px;
+  width: min(19rem, calc(100% - 16px));
+  max-height: 20rem;
+  overflow-y: auto;
+  padding: var(--space-1);
+  border-radius: var(--radius-card);
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  box-shadow: var(--shadow-task-hover);
+  font-family: var(--font-ui);
+}
+
+.menuLabel {
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: var(--ls-support);
+  text-transform: none;
+  color: var(--ws-text-muted);
+}
+
+.menuItem {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-item);
+  background: transparent;
+  color: var(--ws-text);
+  font-size: var(--fs-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem small {
+  display: block;
+  font-size: var(--fs-micro);
+  color: var(--ws-text-muted);
+}
+
+.menuItemActive {
+  background: var(--feature-soft, var(--ws-accent-soft));
+}
+
+.menuGlyph {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--ws-border);
+  border-radius: var(--radius-sm);
+  background: var(--ws-surface);
+  font-family: var(--font-reading);
+  font-weight: 600;
+}
+
+.inlineForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--fs-small);
+  color: var(--ws-text-muted);
+}
+
+.inlineForm button {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--feature-soft, var(--ws-accent-soft));
+  color: var(--ws-text);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fixedToolbar button,
+  .bubble button {
+    transition: none;
+  }
+}

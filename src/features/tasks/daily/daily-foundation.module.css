@@ -187,6 +187,20 @@
 .titleActions > div {
   max-width: 100%;
 }
+@media (min-width: 701px) {
+  /* Keep date range, view toggle and Observatory on the title row; the date label shrinks first. */
+  .titleActions {
+    flex-wrap: nowrap;
+    flex: 0 1 auto;
+  }
+  .titleActions > :not(.dateNav) {
+    flex: none;
+  }
+  .dateNav {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+}
 .dateNav {
   display: inline-grid;
   grid-template-columns: auto minmax(0, var(--date-nav-label-w, 152px)) auto;
@@ -235,9 +249,7 @@
   border-radius: var(--radius-card);
 }
 .forecast::before,
-.progress::before,
-.arc::before,
-.arc::after {
+.progress::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -341,18 +353,6 @@
 .arc {
   min-height: 123px;
   padding: 12px 19px 7px;
-}
-.arc::before {
-  background-image: url('/visuals/daily-v2/celestial-coordinate-rule.svg');
-  background-position: center bottom -14px;
-  background-size: min(100%, 720px) auto;
-  opacity: 0.45;
-}
-.arc::after {
-  background-image: url('/visuals/daily-v2/moon-phase-divider.svg');
-  background-position: center top 5px;
-  background-size: clamp(125px, 19%, 240px) auto;
-  opacity: 0.56;
 }
 .arcHeader {
   flex-wrap: wrap;
@@ -471,10 +471,6 @@
     height: 66px;
     margin-inline: 14px;
   }
-  .arc::after {
-    background-position: center top 23px;
-    background-size: 130px auto;
-  }
   .nebulaBank {
     opacity: 0.55;
   }
@@ -513,6 +509,226 @@
     transition: none;
   }
   .topbarBackdrop {
+    transition: none;
+  }
+}
+
+/* Active task (v3.4): same card footprint as the former forecast card. */
+.eyebrowUpper {
+  font-variant-caps: normal;
+  
+}
+.forecastStar {
+  position: relative;
+}
+.activeRing {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.activeBody {
+  display: grid;
+  min-width: 0;
+  row-gap: 1px;
+}
+.activeTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 22px;
+}
+.activeTitle:focus-visible {
+  outline: none;
+  background: var(--daily-pill);
+}
+.activeTitle {
+  min-width: 0;
+  max-width: calc(100% - 150px);
+  justify-self: start;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  color: var(--ws-text);
+  cursor: pointer;
+  font-size: var(--fs-ui);
+  font-weight: 600;
+  line-height: 1.42;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activeHint {
+  margin: 0 56px 0 0;
+  overflow: hidden;
+  color: var(--ws-text);
+  font-size: var(--fs-ui);
+  font-weight: 400;
+  line-height: 1.42;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Big round + at the far right of the empty card. */
+.activeAdd {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 1px solid var(--daily-card-line);
+  border-radius: 50%;
+  background: var(--ws-surface);
+  color: var(--daily-heading-accent);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.activeAdd:hover,
+.activeAdd[aria-expanded='true'] {
+  background: var(--daily-pill);
+}
+.activeAdd:focus-visible {
+  outline: none;
+  background: var(--daily-pill);
+}
+/* Plain dropdown inside the card: it scrolls with the page instead of floating over it. */
+.activePicker {
+  position: absolute;
+  z-index: 5;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--daily-card-line);
+  border-radius: var(--radius-card);
+  background: var(--ws-surface);
+  box-shadow: var(--shadow-popover);
+}
+/* Active task: duration lives in the small circle; the ring is the progress bar. */
+.orbInput {
+  position: relative;
+  width: 34px;
+  height: 22px;
+  margin-top: -6px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ws-text);
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: lining-nums;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.orbInput::-webkit-outer-spin-button,
+.orbInput::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.orbInput:focus,
+.orbInput:focus-visible {
+  outline: none;
+  border-radius: 6px;
+  background: var(--daily-pill);
+}
+.orbUnit {
+  position: absolute;
+  bottom: 9px;
+  left: 0;
+  right: 0;
+  color: var(--ws-text-muted);
+  font-size: 9px;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+.activeTrack {
+  stroke: var(--daily-card-line);
+}
+.activeArc {
+  stroke: var(--daily-violet);
+  transition:
+    stroke-dashoffset 1s linear,
+    stroke var(--dur-base, 0.3s) var(--ease);
+}
+.activeArcOver {
+  stroke: var(--daily-planet-urgent);
+}
+/* Filled Start button so it reads as the primary action. */
+.activeBig.activeStart {
+  border-color: var(--daily-accent);
+  background: var(--daily-accent);
+  color: var(--ws-surface);
+}
+.activeBig.activeStart:hover {
+  background: var(--daily-heading-accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .activeArc {
+    transition: none;
+  }
+}
+/* Cancel / complete / start cluster at the far right of an active card. */
+.activeActions {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateY(-50%);
+}
+.activeBig {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--daily-card-line);
+  border-radius: 50%;
+  background: var(--ws-surface);
+  color: var(--daily-heading-accent);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.activeBig:hover {
+  background: var(--daily-pill);
+}
+.activeSmall {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--daily-card-line);
+  border-radius: 50%;
+  background: var(--ws-surface);
+  color: var(--ws-text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.activeSmall:hover {
+  background: var(--daily-pill);
+  color: var(--daily-heading-accent);
+}
+.activeBig:focus-visible,
+.activeSmall:focus-visible {
+  outline: none;
+  background: var(--daily-pill);
+}
+@media (prefers-reduced-motion: reduce) {
+  .activeBig,
+  .activeSmall {
     transition: none;
   }
 }

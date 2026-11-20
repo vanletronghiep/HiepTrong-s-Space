@@ -156,6 +156,10 @@ export class NotificationService {
       if (record.createdAt <= cutoffIso) {
         continue;
       }
+      // v4.2: completion no longer notifies; hide legacy 'completed' rows until retention purges them.
+      if (record.kind === 'completed') {
+        continue;
+      }
       const linkedTask = record.taskId ? (taskMap.get(record.taskId) ?? null) : null;
       const source = record.payload?.sourceKey ? sources.get(record.payload.sourceKey) : undefined;
       const dto = buildNotificationDto({

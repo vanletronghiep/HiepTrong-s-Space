@@ -292,7 +292,9 @@ export function noteMarkdownToProseMirrorJson(markdown: string): ProseMirrorNode
   return { type: 'doc', content };
 }
 
-function proseMirrorInlineNodesToLines(nodes: ProseMirrorNodeJson[] | undefined): NoteTextSegment[][] {
+function proseMirrorInlineNodesToLines(
+  nodes: ProseMirrorNodeJson[] | undefined,
+): NoteTextSegment[][] {
   if (!nodes || nodes.length === 0) {
     return [[]];
   }
@@ -376,7 +378,12 @@ export function extractNotePlainText(markdown: string): string {
   for (const block of document.blocks) {
     if (block.type === 'paragraph') {
       const lineTexts = block.lines
-        .map((segments) => segments.map((s) => s.text).join('').trim())
+        .map((segments) =>
+          segments
+            .map((s) => s.text)
+            .join('')
+            .trim(),
+        )
         .filter((line) => line.length > 0);
       if (lineTexts.length > 0) {
         blockTexts.push(lineTexts.join('\n'));
@@ -385,7 +392,12 @@ export function extractNotePlainText(markdown: string): string {
       const itemTexts = block.items
         .map((itemLines) =>
           itemLines
-            .map((segments) => segments.map((s) => s.text).join('').trim())
+            .map((segments) =>
+              segments
+                .map((s) => s.text)
+                .join('')
+                .trim(),
+            )
             .filter((line) => line.length > 0)
             .join(' '),
         )

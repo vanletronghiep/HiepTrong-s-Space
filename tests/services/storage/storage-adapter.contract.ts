@@ -21,6 +21,10 @@ function makeTask(overrides: Partial<TaskRecord> = {}): TaskRecord {
     completedAt: overrides.completedAt ?? null,
     reminderAt:
       overrides.reminderAt === undefined ? '2026-10-29T16:59:00.000Z' : overrides.reminderAt,
+    repeatWeekly: overrides.repeatWeekly ?? false,
+    repeatUntil: overrides.repeatUntil ?? null,
+    subtasks: overrides.subtasks ?? [],
+    transferCount: overrides.transferCount ?? 0,
     createdAt: overrides.createdAt ?? '2026-10-28T03:00:00.000Z',
     updatedAt: overrides.updatedAt ?? '2026-10-28T03:00:00.000Z',
   };

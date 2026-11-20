@@ -69,7 +69,18 @@ export function buildNotificationDto(options: {
   const isRead = record.readAt !== null;
 
   if (record.payload?.sourceKey && record.payload.deadlineAt) {
-    return { id: record.id, kind: record.kind, tagLabel, title: record.payload.title ?? tagLabel, message: record.payload.message ?? '', isRead, createdAt: record.createdAt, timeLeftMs: Date.parse(record.payload.deadlineAt) - now.getTime(), taskId: null, targetUrl: record.payload.targetUrl ?? null };
+    return {
+      id: record.id,
+      kind: record.kind,
+      tagLabel,
+      title: record.payload.title ?? tagLabel,
+      message: record.payload.message ?? '',
+      isRead,
+      createdAt: record.createdAt,
+      timeLeftMs: Date.parse(record.payload.deadlineAt) - now.getTime(),
+      taskId: null,
+      targetUrl: record.payload.targetUrl ?? null,
+    };
   }
 
   if (record.kind === 'general' || record.kind === 'system') {
